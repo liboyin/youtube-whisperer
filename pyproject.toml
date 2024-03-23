@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "youtube_whisperer"
+version = "0.0.1"
+description = "Download video and run speech recognition"
+requires-python = ">=3.11"
+authors = [
+  {name = "Libo Yin", email = "liboyin830@gmail.com"}
+]
+dependencies = [
+  "ctranslate2",
+  "faster-whisper",
+  "ffmpeg-python"
+]
