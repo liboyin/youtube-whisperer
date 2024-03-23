@@ -1,0 +1,6 @@
+ctranslate2
+faster-whisper
+ffmpeg-python
+pytest
+pytest-cov
+pytest-randomly
