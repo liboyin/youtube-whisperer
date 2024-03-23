@@ -17,7 +17,7 @@ def get_default_whisper_model_parameters() -> dict[str, Any]:
     Returns:
         dict: A dictionary containing the parameters for the WhisperModel.
     """
-    result = {
+    result: dict[str, Any] = {
         "model_size_or_path": os.getenv("ASR_MODEL", "large-v3"),
         "download_root": os.getenv("ASR_MODEL_PATH", str(Path.home() / ".cache" / "whisper")),
     }
