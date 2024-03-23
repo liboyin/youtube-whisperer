@@ -1,5 +1,5 @@
 import pytest
-from deduplicate_srt import SrtBlock, yield_stripped_lines, yield_srt_blocks, deduplicate_srt_blocks
+from youtube_whisperer.deduplicate_srt import SrtBlock, yield_stripped_lines, yield_srt_blocks, deduplicate_srt_blocks
 from pathlib import Path
 from textwrap import dedent
 
@@ -61,8 +61,8 @@ def test_main_function(tmp_path: Path):
         """))
     
     # Assuming main function is adjusted to accept Path object and return modified data as string for testing
-    from deduplicate_srt import main
-    main(test_file)  # This needs to be adapted based on how main function is structured for testing
+    from youtube_whisperer.deduplicate_srt import deduplicate_single
+    deduplicate_single(test_file)  # This needs to be adapted based on how main function is structured for testing
     
     with test_file.open("r") as f:
         content = f.read()
