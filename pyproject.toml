@@ -15,3 +15,13 @@ dependencies = [
   "faster-whisper",
   "ffmpeg-python"
 ]
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_optional = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=. --cov-report html"
