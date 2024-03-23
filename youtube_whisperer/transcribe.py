@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from ctranslate2 import get_cuda_device_count
+import ctranslate2
 from faster_whisper import WhisperModel
 import numpy as np
 
@@ -21,15 +21,14 @@ def get_default_whisper_model_parameters() -> dict[str, Any]:
         "model_size_or_path": os.getenv("ASR_MODEL", "large-v3"),
         "download_root": os.getenv("ASR_MODEL_PATH", str(Path.home() / ".cache" / "whisper")),
     }
-    result["device"] = device = "cuda" if get_cuda_device_count() else "cpu"
+    is_cuda_available = ctranslate2.get_cuda_device_count() > 0
+    result["device"] = "cuda" if is_cuda_available else "cpu"
     # More about available quantization levels is here: https://opennmt.net/CTranslate2/quantization.html
-    if device == "cuda":
+    if is_cuda_available:
         result["compute_type"] = "float32"
-    elif device == "cpu":
+    else:
         result["compute_type"] = "int8"
         result["cpu_threads"] = multiprocessing.cpu_count()
-    else:
-        raise ValueError(f"Unknown device: {device}")
     return result
 
 
