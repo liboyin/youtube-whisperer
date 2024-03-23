@@ -118,7 +118,11 @@ def deduplicate_multi(dir_path: Path, recursive: bool = True) -> None:
     for file_path in file_iterator:
         deduplicate_single(file_path)
 
-if __name__ == '__main__':
+
+def main() -> None:
+    """
+    CLI entry point for deduplicating SRT files.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, help="SRT file path to read from and to write to, or a directory containing SRT files.")
     args = parser.parse_args()
@@ -129,3 +133,6 @@ if __name__ == '__main__':
         deduplicate_multi(p)
     else:
         raise FileNotFoundError(f"{p} is not a file or a directory")
+
+if __name__ == '__main__':
+    main()
