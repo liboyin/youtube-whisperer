@@ -3,10 +3,13 @@
         "dockerfile": "../Dockerfile"
     },
 	"remoteUser": "vscode",
+	"mounts": [
+		"source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.whisper,target=/home/vscode/.whisper,type=bind,consistency=cached"
+	],
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"eamodio.gitlens",
 				"github.copilot",
 				"github.copilot-chat",
 				"mhutchie.git-graph",
