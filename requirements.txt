@@ -5,3 +5,4 @@ pytest
 pytest-cov
 pytest-mock
 pytest-randomly
+yt_dlp

@@ -13,7 +13,8 @@ authors = [
 dependencies = [
   "ctranslate2",
   "faster-whisper",
-  "ffmpeg-python"
+  "ffmpeg-python",
+  "yt-dlp",
 ]
 
 [tool.mypy]
