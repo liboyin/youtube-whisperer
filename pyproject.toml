@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -15,6 +15,14 @@ dependencies = [
   "faster-whisper",
   "ffmpeg-python",
   "yt-dlp",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "pytest-mock",
+  "pytest-randomly",
 ]
 
 [tool.mypy]
