@@ -1,5 +1,27 @@
-import numpy as np
-from youtube_whisperer.transcribe import get_default_whisper_model_parameters, transcribe, transcribe_with_default_model
+import pytest
+
+from youtube_whisperer.transcribe import strtobool, get_default_whisper_model_parameters
+
+
+def test_strtobool_true():
+    assert strtobool('y') == True
+    assert strtobool('yes') == True
+    assert strtobool('t') == True
+    assert strtobool('true') == True
+    assert strtobool('on') == True
+    assert strtobool('1') == True
+
+def test_strtobool_false():
+    assert strtobool('n') == False
+    assert strtobool('no') == False
+    assert strtobool('f') == False
+    assert strtobool('false') == False
+    assert strtobool('off') == False
+    assert strtobool('0') == False
+
+def test_strtobool_invalid():
+    with pytest.raises(ValueError):
+        strtobool('invalid')
 
 
 def test_get_default_whisper_model_parameters_cpu(mocker):
