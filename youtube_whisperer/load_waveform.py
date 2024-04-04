@@ -7,9 +7,9 @@ import numpy as np
 DEFAULT_SAMPLE_RATE = 16000
 
 
-def load_waveform_from_io_stream(io: BinaryIO, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
+def load_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
     """
-    Load audio from a binary I/O stream and return it as a 1D float32 np.ndarray with a range of [-1, 1].
+    Load audio from a bytes object and return it as a 1D float32 np.ndarray with a range of [-1, 1].
 
     Simplified from https://github.com/openai/whisper/blob/main/whisper/audio.py
     
@@ -30,14 +30,21 @@ def load_waveform_from_io_stream(io: BinaryIO, sample_rate: int = DEFAULT_SAMPLE
     out, _ = (
         ffmpeg.input("pipe:", threads=0)
         .output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
-        .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True, input=io.read())
+        .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True, input=data)
     )
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768
 
 
+def load_waveform_from_io_stream(io: BinaryIO, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
+    """
+    Load audio from a binary I/O stream and return it as a 1D float32 np.ndarray with a range of [-1, 1].
+    """
+    return load_waveform_from_bytes(io.read(), sample_rate)
+
+
 def load_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
     """
-    Load audio from a file and return it as a 1D float32 np.ndarray with a range of [-1, 1].
+    Load audio from a binary file and return it as a 1D float32 np.ndarray with a range of [-1, 1].
     """
     with path.open("rb") as f:
         return load_waveform_from_io_stream(f, sample_rate)
