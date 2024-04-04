@@ -27,11 +27,10 @@ def load_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAMPLE_RATE
         "-"
     ]
     """
-    out, _ = (
-        ffmpeg.input("pipe:", threads=0)
-        .output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
-        .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True, input=data)
-    )
+    stream = ffmpeg.input("pipe:", threads=0).output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
+    print(f'ffmpeg args: {stream.get_args()}')
+    out, err = stream.run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True, input=data)
+    print(err.decode())
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768
 
 
@@ -48,4 +47,3 @@ def load_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) 
     """
     with path.open("rb") as f:
         return load_waveform_from_io_stream(f, sample_rate)
-    
