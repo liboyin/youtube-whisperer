@@ -1,31 +1,7 @@
 from pathlib import Path
-import pytest
 from unittest import mock
 
-from youtube_whisperer.transcribe import strtobool, get_default_cuda_flag, get_default_whisper_model_parameters
-
-
-def test_strtobool_true():
-    assert strtobool('y') == True
-    assert strtobool('yes') == True
-    assert strtobool('t') == True
-    assert strtobool('true') == True
-    assert strtobool('on') == True
-    assert strtobool('1') == True
-
-
-def test_strtobool_false():
-    assert strtobool('n') == False
-    assert strtobool('no') == False
-    assert strtobool('f') == False
-    assert strtobool('false') == False
-    assert strtobool('off') == False
-    assert strtobool('0') == False
-
-
-def test_strtobool_invalid():
-    with pytest.raises(ValueError):
-        strtobool('invalid')
+from youtube_whisperer.transcribe import get_default_cuda_flag, get_default_whisper_model_parameters
 
 
 @mock.patch('ctranslate2.get_cuda_device_count')

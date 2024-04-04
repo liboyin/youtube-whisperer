@@ -1,22 +1,8 @@
 from pathlib import Path
-import re
 
 import yt_dlp
 
-
-def remove_os_reserved_chars(text):
-    """
-    Removes OS reserved characters from the given text.
-
-    Should work on Windows, Linux, and macOS.
-
-    Args:
-        text (str): The input text.
-
-    Returns:
-        str: The modified text with reserved characters replaced by underscores.
-    """
-    return re.sub(r'[\\/*?:"<>|]', "_", text)
+from utils import remove_os_reserved_chars
 
 
 def get_video_title(url: str) -> str:
