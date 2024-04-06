@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yt_dlp
 
-from utils import remove_os_reserved_chars
+from utils import remove_os_reserved_chars, prepare_output_file
 
 
 def get_video_title(url: str) -> str:
@@ -23,17 +23,25 @@ def get_video_title(url: str) -> str:
         return ydl.extract_info(url, download=False)['title']
 
 
-def download_video(url: str, title: str) -> Path:
+def download_video(url: str, target_path: Path) -> None:
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
-        'outtmpl': f'{title}.%(ext)s',
+        'outtmpl': str(target_path),
         'verbose': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-    return Path(f'{title}.mp4')
 
 
-def download_video_with_default_title(url: str) -> Path:
+def download_video_with_default_title(url: str, target_dir: Path | None = None) -> Path:
+    if target_dir is None:
+        target_dir = Path.cwd()
     title = remove_os_reserved_chars(get_video_title(url))
-    return download_video(url, title)
+    target_path = prepare_output_file(target_dir / f'{title}.mp4')
+    download_video(url, target_path)
+    return target_path
+
+
+if __name__ == '__main__':
+    url = 'https://www.youtube.com/watch?v=8g18jFHCLXk'
+    download_video_with_default_title(url, Path.home() / '.whisperer')
