@@ -6,20 +6,27 @@ from faster_whisper.utils import format_timestamp
 import numpy as np
 
 from model_parameters import get_default_whisper_model_parameters
+from deduplicate_srt import SrtBlock, deduplicate_srt_blocks
 
 
-def yield_segments(generator: Iterable[Segment]) -> Generator[Segment, None, None]:
+def yield_srt_blocks(segments: Iterable[Segment]) -> Generator[SrtBlock, None, None]:
     """
-    Yield segments from the given transcription generator.
+    Generate SrtBlock objects from an iterable of segments.
     """
-    for segment in generator:
-        print(f'{segment.id} {format_timestamp(segment.start)} -> {format_timestamp(segment.end)}: {segment.text}')
-        yield segment
+    for segment in segments:
+        print(segment)
+        result = SrtBlock(
+            format_timestamp(segment.start),
+            format_timestamp(segment.end),
+            segment.text.strip().split('\n'),
+        )
+        print(result)
+        yield result
 
 
 def get_transcription_generator(model: WhisperModel, waveform: np.ndarray, language: str) -> Iterable[Segment]:
     """
-    Generates transcriptions for the given waveform using the specified Whisper model.
+    Return a transcription generator for the given waveform using the specified Whisper model.
 
     Args:
         model (WhisperModel): The Whisper model used for transcription.
@@ -27,14 +34,14 @@ def get_transcription_generator(model: WhisperModel, waveform: np.ndarray, langu
         language (str): The language of the transcription.
 
     Returns:
-        Iterable[Segment]: A generator that yields Segments of the transcription.
+        Iterable[Segment]: An iterable of Segments of the transcription.
     """
-    generator, info = model.transcribe(waveform, beam_size=5, task='transcribe', language=language)
+    segments, info = model.transcribe(waveform, beam_size=5, task='transcribe', language=language)
     print(info)
-    return generator
+    return segments
 
 
-def transcribe(model: WhisperModel, waveform: np.ndarray, language: str) -> list[Segment]:
+def transcribe(model: WhisperModel, waveform: np.ndarray, language: str) -> list[SrtBlock]:
     """
     Transcribe the given waveform using the provided WhisperModel.
 
@@ -44,12 +51,12 @@ def transcribe(model: WhisperModel, waveform: np.ndarray, language: str) -> list
         language (str): The language of the waveform.
 
     Returns:
-        list[Segment]: Segments of the transcription.
+        list[SrtBlock]: Transcription of the waveform as a list of SRT blocks.
     """
-    return list(yield_segments(get_transcription_generator(model, waveform, language)))
+    return deduplicate_srt_blocks(yield_srt_blocks(get_transcription_generator(model, waveform, language)))
 
 
-def transcribe_with_default_model(waveform: np.ndarray, language: str) -> list[Segment]:
+def transcribe_with_default_model(waveform: np.ndarray, language: str) -> list[SrtBlock]:
     """
     Transcribe the given waveform using the default WhisperModel.
 
@@ -58,7 +65,7 @@ def transcribe_with_default_model(waveform: np.ndarray, language: str) -> list[S
         language (str): The language of the waveform.
 
     Returns:
-        list[Segment]: Segments of the transcription.
+        list[SrtBlock]: Transcription of the waveform as a list of SRT blocks.
     """
     model = WhisperModel(**get_default_whisper_model_parameters())
     return transcribe(model, waveform, language)
