@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator, Iterable, Self
 
-ARROW = ' --> '
+ARROW = '-->'
 
 @dataclass
 class SrtBlock:
@@ -24,7 +24,7 @@ class SrtBlock:
         :return: An instance of SrtBlock.
         """
         assert len(lines) >= 3, lines
-        start_time, end_time = lines[1].split(ARROW, maxsplit=1)
+        start_time, end_time = list(map(str.strip, lines[1].split(ARROW)))
         return cls(start_time, end_time, lines[2:])
 
     def to_lines(self, line_number: int, trailing_new_line: bool = True) -> list[str]:
@@ -37,7 +37,7 @@ class SrtBlock:
         """
         result = [
             str(line_number),
-            ''.join([self.start_time, ARROW, self.end_time]),
+            ''.join([self.start_time, ' ', ARROW, ' ', self.end_time]),
         ] + self.content
         if trailing_new_line:
             result.append('\n')
