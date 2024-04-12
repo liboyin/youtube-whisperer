@@ -52,7 +52,7 @@ def test_get_default_whisper_model_parameters_with_env_var_cuda(monkeypatch):
 
 
 def test_get_default_whisper_model_parameters_without_env_var_cpu(mocker):
-    mocker.patch('youtube_whisperer.transcribe.get_default_cuda_flag', return_value=False)
+    mocker.patch('youtube_whisperer.model_parameters.get_default_cuda_flag', return_value=False)
     mocker.patch('pathlib.Path.home', return_value=Path("/test"))
     mocker.patch('multiprocessing.cpu_count', return_value=8)
     assert get_default_whisper_model_parameters() == {
@@ -65,7 +65,7 @@ def test_get_default_whisper_model_parameters_without_env_var_cpu(mocker):
 
 
 def test_get_default_whisper_model_parameters_without_env_var_cuda(mocker):
-    mocker.patch('youtube_whisperer.transcribe.get_default_cuda_flag', return_value=True)
+    mocker.patch('youtube_whisperer.model_parameters.get_default_cuda_flag', return_value=True)
     mocker.patch('pathlib.Path.home', return_value=Path("/test"))
     assert get_default_whisper_model_parameters() == {
         "model_size_or_path": "large-v3",
