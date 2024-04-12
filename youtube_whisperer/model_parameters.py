@@ -5,7 +5,7 @@ from typing import Any
 
 import ctranslate2
 
-from utils import strtobool
+from .utils import strtobool
 
 
 def get_default_cuda_flag() -> bool:
