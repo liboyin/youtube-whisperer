@@ -2,7 +2,8 @@ from pathlib import Path
 
 import yt_dlp
 
-from utils import remove_os_reserved_chars, prepare_output_file
+from pathlib_extensions import prepare_output_file
+from utils import remove_os_reserved_chars
 
 
 def get_video_title(url: str) -> str:
