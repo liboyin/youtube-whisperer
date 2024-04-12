@@ -6,7 +6,7 @@ from faster_whisper.utils import format_timestamp
 import numpy as np
 
 from model_parameters import get_default_whisper_model_parameters
-from deduplicate_srt import SrtBlock, deduplicate_srt_blocks
+from srt_deduplicator import SrtBlock, deduplicate_srt_blocks
 
 
 def yield_srt_blocks(segments: Iterable[Segment]) -> Generator[SrtBlock, None, None]:

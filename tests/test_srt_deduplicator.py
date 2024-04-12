@@ -1,4 +1,4 @@
-from youtube_whisperer.deduplicate_srt import (
+from youtube_whisperer.srt_deduplicator import (
     SrtBlock,
     yield_stripped_lines,
     yield_srt_blocks,
@@ -86,6 +86,6 @@ def test_deduplicate_single(temp_srt_file: Path):
 
 def test_deduplicate_multi(temp_srt_file: Path):
     temp_dir_path = temp_srt_file.parent
-    with mock.patch('youtube_whisperer.deduplicate_srt.deduplicate_single') as mock_deduplicate_single:
+    with mock.patch('youtube_whisperer.srt_deduplicator.deduplicate_single') as mock_deduplicate_single:
         deduplicate_multi(temp_dir_path, recursive=False)
     assert mock_deduplicate_single.call_count == 1
