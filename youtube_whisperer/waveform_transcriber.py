@@ -9,7 +9,7 @@ from model_parameters import get_default_whisper_model_parameters
 from srt_deduplicator import SrtBlock, deduplicate_srt_blocks
 
 
-def yield_srt_blocks(segments: Iterable[Segment]) -> Generator[SrtBlock, None, None]:
+def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Generator[SrtBlock, None, None]:
     """
     Generate SrtBlock objects from an iterable of segments.
     """
@@ -41,7 +41,7 @@ def get_transcription_generator(model: WhisperModel, waveform: np.ndarray, langu
     return segments
 
 
-def transcribe(model: WhisperModel, waveform: np.ndarray, language: str) -> list[SrtBlock]:
+def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, language: str) -> list[SrtBlock]:
     """
     Transcribe the given waveform using the provided WhisperModel.
 
@@ -53,10 +53,10 @@ def transcribe(model: WhisperModel, waveform: np.ndarray, language: str) -> list
     Returns:
         list[SrtBlock]: Transcription of the waveform as a list of SRT blocks.
     """
-    return deduplicate_srt_blocks(yield_srt_blocks(get_transcription_generator(model, waveform, language)))
+    return deduplicate_srt_blocks(yield_srt_blocks_from_segments(get_transcription_generator(model, waveform, language)))
 
 
-def transcribe_with_default_model(waveform: np.ndarray, language: str) -> list[SrtBlock]:
+def transcribe_waveform_with_default_model(waveform: np.ndarray, language: str) -> list[SrtBlock]:
     """
     Transcribe the given waveform using the default WhisperModel.
 
@@ -68,4 +68,4 @@ def transcribe_with_default_model(waveform: np.ndarray, language: str) -> list[S
         list[SrtBlock]: Transcription of the waveform as a list of SRT blocks.
     """
     model = WhisperModel(**get_default_whisper_model_parameters())
-    return transcribe(model, waveform, language)
+    return transcribe_waveform(model, waveform, language)
