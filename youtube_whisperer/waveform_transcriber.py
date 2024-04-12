@@ -1,27 +1,12 @@
-from typing import Iterable, Generator
+from typing import Iterable
 
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
-from faster_whisper.utils import format_timestamp
 import numpy as np
 
 from .model_parameters import get_default_whisper_model_parameters
+from .segment_to_srt_adaptor import yield_srt_blocks_from_segments
 from .srt_deduplicator import SrtBlock, deduplicate_srt_blocks
-
-
-def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Generator[SrtBlock, None, None]:
-    """
-    Generate SrtBlock objects from an iterable of segments.
-    """
-    for segment in segments:
-        print(segment)
-        result = SrtBlock(
-            format_timestamp(segment.start),
-            format_timestamp(segment.end),
-            segment.text.strip().split('\n'),
-        )
-        print(result)
-        yield result
 
 
 def get_transcription_generator(model: WhisperModel, waveform: np.ndarray, language: str) -> Iterable[Segment]:
