@@ -2,8 +2,8 @@ from pathlib import Path
 
 import yt_dlp
 
-from .pathlib_extensions import prepare_output_file
-from .utils import remove_os_reserved_chars
+from youtube_whisperer.pathlib_extensions import prepare_output_file
+from youtube_whisperer.utils import remove_os_reserved_chars
 
 
 def get_video_title(url: str) -> str:

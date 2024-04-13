@@ -4,9 +4,9 @@ from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
 import numpy as np
 
-from .model_parameters import get_default_whisper_model_parameters
-from .segment_to_srt_adaptor import yield_srt_blocks_from_segments
-from .srt_deduplicator import SrtBlock, deduplicate_srt_blocks
+from youtube_whisperer.model_parameters import get_default_whisper_model_parameters
+from youtube_whisperer.segment_to_srt_adaptor import yield_srt_blocks_from_segments
+from youtube_whisperer.srt_deduplicator import SrtBlock, deduplicate_srt_blocks
 
 
 def get_transcription_generator(model: WhisperModel, waveform: np.ndarray, language: str, **kwargs) -> Iterable[Segment]:

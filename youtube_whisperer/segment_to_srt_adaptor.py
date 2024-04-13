@@ -5,8 +5,8 @@ from typing import Iterable, Generator
 from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
 
-from .pathlib_extensions import prepare_output_file
-from .srt_deduplicator import SrtBlock, yield_lines_from_srt_blocks
+from youtube_whisperer.pathlib_extensions import prepare_output_file
+from youtube_whisperer.srt_deduplicator import SrtBlock, yield_lines_from_srt_blocks
 
 
 def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:
