@@ -1,6 +1,36 @@
+from pathlib import Path
+
 import pytest
 
-from youtube_whisperer.pathlib_extensions import prepare_output_file, NotAFileError, SuffixError
+from youtube_whisperer.pathlib_extensions import NotAFileError, SuffixError, prepare_input_file, prepare_output_file
+
+
+def test_prepare_input_file_valid():
+    assert prepare_input_file(__file__) == Path(__file__)
+
+
+def test_prepare_input_file_invalid():
+    with pytest.raises(NotAFileError):
+        prepare_input_file(Path.cwd())
+
+
+def test_prepare_input_file_not_found():
+    with pytest.raises(FileNotFoundError):
+        prepare_input_file('file/that/does/not/exist')
+
+
+def test_prepare_input_file_check_suffix():
+    with pytest.raises(SuffixError):
+        prepare_input_file(__file__, check_suffix='.txt')
+
+
+def test_prepare_input_file_with_suffix():
+    assert prepare_input_file(__file__, with_suffix='.py') == Path(__file__)
+
+
+def test_prepare_input_file_invalid_argument():
+    with pytest.raises(ValueError):
+        prepare_input_file(__file__, check_suffix='.txt', with_suffix='.txt')
 
 
 def test_prepare_output_file_valid(tmp_path):
