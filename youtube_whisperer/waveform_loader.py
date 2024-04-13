@@ -21,13 +21,20 @@ def load_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAMPLE_RATE
         "-ac", "1",  # downmix to mono channel
         "-acodec", "pcm_s16le",  # PCM (Pulse-code Modulation) signed 16-bit little-endian
         "-ar", str(sr),  # sample rate
-        "-"  # output to stdout instead of a file
+        "-"  # output to stdout instead of a file, same as pipe:
     ]
     """
-    stream = ffmpeg.input("pipe:", threads=0).output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
+    stream = (
+        ffmpeg
+        .input("pipe:", threads=0)
+        .output("pipe:", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
+    )
     print(f'ffmpeg args: {stream.get_args()}')
-    out, err = stream.run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True, input=data)
-    print(err.decode())
+    try:
+        out, err = stream.run(input=data, capture_stdout=True, capture_stderr=True)
+    except ffmpeg.Error as e:
+        print(e.stderr.decode())
+        raise
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768
 
 
@@ -36,3 +43,7 @@ def load_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) 
     Load audio from a binary file and return it as a 1D float32 np.ndarray with a range of [-1, 1].
     """
     return load_waveform_from_bytes(path.read_bytes(), sample_rate)
+
+
+if __name__ == '__main__':
+    print(len(load_waveform_from_file(Path.home() / '.whisper/test.mp4')))
