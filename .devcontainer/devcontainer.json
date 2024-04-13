@@ -1,30 +1,30 @@
 {
-	"build": {
+    "build": {
         "dockerfile": "../Dockerfile"
     },
-	"remoteUser": "vscode",
-	"mounts": [
-		"source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
-		"source=${localEnv:HOME}/.whisper,target=/home/vscode/.whisper,type=bind,consistency=cached"
-	],
-	"postCreateCommand": "chmod +x .devcontainer/postCreateCommand.sh && ./.devcontainer/postCreateCommand.sh",
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"charliermarsh.ruff",
-				"github.copilot",
-				"github.copilot-chat",
-				"mhutchie.git-graph",
-				"ms-azuretools.vscode-docker",
-				"ms-python.debugpy",
-				"ms-python.python",
-				"ms-python.vscode-pylance",
-				"ryu1kn.partial-diff",
-				"streetsidesoftware.code-spell-checker",
-				"tamasfe.even-better-toml",
-				"visualstudioexptteam.intellicode-api-usage-examples",
-				"visualstudioexptteam.vscodeintellicode",
-			]
-		}
-	}
+    "remoteUser": "vscode",
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.whisper,target=/home/vscode/.whisper,type=bind,consistency=cached"
+    ],
+    "postCreateCommand": "chmod +x .devcontainer/postCreateCommand.sh && ./.devcontainer/postCreateCommand.sh",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "github.copilot",
+                "github.copilot-chat",
+                "mhutchie.git-graph",
+                "ms-azuretools.vscode-docker",
+                "ms-python.debugpy",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ryu1kn.partial-diff",
+                "streetsidesoftware.code-spell-checker",
+                "tamasfe.even-better-toml",
+                "visualstudioexptteam.intellicode-api-usage-examples",
+                "visualstudioexptteam.vscodeintellicode"
+            ]
+        }
+    }
 }
