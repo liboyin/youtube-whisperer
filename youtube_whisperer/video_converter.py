@@ -5,36 +5,20 @@ import ffmpeg
 from youtube_whisperer.pathlib_extensions import prepare_output_file
 
 
-def encode_video_from_bytes(data: bytes) -> bytes:
+def encode_video_from_file(input_file: Path, output_file: Path | None = None) -> Path:
     """
-    Encode a video from a bytes object with NVENC H.264 video codec and AAC audio codec.
+    Encode a video file to MP4 with H.264 video codec and AAC audio codec.
 
     cmd = [
         'ffmpeg',
         '-i', input_file,
-        '-c:v', 'h264_nvenc',  # set video codec to NVENC H.264
-        '-cq', '27',  # set constant quality level to 27
-        '-c:a', 'aac',  # set audio codec to AAC
-        '-b:a', '160k',  # set audio bitrate to 160 kbps
-        '-ac', '2',  # set audio channel to stereo
-        '-f', 'mp4',  # save output in an MP4 container
-        "-"  # output to stdout instead of a file
+        '-c:v', 'libx264',  # sets video codec to H.264
+        '-c:a', 'aac',  # sets audio codec to AAC
+        '-b:a', '160k',  # sets audio bitrate to 160 kbps
+        '-ac', '2',  # sets audio channel to stereo
+        '-f', 'mp4',  # saves output in an MP4 container
+        '-'  # output to stdout instead of a file
     ]
-    """
-    stream = (
-        ffmpeg
-        .input('pipe:', format='mp4')
-        .output('pipe:', vcodec='h264_nvenc', cq=27, acodec='aac', audio_bitrate='160k', ac=2, format='mp4')
-    )
-    print(f'ffmpeg args: {stream.get_args()}')
-    out, err = stream.run(input=data, capture_stdout=True, capture_stderr=True)
-    print(err.decode())
-    return out
-
-
-def encode_video_from_file(input_file: Path, output_file: Path | None = None) -> Path:
-    """
-    Encode a video from a file to an MP4 file with NVENC H.264 video codec and AAC audio codec.
 
     Args:
         input_file (Path): The path to the input video file.
@@ -45,6 +29,24 @@ def encode_video_from_file(input_file: Path, output_file: Path | None = None) ->
     """
     if output_file is None:
         output_file = input_file.with_suffix('.mp4')
-    result = encode_video_from_bytes(input_file.read_bytes())
-    prepare_output_file(output_file).write_bytes(result)
+    assert input_file != output_file
+    output_file = prepare_output_file(output_file)
+    stream = (
+        ffmpeg
+        .input(str(input_file), threads=0)
+        # TODO: output target must be seekable. Is it possible to use a buffer instead of a file?
+        .output(str(output_file), vcodec='libx264', acodec='aac', audio_bitrate='160k', ac=2, format='mp4')
+    )
+    print(f'ffmpeg args: {stream.get_args()}')
+    try:
+        stream.run(input=input_file.read_bytes(), capture_stdout=True, capture_stderr=True, overwrite_output=True)
+    except ffmpeg.Error as e:
+        print(e.stderr.decode())
+        raise
     return output_file
+
+
+if __name__ == '__main__':
+    input_file = Path.home() / '.whisper/test.mp4'
+    output_file = Path.home() / '.whisper/test.out.mp4'
+    encode_video_from_file(input_file, output_file)
