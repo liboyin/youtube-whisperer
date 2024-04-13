@@ -38,7 +38,7 @@ class SrtBlock:
             ''.join([self.start_time, ' ', ARROW, ' ', self.end_time]),
         ]
         result.extend(self.content)
-        result.append('\n')
+        result.append('')  # there must be an empty line at the end of each block, including the last one
         return result
 
 
@@ -93,6 +93,33 @@ def deduplicate_srt_blocks(blocks: Iterable[SrtBlock]) -> list[SrtBlock]:
     return result
 
 
+def yield_lines_from_srt_blocks(blocks: Iterable[SrtBlock]) -> Generator[str, None, None]:
+    """
+    Generator that yields lines from an iterable of SrtBlock objects.
+
+    Args:
+        blocks (Iterable[SrtBlock]): An iterable of SrtBlock objects.
+
+    Yields:
+        str: A line from the string representation of the SRT file content.
+    """
+    for i, block in enumerate(blocks, start=1):
+        yield from block.to_lines(i)
+
+
+def srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
+    """
+    Converts an iterable of SrtBlock instances to a single string suitable for writing to an SRT file.
+    
+    Args:
+        blocks (Iterable[SrtBlock]): An iterable of SrtBlock objects.
+    
+    Returns:
+        String representation of the SRT file content.
+    """
+    return '\n'.join(yield_lines_from_srt_blocks(blocks))
+
+
 def deduplicate_single(file_path: Path) -> None:
     """
     Main function to read an SRT file, deduplicate subtitle blocks, and write the results back to the same file.
@@ -103,9 +130,7 @@ def deduplicate_single(file_path: Path) -> None:
     print(f"Processing {file_path}")
     with file_path.open(mode='r') as file_handler:
         blocks = deduplicate_srt_blocks(yield_srt_blocks(yield_stripped_lines(file_handler)))
-    with file_path.open(mode='w') as file_handler:
-        lines = ('\n'.join(block.to_lines(i)) for i, block in enumerate(blocks, start=1))
-        file_handler.writelines(lines)
+    file_path.write_text(srt_blocks_to_str(blocks))
 
 
 def deduplicate_multi(dir_path: Path, recursive: bool = True) -> None:

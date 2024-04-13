@@ -3,6 +3,8 @@ from youtube_whisperer.srt_deduplicator import (
     yield_stripped_lines,
     yield_srt_blocks,
     deduplicate_srt_blocks,
+    yield_lines_from_srt_blocks,
+    srt_blocks_to_str,
     deduplicate_single,
     deduplicate_multi,
 )
@@ -64,15 +66,40 @@ def test_deduplicate_srt_blocks():
 
 def test_srtblock_to_lines():
     block = SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["Line."])
-    expected = ["1", "00:00:01,000 --> 00:00:02,000", "Line.", "\n"]
+    expected = ["1", "00:00:01,000 --> 00:00:02,000", "Line.", ""]
     assert block.to_lines(1) == expected
+
+
+def test_yield_lines_from_srt_blocks():
+    blocks = [
+        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
+    ]
+    expected = [
+        "1",
+        "00:00:01,000 --> 00:00:02,000",
+        "First line.",
+        "",
+        "2",
+        "00:00:02,000 --> 00:00:03,000",
+        "Second line.",
+        "",
+    ]
+    assert list(yield_lines_from_srt_blocks(blocks)) == expected
+
+
+def test_srt_blocks_to_str():
+    blocks = [
+        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
+    ]
+    expected = "1\n00:00:01,000 --> 00:00:02,000\nFirst line.\n\n2\n00:00:02,000 --> 00:00:03,000\nSecond line.\n"
+    assert srt_blocks_to_str(blocks) == expected
 
 
 def test_deduplicate_single(temp_srt_file: Path):
     deduplicate_single(temp_srt_file)
-    with temp_srt_file.open("r") as f:
-        content = f.read()
-    expected_content = dedent("""\
+    expected = dedent("""\
         1
         00:00:01,000 --> 00:00:02,000
         First line.
@@ -81,7 +108,7 @@ def test_deduplicate_single(temp_srt_file: Path):
         00:00:02,000 --> 00:00:04,000
         Second line.
         """)
-    assert content.strip() == expected_content.strip()
+    assert temp_srt_file.read_text().strip() == expected.strip()
 
 
 def test_deduplicate_multi(temp_srt_file: Path):
