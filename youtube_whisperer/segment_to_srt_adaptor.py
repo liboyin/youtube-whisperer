@@ -1,10 +1,31 @@
+import argparse
 from pathlib import Path
 from typing import Iterable, Generator
 
 from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
 
-from .srt_deduplicator import SrtBlock
+from .pathlib_extensions import prepare_output_file
+from .srt_deduplicator import SrtBlock, yield_lines_from_srt_blocks
+
+
+def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:
+    """
+    Load Segments from an iterable of lines.
+    """
+    result = []
+    for line in lines:
+        if line := line.strip():
+            result.append(eval(line, globals(), locals()))
+    return result
+
+
+def load_segments_from_file(file_path: Path) -> list[Segment]:
+    """
+    Load Segments from a file.
+    """
+    with file_path.open() as file_handler:
+        return load_segments_from_lines(file_handler)
 
 
 def segment_to_srt_block(segment: Segment) -> SrtBlock:
@@ -20,7 +41,7 @@ def segment_to_srt_block(segment: Segment) -> SrtBlock:
 
 def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Generator[SrtBlock, None, None]:
     """
-    Generate SrtBlock objects from an iterable of segments.
+    Generate SrtBlock objects from an iterable of Segments.
     """
     for segment in segments:
         print(segment)
@@ -29,23 +50,29 @@ def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Generator[Srt
         yield result
 
 
-def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:
+def segments_to_srt_file(input_file: Path, output_file: Path | None = None) -> Path:
     """
-    Load segments from an iterable of lines.
+    Convert a Segment file to an SRT file.
     """
-    result = []
-    for line in lines:
-        if line := line.strip():
-            result.append(eval(line, globals(), locals()))
-    return result
+    if output_file is None:
+        output_file = input_file.with_suffix('.srt')
+    blocks = yield_srt_blocks_from_segments(load_segments_from_file(input_file))
+    prepare_output_file(output_file).write_text('\n'.join(yield_lines_from_srt_blocks(blocks)))
+    return output_file
 
 
-def load_segments_from_file(file_path: Path) -> list[Segment]:
+def main() -> None:
     """
-    Load segments from a file.
+    CLI entry point to convert a Segment file to an SRT file.
     """
-    return load_segments_from_lines(file_path.read_text().splitlines())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", type=Path, help="Segment file path to convert to an SRT file.")
+    args = parser.parse_args()
+    p = args.path
+    if p.is_file():
+        segments_to_srt_file(p)
+    else:
+        raise FileNotFoundError(f"{p} is not a file")
 
 if __name__ == '__main__':
-    for _ in yield_srt_blocks_from_segments(load_segments_from_file(Path.cwd() / 'segments.txt')):
-        pass
+    main()
