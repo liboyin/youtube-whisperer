@@ -10,6 +10,11 @@ ARROW = '-->'
 class SrtBlock:
     """
     Represents a subtitle block within an SRT file, including its start and end times, along with the subtitle content.
+
+    Attributes:
+        start_time (str): Start time of the subtitle block.
+        end_time (str): End time of the subtitle block.
+        content (list[str]): Content of the subtitle block.
     """
     start_time: str
     end_time: str
@@ -18,11 +23,7 @@ class SrtBlock:
     @classmethod
     def from_lines(cls, lines: list[str]) -> Self:
         """
-        Creates an SrtBlock instance from a list of strings, where the first line is the start and end times, 
-        followed by the subtitle content lines.
-        
-        :param lines: List of strings representing the subtitle block.
-        :return: An instance of SrtBlock.
+        Creates an SrtBlock instance from a list of strings.
         """
         assert len(lines) >= 3, lines
         start_time, end_time = list(map(str.strip, lines[1].split(ARROW)))
@@ -31,9 +32,6 @@ class SrtBlock:
     def to_lines(self, line_number: int) -> list[str]:
         """
         Converts the SrtBlock instance back into a list of strings suitable for writing to an SRT file.
-        
-        :param line_number: The sequence number of the subtitle block.
-        :return: A list of strings representing the SrtBlock in SRT file format.
         """
         result = [
             str(line_number),
@@ -46,10 +44,7 @@ class SrtBlock:
 
 def yield_stripped_lines(text: Iterable[str]) -> Generator[str, None, None]:
     """
-    Generator that yields stripped lines from an iterable of strings, removing leading and trailing whitespace.
-    
-    :param text: Iterable of strings.
-    :yield: Stripped string.
+    Generator that yields stripped lines from an iterable of strings.
     """
     for line in text:
         yield line.strip()
@@ -59,8 +54,11 @@ def yield_srt_blocks(text: Iterable[str]) -> Generator[SrtBlock, None, None]:
     """
     Generator that yields SrtBlock instances from an iterable of lines from an SRT file.
     
-    :param text: Iterable of strings representing the SRT file content.
-    :yield: SrtBlock instances.
+    Args:
+        text: Iterable of strings representing the SRT file content.
+    
+    Yields:
+        SrtBlock instances.
     """
     block_lines: list[str] = []
     for line in text:
@@ -80,8 +78,11 @@ def deduplicate_srt_blocks(blocks: Iterable[SrtBlock]) -> list[SrtBlock]:
     """
     Deduplicates consecutive SrtBlock instances with identical content by merging their time spans.
     
-    :param blocks: Iterable of SrtBlock instances.
-    :return: List of deduplicated SrtBlock instances.
+    Args:
+        blocks: Iterable of SrtBlock instances.
+    
+    Returns:
+        List of deduplicated SrtBlock instances.
     """
     result: list[SrtBlock] = []
     for block in blocks:
@@ -96,7 +97,8 @@ def deduplicate_single(file_path: Path) -> None:
     """
     Main function to read an SRT file, deduplicate subtitle blocks, and write the results back to the same file.
     
-    :param file_path: Path to the SRT file.
+    Args:
+        file_path: Path to the SRT file.
     """
     print(f"Processing {file_path}")
     with file_path.open(mode='r') as file_handler:
@@ -111,8 +113,9 @@ def deduplicate_multi(dir_path: Path, recursive: bool = True) -> None:
     Main function to read all SRT files in a directory and its subdirectories (if recursive is True), 
     deduplicate subtitle blocks, and write the results back to the same files.
 
-    :param dir_path: Path to the directory containing SRT files.
-    :param recursive: Whether to search for SRT files recursively in subdirectories. Default is True.
+    Args:
+        dir_path: Path to the directory containing SRT files.
+        recursive: Whether to search for SRT files recursively in subdirectories. Default is True.
     """
     file_iterator = dir_path.rglob('*.srt') if recursive else dir_path.glob('*.srt')
     for file_path in file_iterator:
