@@ -50,15 +50,15 @@ def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Generator[Srt
         yield result
 
 
-def segments_to_srt_file(input_file: Path, output_file: Path | None = None) -> Path:
+def segments_to_srt_file(input_file_path: Path, output_file_path: Path | None = None) -> Path:
     """
     Convert a Segment file to an SRT file.
     """
-    if output_file is None:
-        output_file = input_file.with_suffix('.srt')
-    blocks = yield_srt_blocks_from_segments(load_segments_from_file(input_file))
-    prepare_output_file(output_file).write_text('\n'.join(yield_lines_from_srt_blocks(blocks)))
-    return output_file
+    if output_file_path is None:
+        output_file_path = input_file_path.with_suffix('.srt')
+    blocks = yield_srt_blocks_from_segments(load_segments_from_file(input_file_path))
+    prepare_output_file(output_file_path).write_text('\n'.join(yield_lines_from_srt_blocks(blocks)))
+    return output_file_path
 
 
 def main() -> None:
