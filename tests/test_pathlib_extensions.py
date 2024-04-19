@@ -2,7 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from youtube_whisperer.pathlib_extensions import NotAFileError, SuffixError, prepare_input_file, prepare_output_file
+from youtube_whisperer.pathlib_extensions import (
+    NotAFileError,
+    SuffixError,
+    prepare_input_file,
+    prepare_output_dir,
+    prepare_output_file,
+)
 
 
 def test_prepare_input_file_valid():
@@ -31,6 +37,22 @@ def test_prepare_input_file_with_suffix():
 def test_prepare_input_file_invalid_argument():
     with pytest.raises(ValueError):
         prepare_input_file(__file__, check_suffix='.txt', with_suffix='.txt')
+
+
+def test_prepare_output_dir_valid(tmp_path):
+    d = tmp_path / "sub"
+    d.mkdir()
+    assert prepare_output_dir(d) == d
+
+
+def test_prepare_output_dir_invalid():
+    with pytest.raises(NotADirectoryError):
+        prepare_output_dir(__file__)
+
+
+def test_prepare_output_dir_create(tmp_path):
+    d = tmp_path / "sub2"
+    assert prepare_output_dir(d, create=True) == d
 
 
 def test_prepare_output_file_valid(tmp_path):
