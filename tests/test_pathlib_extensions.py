@@ -5,10 +5,25 @@ import pytest
 from youtube_whisperer.pathlib_extensions import (
     NotAFileError,
     SuffixError,
+    prepare_input_dir,
     prepare_input_file,
     prepare_output_dir,
     prepare_output_file,
 )
+
+
+def test_prepare_input_dir_valid():
+    assert prepare_input_dir(Path.cwd()) == Path.cwd()
+
+
+def test_prepare_input_dir_invalid():
+    with pytest.raises(NotADirectoryError):
+        prepare_input_dir(__file__)
+
+
+def test_prepare_input_dir_not_found():
+    with pytest.raises(FileNotFoundError):
+        prepare_input_dir('path/that/does/not/exist')
 
 
 def test_prepare_input_file_valid():

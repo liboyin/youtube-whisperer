@@ -14,6 +14,28 @@ class SuffixError(Exception):
     """Raised when the file suffix does not meet the expected criteria."""
 
 
+def prepare_input_dir(p: AnyPath) -> Path:
+    """Prepare the target directory path for reading.
+
+    Args:
+        p (AnyPath): The target directory path.
+
+    Returns:
+        Path: The verified directory path.
+
+    Raises:
+        FileNotFoundError: If the target path does not exist.
+        NotADirectoryError: If the target path exists but is not a directory.
+    """
+    if isinstance(p, str):
+        p = Path(p)
+    if not p.is_dir():
+        if p.exists():
+            raise NotADirectoryError(p)
+        raise FileNotFoundError(p)
+    return p
+
+
 def prepare_input_file(p: AnyPath, check_suffix: str | None = None, with_suffix: str | None = None) -> Path:
     """Prepare the target file path for reading.
 
