@@ -3,7 +3,7 @@ from pathlib import Path
 import yt_dlp
 
 from youtube_whisperer.pathlib_extensions import prepare_output_file
-from youtube_whisperer.utils import remove_os_reserved_chars
+from youtube_whisperer.utils import replace_os_reserved_chars
 
 
 def get_video_title(url: str) -> str:
@@ -37,7 +37,7 @@ def download_video(url: str, target_path: Path) -> None:
 def download_video_with_default_title(url: str, target_dir: Path | None = None) -> Path:
     if target_dir is None:
         target_dir = Path.cwd()
-    title = remove_os_reserved_chars(get_video_title(url))
+    title = replace_os_reserved_chars(get_video_title(url))
     target_path = prepare_output_file(target_dir / f'{title}.mp4')
     download_video(url, target_path)
     return target_path

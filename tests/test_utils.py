@@ -1,18 +1,18 @@
 import pytest
 
-from youtube_whisperer.utils import remove_os_reserved_chars, strtobool
+from youtube_whisperer.utils import replace_os_reserved_chars, strtobool
 
 
 def test_remove_os_reserved_chars():
-    assert remove_os_reserved_chars("file?name") == "file_name"
-    assert remove_os_reserved_chars("file*name") == "file_name"
-    assert remove_os_reserved_chars("file:name") == "file_name"
-    assert remove_os_reserved_chars("file<name") == "file_name"
-    assert remove_os_reserved_chars("file>name") == "file_name"
-    assert remove_os_reserved_chars("file|name") == "file_name"
-    assert remove_os_reserved_chars("file/name") == "file_name"
-    assert remove_os_reserved_chars("file\\name") == "file_name"
-    assert remove_os_reserved_chars('file"name') == "file_name"
+    assert replace_os_reserved_chars("file?name") == "file_name"
+    assert replace_os_reserved_chars("file*name") == "file_name"
+    assert replace_os_reserved_chars("file:name") == "file_name"
+    assert replace_os_reserved_chars("file<name") == "file_name"
+    assert replace_os_reserved_chars("file>name") == "file_name"
+    assert replace_os_reserved_chars("file|name") == "file_name"
+    assert replace_os_reserved_chars("file/name") == "file_name"
+    assert replace_os_reserved_chars("file\\name") == "file_name"
+    assert replace_os_reserved_chars('file"name') == "file_name"
 
 
 def test_strtobool_true():
