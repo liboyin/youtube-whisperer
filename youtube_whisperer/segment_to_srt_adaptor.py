@@ -54,8 +54,7 @@ def segments_to_srt_file(input_file_path: Path, output_file_path: Path | None = 
     """
     Convert a Segment file to an SRT file.
     """
-    if output_file_path is None:
-        output_file_path = input_file_path.with_suffix('.srt')
+    output_file_path = output_file_path or input_file_path.with_suffix('.srt')
     blocks = yield_srt_blocks_from_segments(load_segments_from_file(input_file_path))
     prepare_output_file(output_file_path).write_text('\n'.join(yield_lines_from_srt_blocks(blocks)))
     return output_file_path

@@ -27,8 +27,7 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
     Returns:
         Path: The path to the encoded MP4 file.
     """
-    if output_file_path is None:
-        output_file_path = input_file_path.with_suffix('.mp4')
+    output_file_path = output_file_path or input_file_path.with_suffix('.mp4')
     assert input_file_path != output_file_path
     output_file_path = prepare_output_file(output_file_path)
     stream = (

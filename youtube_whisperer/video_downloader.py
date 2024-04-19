@@ -35,8 +35,7 @@ def download_video(url: str, target_path: Path) -> None:
 
 
 def download_video_with_default_title(url: str, target_dir: Path | None = None) -> Path:
-    if target_dir is None:
-        target_dir = Path.cwd()
+    target_dir = target_dir or Path.cwd()
     title = replace_os_reserved_chars(get_video_title(url))
     target_path = prepare_output_file(target_dir / f'{title}.mp4')
     download_video(url, target_path)
