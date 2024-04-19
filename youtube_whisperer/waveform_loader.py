@@ -3,6 +3,8 @@ from pathlib import Path
 import ffmpeg
 import numpy as np
 
+from youtube_whisperer.pathlib_extensions import prepare_input_file
+
 DEFAULT_SAMPLE_RATE = 16000
 
 
@@ -42,7 +44,7 @@ def load_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) 
     """
     Load audio from a binary file and return it as a 1D float32 np.ndarray with a range of [-1, 1].
     """
-    return load_waveform_from_bytes(path.read_bytes(), sample_rate)
+    return load_waveform_from_bytes(prepare_input_file(path).read_bytes(), sample_rate)
 
 
 if __name__ == '__main__':

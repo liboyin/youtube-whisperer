@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator, Iterable, Self
 
+from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_input_dir
+
 ARROW = '-->'
 
 
@@ -128,7 +130,7 @@ def deduplicate_single(file_path: Path) -> None:
         file_path: Path to the SRT file.
     """
     print(f"Processing {file_path}")
-    with file_path.open(mode='r') as file_handler:
+    with prepare_input_file(file_path).open(mode='r') as file_handler:
         blocks = deduplicate_srt_blocks(yield_srt_blocks(yield_stripped_lines(file_handler)))
     file_path.write_text(srt_blocks_to_str(blocks))
 
@@ -142,6 +144,7 @@ def deduplicate_multi(dir_path: Path, recursive: bool = True) -> None:
         dir_path: Path to the directory containing SRT files.
         recursive: Whether to search for SRT files recursively in subdirectories. Default is True.
     """
+    prepare_input_dir(dir_path)
     file_iterator = dir_path.rglob('*.srt') if recursive else dir_path.glob('*.srt')
     for file_path in file_iterator:
         deduplicate_single(file_path)

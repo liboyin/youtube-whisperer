@@ -2,7 +2,7 @@ from pathlib import Path
 
 import ffmpeg
 
-from youtube_whisperer.pathlib_extensions import prepare_output_file
+from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_output_file
 
 
 def encode_video_from_file(input_file_path: Path, output_file_path: Path | None = None) -> Path:
@@ -27,9 +27,9 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
     Returns:
         Path: The path to the encoded MP4 file.
     """
-    output_file_path = output_file_path or input_file_path.with_suffix('.mp4')
+    prepare_input_file(input_file_path)
+    output_file_path = prepare_output_file(output_file_path or input_file_path.with_suffix('.mp4'))
     assert input_file_path != output_file_path
-    output_file_path = prepare_output_file(output_file_path)
     stream = (
         ffmpeg
         .input(str(input_file_path), threads=0)
