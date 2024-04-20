@@ -1,11 +1,11 @@
 from youtube_whisperer.srt_deduplicator import (
     SrtBlock,
+    convert_srt_blocks_to_str,
     deduplicate_multi,
     deduplicate_single,
-    srt_blocks_to_str,
     yield_deduplicated_srt_blocks,
     yield_lines_from_srt_blocks,
-    yield_srt_blocks,
+    yield_srt_blocks_from_lines,
 )
 from pathlib import Path
 from textwrap import dedent
@@ -34,12 +34,12 @@ def temp_srt_file(tmp_path_factory):
     file_path.unlink()
 
 
-def test_yield_srt_blocks():
+def test_yield_srt_blocks_from_lines():
     input_lines = [
         "1", "00:00:01,000 --> 00:00:02,000", "First line.", "",
         "2", "00:00:02,000 --> 00:00:03,000", "Second line.", "",
     ]
-    blocks = list(yield_srt_blocks(input_lines))
+    blocks = list(yield_srt_blocks_from_lines(input_lines))
     assert len(blocks) == 2
     assert blocks[0].start_time == "00:00:01,000"
     assert blocks[0].end_time == "00:00:02,000"
@@ -93,13 +93,13 @@ def test_yield_lines_from_srt_blocks():
     assert list(yield_lines_from_srt_blocks(blocks)) == expected
 
 
-def test_srt_blocks_to_str():
+def test_convert_srt_blocks_to_str():
     blocks = [
         SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
         SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
     ]
     expected = "1\n00:00:01,000 --> 00:00:02,000\nFirst line.\n\n2\n00:00:02,000 --> 00:00:03,000\nSecond line.\n"
-    assert srt_blocks_to_str(blocks) == expected
+    assert convert_srt_blocks_to_str(blocks) == expected
 
 
 def test_deduplicate_single(temp_srt_file: Path):

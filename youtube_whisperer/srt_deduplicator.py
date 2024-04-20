@@ -44,7 +44,7 @@ class SrtBlock:
         return result
 
 
-def yield_srt_blocks(lines: Iterable[str]) -> Generator[SrtBlock, None, None]:
+def yield_srt_blocks_from_lines(lines: Iterable[str]) -> Generator[SrtBlock, None, None]:
     """
     Generator that yields SrtBlock instances from an iterable of lines from an SRT file.
     
@@ -105,7 +105,7 @@ def yield_lines_from_srt_blocks(blocks: Iterable[SrtBlock]) -> Generator[str, No
         yield from block.to_lines(i)
 
 
-def srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
+def convert_srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
     """
     Converts an iterable of SrtBlock instances to a single string suitable for writing to an SRT file.
     
@@ -128,8 +128,8 @@ def deduplicate_single(file_path: Path) -> None:
     print(f"Processing {file_path}")
     with prepare_input_file(file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
-        blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks(file_handler)))
-    file_path.write_text(srt_blocks_to_str(blocks))
+        blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
+    file_path.write_text(convert_srt_blocks_to_str(blocks))
 
 
 def deduplicate_multi(dir_path: Path, recursive: bool = True) -> None:
@@ -153,8 +153,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, help="SRT file path to read from and to write to, or a directory containing SRT files.")
-    args = parser.parse_args()
-    p = args.path
+    p = parser.parse_args().path
     if p.is_file():
         deduplicate_single(p)
     elif p.is_dir():
