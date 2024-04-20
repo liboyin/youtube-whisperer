@@ -57,7 +57,7 @@ def yield_srt_blocks(text: Iterable[str]) -> Generator[SrtBlock, None, None]:
     Generator that yields SrtBlock instances from an iterable of lines from an SRT file.
     
     Args:
-        text: Iterable of strings representing the SRT file content.
+        text (Iterable[str]): Iterable of strings representing the SRT file content.
     
     Yields:
         SrtBlock instances.
@@ -76,23 +76,26 @@ def yield_srt_blocks(text: Iterable[str]) -> Generator[SrtBlock, None, None]:
         yield SrtBlock.from_lines(block_lines)
 
 
-def deduplicate_srt_blocks(blocks: Iterable[SrtBlock]) -> list[SrtBlock]:
+def yield_deduplicated_srt_blocks(blocks: Iterable[SrtBlock]) -> Generator[SrtBlock, None, None]:
     """
-    Deduplicates consecutive SrtBlock instances with identical content by merging their time spans.
+    Generator that yields deduplicated SrtBlock instances from an iterable of SrtBlock instances.
     
     Args:
-        blocks: Iterable of SrtBlock instances.
+        blocks (Iterable[SrtBlock]): Iterable of SrtBlock instances.
     
-    Returns:
-        List of deduplicated SrtBlock instances.
+    Yields:
+        Deduplicated SrtBlock instances.
     """
-    result: list[SrtBlock] = []
-    for block in blocks:
-        if result and block.content == result[-1].content:
-            result[-1].end_time = block.end_time
+    previous: SrtBlock | None = None
+    for current in blocks:
+        if previous and current.content == previous.content:
+            previous.end_time = current.end_time
         else:
-            result.append(block)
-    return result
+            if previous:
+                yield previous
+            previous = current
+    if previous:
+        yield previous
 
 
 def yield_lines_from_srt_blocks(blocks: Iterable[SrtBlock]) -> Generator[str, None, None]:
@@ -131,7 +134,7 @@ def deduplicate_single(file_path: Path) -> None:
     """
     print(f"Processing {file_path}")
     with prepare_input_file(file_path).open(mode='r') as file_handler:
-        blocks = deduplicate_srt_blocks(yield_srt_blocks(yield_stripped_lines(file_handler)))
+        blocks = yield_deduplicated_srt_blocks(yield_srt_blocks(yield_stripped_lines(file_handler)))
     file_path.write_text(srt_blocks_to_str(blocks))
 
 

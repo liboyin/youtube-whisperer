@@ -6,7 +6,7 @@ import numpy as np
 
 from youtube_whisperer.model_parameters import get_default_whisper_model_parameters
 from youtube_whisperer.segment_to_srt_adaptor import yield_srt_blocks_from_segments
-from youtube_whisperer.srt_deduplicator import SrtBlock, deduplicate_srt_blocks
+from youtube_whisperer.srt_deduplicator import SrtBlock, yield_deduplicated_srt_blocks
 
 
 def get_transcription_generator(model: WhisperModel, waveform: np.ndarray, **kwargs) -> Iterable[Segment]:
@@ -38,7 +38,7 @@ def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, **kwargs) -> 
     Returns:
         list[SrtBlock]: Transcription of the waveform as a list of SRT blocks.
     """
-    return deduplicate_srt_blocks(yield_srt_blocks_from_segments(get_transcription_generator(model, waveform, **kwargs)))
+    return list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_segments(get_transcription_generator(model, waveform, **kwargs))))
 
 
 def transcribe_waveform_with_default_model(waveform: np.ndarray, **kwargs) -> list[SrtBlock]:

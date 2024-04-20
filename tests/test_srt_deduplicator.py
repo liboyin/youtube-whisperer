@@ -2,7 +2,7 @@ from youtube_whisperer.srt_deduplicator import (
     SrtBlock,
     yield_stripped_lines,
     yield_srt_blocks,
-    deduplicate_srt_blocks,
+    yield_deduplicated_srt_blocks,
     yield_lines_from_srt_blocks,
     srt_blocks_to_str,
     deduplicate_single,
@@ -53,13 +53,24 @@ def test_yield_srt_blocks():
     assert blocks[1].content == ["Second line."]
 
 
-def test_deduplicate_srt_blocks():
+def test_yield_deduplicated_srt_blocks_duplicate_on_head():
+    input_blocks = [
+        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
+    ]
+    deduplicated = list(yield_deduplicated_srt_blocks(input_blocks))
+    assert len(deduplicated) == 2  # Should merge the last two blocks
+    assert deduplicated[1].end_time == "00:00:03,000"
+
+
+def test_yield_deduplicated_srt_blocks_duplicate_on_tail():
     input_blocks = [
         SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
         SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
         SrtBlock(start_time="00:00:03,000", end_time="00:00:04,000", content=["Second line."]),
     ]
-    deduplicated = deduplicate_srt_blocks(input_blocks)
+    deduplicated = list(yield_deduplicated_srt_blocks(input_blocks))
     assert len(deduplicated) == 2  # Should merge the last two blocks
     assert deduplicated[1].end_time == "00:00:04,000"
 
