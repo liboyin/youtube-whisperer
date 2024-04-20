@@ -1,12 +1,11 @@
 from youtube_whisperer.srt_deduplicator import (
     SrtBlock,
-    yield_stripped_lines,
-    yield_srt_blocks,
+    deduplicate_multi,
+    deduplicate_single,
+    srt_blocks_to_str,
     yield_deduplicated_srt_blocks,
     yield_lines_from_srt_blocks,
-    srt_blocks_to_str,
-    deduplicate_single,
-    deduplicate_multi,
+    yield_srt_blocks,
 )
 from pathlib import Path
 from textwrap import dedent
@@ -32,12 +31,6 @@ def temp_srt_file(tmp_path_factory):
         Second line.
         """))
     return file_path
-
-
-def test_yield_stripped_lines():
-    input_lines = ["  line1\n", "line2  ", "\n", "line3"]
-    expected = ["line1", "line2", "", "line3"]
-    assert list(yield_stripped_lines(input_lines)) == expected
 
 
 def test_yield_srt_blocks():

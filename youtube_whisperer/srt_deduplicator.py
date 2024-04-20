@@ -44,15 +44,7 @@ class SrtBlock:
         return result
 
 
-def yield_stripped_lines(text: Iterable[str]) -> Generator[str, None, None]:
-    """
-    Generator that yields stripped lines from an iterable of strings.
-    """
-    for line in text:
-        yield line.strip()
-
-
-def yield_srt_blocks(text: Iterable[str]) -> Generator[SrtBlock, None, None]:
+def yield_srt_blocks(lines: Iterable[str]) -> Generator[SrtBlock, None, None]:
     """
     Generator that yields SrtBlock instances from an iterable of lines from an SRT file.
     
@@ -63,7 +55,8 @@ def yield_srt_blocks(text: Iterable[str]) -> Generator[SrtBlock, None, None]:
         SrtBlock instances.
     """
     block_lines: list[str] = []
-    for line in text:
+    for line in lines:
+        line = line.strip()
         if not line and block_lines:
             # terminate an SRT block when an empty line is encountered
             yield SrtBlock.from_lines(block_lines)
@@ -133,8 +126,8 @@ def deduplicate_single(file_path: Path) -> None:
         file_path: Path to the SRT file.
     """
     print(f"Processing {file_path}")
-    with prepare_input_file(file_path).open(mode='r') as file_handler:
-        blocks = yield_deduplicated_srt_blocks(yield_srt_blocks(yield_stripped_lines(file_handler)))
+    with prepare_input_file(file_path).open() as file_handler:
+        blocks = yield_deduplicated_srt_blocks(yield_srt_blocks(file_handler))
     file_path.write_text(srt_blocks_to_str(blocks))
 
 
