@@ -6,7 +6,7 @@ from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
 
 from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_output_file
-from youtube_whisperer.srt_deduplicator import SrtBlock, yield_lines_from_srt_blocks
+from youtube_whisperer.srt_deduplicator import SrtBlock, yield_lines_from_srt_blocks, yield_deduplicated_srt_blocks
 
 
 def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:
@@ -50,12 +50,23 @@ def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Generator[Srt
         yield result
 
 
-def segments_to_srt_file(input_file_path: Path, output_file_path: Path | None = None) -> Path:
+def convert_segments_file_to_srt(input_file_path: Path, output_file_path: Path | None = None, deduplicate: bool = False) -> Path:
     """
-    Convert a Segment file to an SRT file.
+    Converts a segments file to an SRT file.
+
+    Args:
+        input_file_path (Path): The path to the input segments file.
+        output_file_path (Path, optional): The path to the output SRT file. If not provided, a file with the same name as the input file and the .srt extension will be created. Defaults to None.
+        deduplicate (bool, optional): Whether to deduplicate the segments. Defaults to False.
+
+    Returns:
+        Path: The path to the output SRT file.
     """
+    prepare_input_file(input_file_path)
     output_file_path = prepare_output_file(output_file_path or input_file_path.with_suffix('.srt'))
-    blocks = yield_srt_blocks_from_segments(load_segments_from_file(prepare_input_file(input_file_path)))
+    blocks = yield_srt_blocks_from_segments(load_segments_from_file(input_file_path))
+    if deduplicate:
+        blocks = yield_deduplicated_srt_blocks(blocks)
     output_file_path.write_text('\n'.join(yield_lines_from_srt_blocks(blocks)))
     return output_file_path
 
@@ -66,12 +77,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, help="Segment file path to convert to an SRT file.")
-    args = parser.parse_args()
-    p = args.path
-    if p.is_file():
-        segments_to_srt_file(p)
-    else:
-        raise FileNotFoundError(f"{p} is not a file")
+    convert_segments_file_to_srt(parser.parse_args().path)
 
 if __name__ == '__main__':
     main()
