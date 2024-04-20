@@ -6,7 +6,7 @@ from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
 
 from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_output_file
-from youtube_whisperer.srt_deduplicator import SrtBlock, yield_lines_from_srt_blocks, yield_deduplicated_srt_blocks
+from youtube_whisperer.srt_deduplicator import SrtBlock, convert_srt_blocks_to_str, yield_deduplicated_srt_blocks
 
 
 def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:
@@ -64,10 +64,10 @@ def convert_segments_file_to_srt(input_file_path: Path, output_file_path: Path |
     """
     prepare_input_file(input_file_path)
     output_file_path = prepare_output_file(output_file_path or input_file_path.with_suffix('.srt'))
-    blocks = yield_srt_blocks_from_segments(load_segments_from_file(input_file_path))
+    srt_blocks_generator = yield_srt_blocks_from_segments(load_segments_from_file(input_file_path))
     if deduplicate:
-        blocks = yield_deduplicated_srt_blocks(blocks)
-    output_file_path.write_text('\n'.join(yield_lines_from_srt_blocks(blocks)))
+        srt_blocks_generator = yield_deduplicated_srt_blocks(srt_blocks_generator)
+    output_file_path.write_text(convert_srt_blocks_to_str(srt_blocks_generator))
     return output_file_path
 
 
