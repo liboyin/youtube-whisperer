@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Iterable
 
 from faster_whisper import WhisperModel
@@ -5,28 +6,10 @@ from faster_whisper.transcribe import Segment
 import numpy as np
 
 from youtube_whisperer.model_parameters import get_default_whisper_model_parameters
-from youtube_whisperer.segment_to_srt_adaptor import yield_srt_blocks_from_segments
-from youtube_whisperer.srt_deduplicator import SrtBlock, yield_deduplicated_srt_blocks
+from youtube_whisperer.pathlib_extensions import prepare_output_file
 
 
-def get_transcription_generator(model: WhisperModel, waveform: np.ndarray, **kwargs) -> Iterable[Segment]:
-    """
-    Return a transcription generator for the given waveform using the specified Whisper model.
-
-    Args:
-        model (WhisperModel): The Whisper model used for transcription.
-        waveform (np.ndarray): The waveform to transcribe.
-        kwargs: Additional arguments to pass to model.transcribe().
-
-    Returns:
-        Iterable[Segment]: An iterable of Segments of the transcription.
-    """
-    segments, info = model.transcribe(waveform, **kwargs)
-    print(info)
-    return segments
-
-
-def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, **kwargs) -> list[SrtBlock]:
+def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, **kwargs) -> Iterable[Segment]:
     """
     Transcribe the given waveform using the provided WhisperModel.
 
@@ -36,12 +19,14 @@ def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, **kwargs) -> 
         kwargs: Additional arguments to pass to model.transcribe().
 
     Returns:
-        list[SrtBlock]: Transcription of the waveform as a list of SRT blocks.
+        Iterable[Segment]: An iterable of Segments of the transcription.
     """
-    return list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_segments(get_transcription_generator(model, waveform, **kwargs))))
+    segments_generator, info = model.transcribe(waveform, **kwargs)
+    print(info)
+    return segments_generator
 
 
-def transcribe_waveform_with_default_model(waveform: np.ndarray, **kwargs) -> list[SrtBlock]:
+def transcribe_waveform_with_default_model(waveform: np.ndarray, **kwargs) -> Iterable[Segment]:
     """
     Transcribe the given waveform using the default WhisperModel.
 
@@ -50,7 +35,18 @@ def transcribe_waveform_with_default_model(waveform: np.ndarray, **kwargs) -> li
         kwargs: Additional arguments to pass to model.transcribe().
 
     Returns:
-        list[SrtBlock]: Transcription of the waveform as a list of SRT blocks.
+        Iterable[Segment]: An iterable of Segments of the transcription.
     """
     model = WhisperModel(**get_default_whisper_model_parameters())
     return transcribe_waveform(model, waveform, **kwargs)
+
+
+def write_segments_to_file(segments: Iterable[Segment], file_path: Path) -> None:
+    """
+    Write Segments to a file.
+
+    Args:
+        segments (Iterable[Segment]): The Segments to write.
+        file_path (Path): The path to the file to write to.
+    """
+    prepare_output_file(file_path).write_text('\n'.join(map(str, segments)))
