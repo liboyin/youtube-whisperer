@@ -30,7 +30,8 @@ def temp_srt_file(tmp_path_factory):
         00:00:03,000 --> 00:00:04,000
         Second line.
         """))
-    return file_path
+    yield file_path
+    file_path.unlink()
 
 
 def test_yield_srt_blocks():
