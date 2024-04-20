@@ -127,7 +127,8 @@ def deduplicate_single(file_path: Path) -> None:
     """
     print(f"Processing {file_path}")
     with prepare_input_file(file_path).open() as file_handler:
-        blocks = yield_deduplicated_srt_blocks(yield_srt_blocks(file_handler))
+        # force a file read before closing file_handler because both generators are lazy
+        blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks(file_handler)))
     file_path.write_text(srt_blocks_to_str(blocks))
 
 
