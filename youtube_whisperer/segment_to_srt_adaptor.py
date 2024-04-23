@@ -33,8 +33,8 @@ def segment_to_srt_block(segment: Segment) -> SrtBlock:
     Convert a Segment object to an SrtBlock object.
     """
     return SrtBlock(
-        format_timestamp(segment.start),
-        format_timestamp(segment.end),
+        format_timestamp(segment.start, always_include_hours=True, decimal_marker=','),
+        format_timestamp(segment.end, always_include_hours=True, decimal_marker=','),
         segment.text.strip().split('\n'),
     )
 
