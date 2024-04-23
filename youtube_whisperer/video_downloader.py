@@ -3,7 +3,7 @@ from pathlib import Path
 import yt_dlp
 
 from youtube_whisperer.pathlib_extensions import prepare_output_dir, prepare_output_file
-from youtube_whisperer.utils import replace_os_reserved_chars
+from youtube_whisperer.utils import DEFAULT_HOME_DIR, replace_os_reserved_chars
 
 
 def get_video_title(url: str) -> str:
@@ -45,4 +45,4 @@ def download_video_with_default_title(url: str, target_dir: Path | None = None) 
 
 if __name__ == '__main__':
     url = 'https://www.youtube.com/watch?v=8g18jFHCLXk'
-    download_video_with_default_title(url, Path.home() / '.whisperer')
+    download_video_with_default_title(url, DEFAULT_HOME_DIR)

@@ -5,7 +5,7 @@ from typing import Any
 
 import ctranslate2
 
-from youtube_whisperer.utils import strtobool
+from youtube_whisperer.utils import DEFAULT_HOME_DIR, strtobool
 
 
 def get_default_cuda_flag() -> bool:
@@ -31,7 +31,7 @@ def get_default_whisper_model_parameters() -> dict[str, Any]:
     """
     result: dict[str, Any] = {
         "model_size_or_path": os.getenv("ASR_MODEL", "large-v3"),
-        "download_root": os.getenv("ASR_MODEL_PATH", str(Path.home() / ".whisper")),
+        "download_root": os.getenv("ASR_MODEL_PATH", str(DEFAULT_HOME_DIR)),
     }
     use_cuda = get_default_cuda_flag()
     result["device"] = "cuda" if use_cuda else "cpu"

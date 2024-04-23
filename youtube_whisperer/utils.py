@@ -1,4 +1,7 @@
+from pathlib import Path
 import re
+
+DEFAULT_HOME_DIR = Path.home() / ".whisper"
 
 
 def replace_os_reserved_chars(text: str, replacement: str = '_') -> str:

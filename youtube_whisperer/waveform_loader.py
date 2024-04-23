@@ -4,6 +4,7 @@ import ffmpeg
 import numpy as np
 
 from youtube_whisperer.pathlib_extensions import prepare_input_file
+from youtube_whisperer.utils import DEFAULT_HOME_DIR
 
 DEFAULT_SAMPLE_RATE = 16000
 
@@ -48,4 +49,4 @@ def load_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) 
 
 
 if __name__ == '__main__':
-    print(len(load_waveform_from_file(Path.home() / '.whisper/test.mp4')))
+    print(len(load_waveform_from_file(DEFAULT_HOME_DIR / 'test.mp4')))
