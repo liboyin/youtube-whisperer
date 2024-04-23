@@ -13,8 +13,8 @@ SEGMENTS = [
 def test_segment_to_srt_block():
     srt_block = segment_to_srt_block(SEGMENTS[0])
     assert isinstance(srt_block, SrtBlock)
-    assert srt_block.start_time == '00:00.000'
-    assert srt_block.end_time == '00:01.240'
+    assert srt_block.start_time == '00:00:00,000'
+    assert srt_block.end_time == '00:00:01,240'
     assert srt_block.content == ['Segment']
 
 
@@ -22,14 +22,14 @@ def test_yield_srt_blocks_from_segments():
     srt_blocks = list(yield_srt_blocks_from_segments(SEGMENTS))
     assert len(srt_blocks) == 3
     assert all(isinstance(x, SrtBlock) for x in srt_blocks)
-    assert srt_blocks[0].start_time == '00:00.000'
-    assert srt_blocks[0].end_time == '00:01.240'
+    assert srt_blocks[0].start_time == '00:00:00,000'
+    assert srt_blocks[0].end_time == '00:00:01,240'
     assert srt_blocks[0].content == ['Segment']
-    assert srt_blocks[1].start_time == '00:01.240'
-    assert srt_blocks[1].end_time == '00:04.240'
+    assert srt_blocks[1].start_time == '00:00:01,240'
+    assert srt_blocks[1].end_time == '00:00:04,240'
     assert srt_blocks[1].content == ['to']
-    assert srt_blocks[2].start_time == '00:04.240'
-    assert srt_blocks[2].end_time == '00:06.240'
+    assert srt_blocks[2].start_time == '00:00:04,240'
+    assert srt_blocks[2].end_time == '00:00:06,240'
     assert srt_blocks[2].content == ['SRT']
 
 
