@@ -9,13 +9,13 @@ from youtube_whisperer.utils import DEFAULT_HOME_DIR, replace_os_reserved_chars
 
 def get_video_title(url: str) -> str:
     """
-    Retrieves the title of a YouTube video given its URL.
+    Retrieves the title of a video given its URL.
 
     Args:
-        url (str): The URL of the YouTube video.
+        url (str): The URL of the video.
 
     Returns:
-        str: The title of the YouTube video.
+        str: The title of the video.
     """
     ydl_opts = {
         'simulate': True,
@@ -26,6 +26,13 @@ def get_video_title(url: str) -> str:
 
 
 def download_video(url: str, target_path: Path) -> None:
+    """
+    Downloads a video from a given URL and saves it to the target path.
+
+    Args:
+        url (str): The URL of the video.
+        target_path (Path): The path where the downloaded video will be saved.
+    """
     prepare_output_file(target_path)
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
@@ -37,6 +44,16 @@ def download_video(url: str, target_path: Path) -> None:
 
 
 def download_video_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR) -> Path:
+    """
+    Downloads a video from the given URL and saves it with a default title in the target directory.
+
+    Args:
+        url (str): The URL of the video to download.
+        target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to DEFAULT_HOME_DIR.
+
+    Returns:
+        Path: The path to the downloaded video file.
+    """
     title = replace_os_reserved_chars(get_video_title(url))
     target_path = prepare_output_dir(target_dir) / f'{title}.mp4'
     download_video(url, target_path)
