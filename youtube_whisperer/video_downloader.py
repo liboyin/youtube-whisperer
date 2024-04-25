@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import yt_dlp
@@ -35,14 +36,20 @@ def download_video(url: str, target_path: Path) -> None:
         ydl.download([url])
 
 
-def download_video_with_default_title(url: str, target_dir: Path | None = None) -> Path:
-    target_dir = prepare_output_dir(target_dir or Path.cwd())
+def download_video_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR) -> Path:
     title = replace_os_reserved_chars(get_video_title(url))
-    target_path = target_dir / f'{title}.mp4'
+    target_path = prepare_output_dir(target_dir) / f'{title}.mp4'
     download_video(url, target_path)
     return target_path
 
 
+def main() -> None:
+    """
+    CLI entry point of the video downloader.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("url", help="The URL of the video to download.")
+    download_video_with_default_title(parser.parse_args().url)
+
 if __name__ == '__main__':
-    url = 'https://www.youtube.com/watch?v=8g18jFHCLXk'
-    download_video_with_default_title(url, DEFAULT_HOME_DIR)
+    main()
