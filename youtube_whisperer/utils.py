@@ -4,6 +4,19 @@ import re
 DEFAULT_HOME_DIR = Path.home() / ".whisper"
 
 
+def is_url(text: str) -> bool:
+    """
+    Check if a string is a valid URL.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        bool: True if the input text is a valid URL, False otherwise.
+    """
+    return bool(re.match(r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)", text))
+
+
 def replace_os_reserved_chars(text: str, replacement: str = '_') -> str:
     """
     Replace reserved characters in a string with a specified replacement character.
