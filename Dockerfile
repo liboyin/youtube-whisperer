@@ -7,3 +7,9 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
 COPY requirements.txt /tmp/pip-tmp/
 RUN pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requirements.txt && \
     rm -rf /tmp/pip-tmp
+
+# reproduce the devcontainer experience
+COPY . /workspace/youtube_whisperer
+WORKDIR /workspace/youtube_whisperer
+USER vscode
+ENTRYPOINT ["/bin/bash"]
