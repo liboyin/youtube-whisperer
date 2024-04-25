@@ -37,7 +37,7 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
         # TODO: output target must be seekable. Is it possible to use a buffer instead of a file?
         .output(str(output_file_path), vcodec='libx264', acodec='aac', audio_bitrate='160k', ac=2, format='mp4')
     )
-    print(f'ffmpeg args: {stream.get_args()}')
+    print('ffmpeg args:', stream.get_args())
     try:
         stream.run(input=input_file_path.read_bytes(), capture_stdout=True, capture_stderr=True, overwrite_output=True)
     except ffmpeg.Error as e:

@@ -32,7 +32,7 @@ def load_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAMPLE_RATE
         .input("pipe:", threads=0)
         .output("pipe:", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
     )
-    print(f'ffmpeg args: {stream.get_args()}')
+    print('ffmpeg args:', stream.get_args())
     try:
         out, err = stream.run(input=data, capture_stdout=True, capture_stderr=True)
     except ffmpeg.Error as e:

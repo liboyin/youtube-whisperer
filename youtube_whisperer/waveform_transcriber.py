@@ -92,6 +92,7 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
         Path: The path to the output file containing the transcribed Segments.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.txt')
+    print('Saving Segments to:', output_file_path)
     segments_generator = transcribe_waveform_with_default_model(load_waveform_from_file(input_file_path))
     for segment in duplicate_segments_to_file(segments_generator, output_file_path):
         print(segment)
