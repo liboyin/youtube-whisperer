@@ -1,6 +1,12 @@
 from faster_whisper.transcribe import Segment
 
-from youtube_whisperer.segment_to_srt_adaptor import segment_to_srt_block, yield_srt_blocks_from_segments, load_segments_from_lines, load_segments_from_file
+from youtube_whisperer.segment_to_srt_adaptor import (
+    convert_segments_file_to_srt,
+    load_segments_from_file,
+    load_segments_from_lines,
+    segment_to_srt_block,
+    yield_srt_blocks_from_segments,
+)
 from youtube_whisperer.srt_deduplicator import SrtBlock
 
 SEGMENTS = [
@@ -51,3 +57,12 @@ def test_load_segments_from_file(tmp_path):
     assert segments[0].text == 'Segment'
     assert segments[1].text == 'to'
     assert segments[2].text == 'SRT'
+
+
+def test_convert_segments_file_to_srt(tmp_path):
+    input_file_path = tmp_path / 'segments.txt'
+    input_file_path.write_text('\n'.join(map(str, SEGMENTS)))
+    output_file_path = convert_segments_file_to_srt(input_file_path, deduplicate=False)
+    assert output_file_path.is_file()
+    expected = "1\n00:00:00,000 --> 00:00:01,240\nSegment\n\n2\n00:00:01,240 --> 00:00:04,240\nto\n\n3\n00:00:04,240 --> 00:00:06,240\nSRT\n"
+    assert output_file_path.read_text() == expected
