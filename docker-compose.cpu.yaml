@@ -1,10 +1,7 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - .:/workspace/youtube_whisperer
-      - ~/.whisper:/home/vscode/.whisper
+    extends:
+      file: docker-compose.yaml
+      service: app
     environment:
       - ASR_CUDA=0
