@@ -2,7 +2,9 @@
 FROM mcr.microsoft.com/devcontainers/python:1-3.12-bullseye
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
-    apt-get install -y --no-install-recommends ffmpeg
+    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY . /workspace/youtube_whisperer
 WORKDIR /workspace/youtube_whisperer
