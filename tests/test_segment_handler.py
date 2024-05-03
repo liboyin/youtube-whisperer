@@ -1,7 +1,12 @@
 from faster_whisper.transcribe import Segment
 import pytest
 
-from youtube_whisperer.waveform_transcriber import duplicate_segments_to_file, write_segments_to_file
+from youtube_whisperer.segment_handler import (
+    duplicate_segments_to_file,
+    load_segments_from_file,
+    load_segments_from_lines,
+    write_segments_to_file,
+)
 
 SEGMENTS = [
     Segment(id=1, seek=2704, start=0.0, end=1.24, text='Segment', tokens=[50365, 4511], temperature=0.0, avg_logprob=-0.309651929245898, compression_ratio=1.2782608695652173, no_speech_prob=0.72765052318573, words=None),
@@ -32,3 +37,23 @@ def test_write_segments_to_file(tmp_path):
     assert output_file_path.is_file()
     assert output_file_path.read_text() == '\n'.join(map(str, SEGMENTS))
     output_file_path.unlink()
+
+
+def test_load_segments_from_lines():
+    segments = load_segments_from_lines(map(str, SEGMENTS))
+    assert len(segments) == 3
+    assert all(isinstance(x, Segment) for x in segments)
+    assert segments[0].text == 'Segment'
+    assert segments[1].text == 'to'
+    assert segments[2].text == 'file'
+
+
+def test_load_segments_from_file(tmp_path):
+    file_path = tmp_path / 'segments.txt'
+    file_path.write_text('\n'.join(map(str, SEGMENTS)))
+    segments = load_segments_from_file(file_path)
+    assert len(segments) == 3
+    assert all(isinstance(x, Segment) for x in segments)
+    assert segments[0].text == 'Segment'
+    assert segments[1].text == 'to'
+    assert segments[2].text == 'file'

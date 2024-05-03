@@ -6,26 +6,8 @@ from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
 
 from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_output_file
+from youtube_whisperer.segment_handler import load_segments_from_file
 from youtube_whisperer.srt_deduplicator import SrtBlock, convert_srt_blocks_to_str, yield_deduplicated_srt_blocks
-
-
-def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:
-    """
-    Load Segments from an iterable of lines.
-    """
-    result = []
-    for line in lines:
-        if line := line.strip():
-            result.append(eval(line, globals(), locals()))
-    return result
-
-
-def load_segments_from_file(file_path: Path) -> list[Segment]:
-    """
-    Load Segments from a file.
-    """
-    with file_path.open() as file_handler:
-        return load_segments_from_lines(file_handler)
 
 
 def segment_to_srt_block(segment: Segment) -> SrtBlock:

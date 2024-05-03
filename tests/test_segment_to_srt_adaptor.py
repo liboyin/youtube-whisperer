@@ -2,8 +2,6 @@ from faster_whisper.transcribe import Segment
 
 from youtube_whisperer.segment_to_srt_adaptor import (
     convert_segments_file_to_srt,
-    load_segments_from_file,
-    load_segments_from_lines,
     segment_to_srt_block,
     yield_srt_blocks_from_segments,
 )
@@ -37,26 +35,6 @@ def test_yield_srt_blocks_from_segments():
     assert srt_blocks[2].start_time == '00:00:04,240'
     assert srt_blocks[2].end_time == '00:00:06,240'
     assert srt_blocks[2].content == ['SRT']
-
-
-def test_load_segments_from_lines():
-    segments = load_segments_from_lines(map(str, SEGMENTS))
-    assert len(segments) == 3
-    assert all(isinstance(x, Segment) for x in segments)
-    assert segments[0].text == 'Segment'
-    assert segments[1].text == 'to'
-    assert segments[2].text == 'SRT'
-
-
-def test_load_segments_from_file(tmp_path):
-    file_path = tmp_path / 'segments.txt'
-    file_path.write_text('\n'.join(map(str, SEGMENTS)))
-    segments = load_segments_from_file(file_path)
-    assert len(segments) == 3
-    assert all(isinstance(x, Segment) for x in segments)
-    assert segments[0].text == 'Segment'
-    assert segments[1].text == 'to'
-    assert segments[2].text == 'SRT'
 
 
 def test_convert_segments_file_to_srt(tmp_path):
