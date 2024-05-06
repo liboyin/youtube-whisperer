@@ -14,6 +14,7 @@ dependencies = [
   "ctranslate2",
   "faster-whisper",
   "ffmpeg-python",
+  "youtube-transcript-api",
   "yt-dlp",
 ]
 
