@@ -130,11 +130,11 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
         Path: The path to the output file.
     """
     print("Processing", input_file_path)
-    output_file_path = output_file_path or input_file_path
+    output_file_path = prepare_output_file(output_file_path or input_file_path)
     with prepare_input_file(input_file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
-    prepare_output_file(output_file_path).write_text(convert_srt_blocks_to_str(blocks))
+    output_file_path.write_text(convert_srt_blocks_to_str(blocks))
     return output_file_path
 
 
