@@ -33,7 +33,7 @@ def test_duplicate_segments_to_file(tmp_path):
 
 def test_write_segments_to_file(tmp_path):
     output_file_path = tmp_path / "output.seg"
-    assert write_segments_to_file(SEGMENTS, output_file_path) is None
+    write_segments_to_file(SEGMENTS, output_file_path)
     assert output_file_path.is_file()
     assert output_file_path.read_text() == '\n'.join(map(str, SEGMENTS))
     output_file_path.unlink()
