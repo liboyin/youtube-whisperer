@@ -19,7 +19,7 @@ def main() -> None:
     for source in parser.parse_args().sources:
         input_file_path = download_video_with_default_title(source) if is_url(source) else Path(source)
         segments_generator = transcribe_waveform_with_default_model(load_waveform_from_file(input_file_path))
-        segments_generator = duplicate_segments_to_file(segments_generator, input_file_path.with_suffix('.txt'))
+        segments_generator = duplicate_segments_to_file(segments_generator, input_file_path.with_suffix('.seg'))
         srt_blocks_generator = yield_deduplicated_srt_blocks(yield_srt_blocks_from_segments(segments_generator))
         output_file_path = prepare_output_file(input_file_path.with_suffix('.srt'))
         output_file_path.write_text(convert_srt_blocks_to_str(srt_blocks_generator))

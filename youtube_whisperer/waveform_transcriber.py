@@ -50,12 +50,12 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
     Args:
         input_file_path (Path): The path to the input file containing the waveform.
         output_file_path (Path, optional): The path to the output file where the transcribed Segments will be saved.
-            If not provided, a file with the same name as the input file and a '.txt' extension will be created.
+            If not provided, a file with the same name as the input file and a '.seg' extension will be created.
 
     Returns:
         Path: The path to the output file containing the transcribed Segments.
     """
-    output_file_path = output_file_path or input_file_path.with_suffix('.txt')
+    output_file_path = output_file_path or input_file_path.with_suffix('.seg')
     print('Saving Segments to:', output_file_path)
     segments_generator = transcribe_waveform_with_default_model(load_waveform_from_file(input_file_path))
     for segment in duplicate_segments_to_file(segments_generator, output_file_path):

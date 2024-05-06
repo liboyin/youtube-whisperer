@@ -38,7 +38,7 @@ def test_yield_srt_blocks_from_segments():
 
 
 def test_convert_segments_file_to_srt(tmp_path):
-    input_file_path = tmp_path / 'segments.txt'
+    input_file_path = tmp_path / 'segments.seg'
     input_file_path.write_text('\n'.join(map(str, SEGMENTS)))
     output_file_path = convert_segments_file_to_srt(input_file_path, deduplicate=False)
     assert output_file_path.is_file()

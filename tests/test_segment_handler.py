@@ -16,7 +16,7 @@ SEGMENTS = [
 
 
 def test_duplicate_segments_to_file(tmp_path):
-    output_file_path = tmp_path / "output.txt"
+    output_file_path = tmp_path / "output.seg"
     segments_generator = duplicate_segments_to_file(SEGMENTS, output_file_path)
     # the file should not exist at this point
     assert not output_file_path.exists()
@@ -32,7 +32,7 @@ def test_duplicate_segments_to_file(tmp_path):
 
 
 def test_write_segments_to_file(tmp_path):
-    output_file_path = tmp_path / "output.txt"
+    output_file_path = tmp_path / "output.seg"
     assert write_segments_to_file(SEGMENTS, output_file_path) is None
     assert output_file_path.is_file()
     assert output_file_path.read_text() == '\n'.join(map(str, SEGMENTS))
@@ -49,7 +49,7 @@ def test_load_segments_from_lines():
 
 
 def test_load_segments_from_file(tmp_path):
-    file_path = tmp_path / 'segments.txt'
+    file_path = tmp_path / 'segments.seg'
     file_path.write_text('\n'.join(map(str, SEGMENTS)))
     segments = load_segments_from_file(file_path)
     assert len(segments) == 3
