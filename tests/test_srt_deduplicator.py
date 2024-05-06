@@ -1,7 +1,7 @@
 from youtube_whisperer.srt_deduplicator import (
     SrtBlock,
     convert_srt_blocks_to_str,
-    deduplicate_single,
+    deduplicate_srt_file,
     yield_deduplicated_srt_blocks,
     yield_lines_from_srt_blocks,
     yield_srt_blocks_from_lines,
@@ -100,8 +100,8 @@ def test_convert_srt_blocks_to_str():
     assert convert_srt_blocks_to_str(blocks) == expected
 
 
-def test_deduplicate_single(temp_srt_file: Path):
-    deduplicate_single(temp_srt_file)
+def test_deduplicate_srt_file(temp_srt_file: Path):
+    assert deduplicate_srt_file(temp_srt_file) is temp_srt_file
     expected = dedent("""\
         1
         00:00:01,000 --> 00:00:02,000

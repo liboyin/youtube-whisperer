@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator, Iterable, Self
 
-from youtube_whisperer.pathlib_extensions import prepare_input_file
+from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_output_file
 
 ARROW = '-->'
 
@@ -118,18 +118,24 @@ def convert_srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
     return '\n'.join(yield_lines_from_srt_blocks(blocks))
 
 
-def deduplicate_single(file_path: Path) -> None:
+def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None) -> Path:
     """
-    Main function to read an SRT file, deduplicate subtitle blocks, and write the results back to the same file.
-    
+    Deduplicates the contents of an SRT file and writes the deduplicated content to a new file.
+
     Args:
-        file_path: Path to the SRT file.
+        input_file_path (Path): The path to the input SRT file.
+        output_file_path (Path | None, optional): The path to the output file. If not provided, the input file will be overwritten. Defaults to None.
+
+    Returns:
+        Path: The path to the output file.
     """
-    print("Processing", file_path)
-    with prepare_input_file(file_path).open() as file_handler:
+    print("Processing", input_file_path)
+    output_file_path = output_file_path or input_file_path
+    with prepare_input_file(input_file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
-    file_path.write_text(convert_srt_blocks_to_str(blocks))
+    prepare_output_file(output_file_path).write_text(convert_srt_blocks_to_str(blocks))
+    return output_file_path
 
 
 def main() -> None:
@@ -138,7 +144,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, help="SRT file path to read from and to write to, or a directory containing SRT files.")
-    deduplicate_single(parser.parse_args().path)
+    deduplicate_srt_file(parser.parse_args().path)
 
 if __name__ == '__main__':
     main()
