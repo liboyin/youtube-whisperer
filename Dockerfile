@@ -12,4 +12,4 @@ WORKDIR /workspace/youtube_whisperer
 RUN pip3 --disable-pip-version-check --no-cache-dir install -r requirements.txt && \
     pip3 --disable-pip-version-check --no-cache-dir install --editable .
 USER vscode
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["sleep", "infinity"]
