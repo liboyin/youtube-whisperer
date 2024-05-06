@@ -1,7 +1,6 @@
 from youtube_whisperer.srt_deduplicator import (
     SrtBlock,
     convert_srt_blocks_to_str,
-    deduplicate_multi,
     deduplicate_single,
     yield_deduplicated_srt_blocks,
     yield_lines_from_srt_blocks,
@@ -9,7 +8,6 @@ from youtube_whisperer.srt_deduplicator import (
 )
 from pathlib import Path
 from textwrap import dedent
-from unittest import mock
 
 import pytest
 
@@ -114,10 +112,3 @@ def test_deduplicate_single(temp_srt_file: Path):
         Second line.
         """)
     assert temp_srt_file.read_text().strip() == expected.strip()
-
-
-def test_deduplicate_multi(temp_srt_file: Path):
-    temp_dir_path = temp_srt_file.parent
-    with mock.patch('youtube_whisperer.srt_deduplicator.deduplicate_single') as mock_deduplicate_single:
-        deduplicate_multi(temp_dir_path, recursive=False)
-    assert mock_deduplicate_single.call_count == 1

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator, Iterable, Self
 
-from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_input_dir
+from youtube_whisperer.pathlib_extensions import prepare_input_file
 
 ARROW = '-->'
 
@@ -132,34 +132,13 @@ def deduplicate_single(file_path: Path) -> None:
     file_path.write_text(convert_srt_blocks_to_str(blocks))
 
 
-def deduplicate_multi(dir_path: Path, recursive: bool = True) -> None:
-    """
-    Main function to read all SRT files in a directory and its subdirectories (if recursive is True), 
-    deduplicate subtitle blocks, and write the results back to the same files.
-
-    Args:
-        dir_path: Path to the directory containing SRT files.
-        recursive: Whether to search for SRT files recursively in subdirectories. Default is True.
-    """
-    prepare_input_dir(dir_path)
-    file_iterator = dir_path.rglob('*.srt') if recursive else dir_path.glob('*.srt')
-    for file_path in file_iterator:
-        deduplicate_single(file_path)
-
-
 def main() -> None:
     """
     CLI entry point for deduplicating SRT files.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, help="SRT file path to read from and to write to, or a directory containing SRT files.")
-    p = parser.parse_args().path
-    if p.is_file():
-        deduplicate_single(p)
-    elif p.is_dir():
-        deduplicate_multi(p)
-    else:
-        raise FileNotFoundError(f"{p} is not a file or a directory")
+    deduplicate_single(parser.parse_args().path)
 
 if __name__ == '__main__':
     main()
