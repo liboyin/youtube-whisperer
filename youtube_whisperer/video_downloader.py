@@ -62,11 +62,12 @@ def download_video_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_
 
 def main() -> None:
     """
-    CLI entry point of the video downloader.
+    CLI entry point to download videos from URLs.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("url", help="The URL of the video to download.")
-    download_video_with_default_title(parser.parse_args().url)
+    parser.add_argument("urls", nargs='+', metavar='N', help="URLs of videos to download.")
+    for url in parser.parse_args().urls:
+        download_video_with_default_title(url)
 
 if __name__ == '__main__':
     main()

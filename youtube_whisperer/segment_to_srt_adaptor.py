@@ -55,11 +55,12 @@ def convert_segments_file_to_srt(input_file_path: Path, output_file_path: Path |
 
 def main() -> None:
     """
-    CLI entry point to convert a Segment file to an SRT file.
+    CLI entry point to convert Segment files to SRT.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("path", type=Path, help="Segment file path to convert to an SRT file.")
-    convert_segments_file_to_srt(parser.parse_args().path)
+    parser.add_argument("paths", type=Path, nargs='+', metavar='N', help="Segment file paths to convert to SRT.")
+    for path in parser.parse_args().paths:
+        convert_segments_file_to_srt(path)
 
 if __name__ == '__main__':
     main()

@@ -12,10 +12,10 @@ from youtube_whisperer.waveform_transcriber import duplicate_segments_to_file, t
 
 def main() -> None:
     """
-    CLI entry point to transcribe a waveform file and save results to a Segment file and an SRT file.
+    CLI entry point to transcribe waveform files and save each result to a Segment file and an SRT file.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("sources", nargs='+', help="Waveform file paths to transcribe, or video URLs to download and transcribe.")
+    parser.add_argument("sources", nargs='+', metavar='N', help="Waveform file paths to transcribe, or video URLs to download and transcribe.")
     for source in parser.parse_args().sources:
         input_file_path = download_video_with_default_title(source) if is_url(source) else Path(source)
         segments_generator = transcribe_waveform_with_default_model(load_waveform_from_file(input_file_path))

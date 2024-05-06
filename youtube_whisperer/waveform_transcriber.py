@@ -65,12 +65,12 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
 
 def main() -> None:
     """
-    CLI entry point to transcribe a waveform file and save the transcribed Segments to a file.
+    CLI entry point to transcribe waveform files and save each result to a Segments file.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("path", type=Path, help="Waveform file path to transcribe.")
-    transcribe_file_with_default_model(parser.parse_args().path)
-
+    parser.add_argument("paths", type=Path, nargs='+', metavar='N', help="Waveform file paths to transcribe.")
+    for path in parser.parse_args().paths:
+        transcribe_file_with_default_model(path)
 
 if __name__ == "__main__":
     main()

@@ -140,11 +140,12 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
 
 def main() -> None:
     """
-    CLI entry point for deduplicating SRT files.
+    CLI entry point to deduplicate SRT files.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("path", type=Path, help="SRT file path to read from and to write to, or a directory containing SRT files.")
-    deduplicate_srt_file(parser.parse_args().path)
+    parser.add_argument("paths", type=Path, nargs='+', metavar='N', help="SRT file paths to deduplicate.")
+    for path in parser.parse_args().paths:
+        deduplicate_srt_file(path)
 
 if __name__ == '__main__':
     main()
