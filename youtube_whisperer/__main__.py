@@ -1,14 +1,11 @@
 import argparse
 from pathlib import Path
 
-from youtube_whisperer.pathlib_extensions import prepare_output_file
-from youtube_whisperer.segment_to_srt_adaptor import yield_deduplicated_srt_blocks, yield_srt_blocks_from_segments
-from youtube_whisperer.srt_deduplicator import convert_srt_blocks_to_str
+from youtube_whisperer.segment_to_srt_adaptor import convert_segments_file_to_srt
 from youtube_whisperer.transcript_downloader import download_transcript_as_srt_file
 from youtube_whisperer.utils import is_url
 from youtube_whisperer.video_downloader import download_video_with_default_title
-from youtube_whisperer.waveform_loader import load_waveform_from_file
-from youtube_whisperer.waveform_transcriber import duplicate_segments_to_file, transcribe_waveform_with_default_model
+from youtube_whisperer.waveform_transcriber import transcribe_file_with_default_model
 
 
 def main() -> None:
@@ -19,16 +16,15 @@ def main() -> None:
     parser.add_argument("sources", nargs='+', metavar='N', help="Waveform file paths to transcribe, or video URLs to download and transcribe.")
     for source in parser.parse_args().sources:
         if is_url(source):
-            input_file_path = download_video_with_default_title(source)
-            if download_transcript_as_srt_file(source, input_file_path.with_suffix('.srt')):
+            waveform_file_path = download_video_with_default_title(source)
+            if download_transcript_as_srt_file(source, waveform_file_path.with_suffix('.srt')):
                 continue
         else:
-            input_file_path = Path(source)
-        segments_generator = transcribe_waveform_with_default_model(load_waveform_from_file(input_file_path))
-        segments_generator = duplicate_segments_to_file(segments_generator, input_file_path.with_suffix('.seg'))
-        srt_blocks_generator = yield_deduplicated_srt_blocks(yield_srt_blocks_from_segments(segments_generator))
-        output_file_path = prepare_output_file(input_file_path.with_suffix('.srt'))
-        output_file_path.write_text(convert_srt_blocks_to_str(srt_blocks_generator))
+            waveform_file_path = Path(source)
+        segment_file_path = transcribe_file_with_default_model(waveform_file_path)
+        print('Saved Segments file:', segment_file_path)
+        srt_file_path = convert_segments_file_to_srt(segment_file_path, deduplicate=True)
+        print('Saved SRT file:', srt_file_path)
 
 
 if __name__ == "__main__":
