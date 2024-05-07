@@ -1,8 +1,56 @@
 services:
-  app:
+  database:
+    image: postgres:16-bookworm
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=prefect
+    ports:
+      - 5432:5432
+    volumes:
+      - prefect-db:/var/lib/postgresql/data
+  prefect-server:
+    image: prefecthq/prefect:2.18.1-python3.12-conda
+    restart: always
+    depends_on:
+      - database
+    volumes:
+      - prefect-server-vol:/root/.prefect
+    ports:
+      - 4200:4200
+    environment:
+      - PREFECT_SERVER_API_HOST=0.0.0.0
+      - PREFECT_API_URL=http://127.0.0.1:4200/api
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://postgres:postgres@database:5432/prefect
+    entrypoint: ["/opt/prefect/entrypoint.sh", "prefect", "server", "start"]
+  prefect-worker:
+    image: prefecthq/prefect:2.18.1-python3.12-conda
+    restart: always
+    depends_on:
+      - prefect-server
+    volumes:
+      - prefect-worker-vol:/root/.prefect
+      - ~/.whisper:/root/.whisper
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+    entrypoint: ["/opt/prefect/entrypoint.sh", "prefect", "worker", "start", "--name", "LocalWorker", "--pool", "LocalPool", "--with-healthcheck"]
+  devcontainer:
     build:
       context: .
       dockerfile: Dockerfile
+    depends_on:
+      - prefect-worker
     volumes:
       - .:/workspace/youtube_whisperer
       - ~/.whisper:/home/vscode/.whisper
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+volumes:
+  prefect-db:
+  prefect-server-vol:
+  prefect-worker-vol:
+networks:
+  default:
+    name: prefect-network
+    driver: bridge

@@ -1,6 +1,6 @@
 {
     "dockerComposeFile": "../docker-compose.cpu.yaml",
-    "service": "app",
+    "service": "devcontainer",
     "overrideCommand": true,
     "remoteUser": "vscode",
     "workspaceFolder": "/workspace/youtube_whisperer",
