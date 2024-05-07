@@ -39,8 +39,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      - prefect-worker
     volumes:
       - .:/workspace/youtube_whisperer
       - ~/.whisper:/home/vscode/.whisper
