@@ -107,7 +107,7 @@ def download_transcript_as_srt_text(url: str, lang_codes: Iterable[str] = DEFAUL
     return SRTFormatter().format_transcript(transcript)
 
 
-def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes: Iterable[str] = DEFAULT_LANG_CODES) -> Path | None:
+def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes: Iterable[str] = DEFAULT_LANG_CODES) -> bool:
     """
     Downloads the transcript of a YouTube video as an SRT file.
 
@@ -117,14 +117,14 @@ def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes
         lang_codes (Iterable[str], optional): A list of language codes to filter available transcripts. Defaults to DEFAULT_LANG_CODES.
 
     Returns:
-        Path | None: The path of the downloaded SRT file if successful, or None otherwise.
+        bool: Whether the download is successful.
     """
     srt_text = download_transcript_as_srt_text(url, lang_codes)
     if srt_text is None:
-        return None
+        return False
     print("Writing SRT file:", output_file_path)
     prepare_output_file(output_file_path).write_text(srt_text)
-    return output_file_path
+    return True
 
 
 def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR, lang_codes: Iterable[str] = DEFAULT_LANG_CODES) -> Path | None:
@@ -140,7 +140,10 @@ def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Pat
         Path | None: The path to the downloaded SRT file if successful, or None otherwise.
     """
     title = replace_os_reserved_chars(get_video_title(url))
-    return download_transcript_as_srt_file(url, target_dir / f'{title}.srt', lang_codes)
+    output_file_path = target_dir / f'{title}.srt'
+    if download_transcript_as_srt_file(url, output_file_path, lang_codes):
+        return output_file_path
+    return None
 
 
 def main() -> None:
@@ -148,7 +151,7 @@ def main() -> None:
     CLI entry point to download video transcripts from URLs.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("urls", nargs='+', metavar='N', help="SRT file paths to deduplicate.")
+    parser.add_argument("urls", nargs='+', metavar='N', help="URLs of videos to download transcripts for.")
     for url in parser.parse_args().urls:
         download_transcript_as_srt_file_with_default_title(url)
 
