@@ -4,10 +4,10 @@ services:
       file: docker-compose.yaml
       service: prefect-worker
     environment:
-      - ASR_CUDA=0
+      - ASR_USE_CUDA=0
   devcontainer:
     extends:
       file: docker-compose.yaml
       service: devcontainer
     environment:
-      - ASR_CUDA=0
+      - ASR_USE_CUDA=0
