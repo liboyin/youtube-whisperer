@@ -1,8 +1,8 @@
 services:
-  app:
+  devcontainer:
     extends:
       file: docker-compose.yaml
-      service: app
+      service: devcontainer
     environment:
       - ASR_CUDA=1
     deploy:

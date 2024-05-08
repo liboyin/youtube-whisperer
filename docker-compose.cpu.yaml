@@ -1,7 +1,13 @@
 services:
-  app:
+  prefect-worker:
     extends:
       file: docker-compose.yaml
-      service: app
+      service: prefect-worker
+    environment:
+      - ASR_CUDA=0
+  devcontainer:
+    extends:
+      file: docker-compose.yaml
+      service: devcontainer
     environment:
       - ASR_CUDA=0
