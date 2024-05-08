@@ -34,6 +34,7 @@ services:
       - ~/.whisper:/root/.whisper
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
+      - WHISPER_USE_CUDA=0
     entrypoint: ["/opt/prefect/entrypoint.sh", "prefect", "worker", "start", "--name", "LocalWorker", "--pool", "LocalPool", "--with-healthcheck"]
   devcontainer:
     build:
@@ -44,6 +45,7 @@ services:
       - ~/.whisper:/home/vscode/.whisper
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
+      - WHISPER_USE_CUDA=0
 volumes:
   prefect-db:
   prefect-server-vol:
