@@ -10,14 +10,14 @@ from youtube_whisperer.utils import DEFAULT_HOME_DIR, strtobool
 
 def get_default_cuda_flag() -> bool:
     """
-    This function checks the environment variable ASR_USE_CUDA to determine whether to use CUDA for GPU acceleration.
+    This function checks the environment variable WHISPER_USE_CUDA to determine whether to use CUDA for GPU acceleration.
     If the environment variable is not set, it checks if there is a CUDA device available on the system.
     If a CUDA device is available, it returns True; otherwise, it returns False.
 
     Returns:
         bool: True if CUDA should be used, False otherwise.
     """
-    gpu = os.getenv("ASR_USE_CUDA", None)
+    gpu = os.getenv("WHISPER_USE_CUDA", None)
     if gpu is None:
         return ctranslate2.get_cuda_device_count() > 0
     return strtobool(gpu)
@@ -30,8 +30,8 @@ def get_default_whisper_model_parameters() -> dict[str, Any]:
     The parameters are determined based on the environment variables and the available hardware.
     """
     result: dict[str, Any] = {
-        "model_size_or_path": os.getenv("ASR_MODEL", "large-v3"),
-        "download_root": os.getenv("ASR_MODEL_PATH", str(DEFAULT_HOME_DIR)),
+        "model_size_or_path": os.getenv("WHISPER_MODEL", "large-v3"),
+        "download_root": os.getenv("WHISPER_MODEL_PATH", str(DEFAULT_HOME_DIR)),
     }
     use_cuda = get_default_cuda_flag()
     result["device"] = "cuda" if use_cuda else "cpu"
