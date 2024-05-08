@@ -122,7 +122,7 @@ def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes
     srt_text = download_transcript_as_srt_text(url, lang_codes)
     if srt_text is None:
         return False
-    print("Writing SRT file:", output_file_path)
+    print("About to write to SRT file:", output_file_path)
     prepare_output_file(output_file_path).write_text(srt_text)
     return True
 
