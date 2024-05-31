@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Generator
+from typing import Iterable, Iterator
 
 from faster_whisper.transcribe import Segment
 
@@ -36,7 +36,7 @@ def write_segments_to_file(segments: Iterable[Segment], file_path: Path) -> None
     prepare_output_file(file_path).write_text('\n'.join(map(str, segments)))
 
 
-def duplicate_segments_to_file(segments: Iterable[Segment], file_path: Path, flush: bool = True) -> Generator[Segment, None, None]:
+def duplicate_segments_to_file(segments: Iterable[Segment], file_path: Path, flush: bool = True) -> Iterator[Segment]:
     """
     Write Segments to a file, and yield them.
 
@@ -46,7 +46,7 @@ def duplicate_segments_to_file(segments: Iterable[Segment], file_path: Path, flu
         flush (bool, optional): Whether to flush the file after writing each Segment. Defaults to True.
 
     Yields:
-        Generator[Segment, None, None]: A generator of Segments as-is.
+        Segments from input as-is.
     """
     with prepare_output_file(file_path).open('w') as file_handler:
         for i, x in enumerate(segments):

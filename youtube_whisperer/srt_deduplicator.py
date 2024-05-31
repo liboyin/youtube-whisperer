@@ -1,7 +1,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator, Iterable, Self
+from typing import Iterable, Iterator, Self
 
 from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_output_file
 
@@ -44,9 +44,9 @@ class SrtBlock:
         return result
 
 
-def yield_srt_blocks_from_lines(lines: Iterable[str]) -> Generator[SrtBlock, None, None]:
+def yield_srt_blocks_from_lines(lines: Iterable[str]) -> Iterator[SrtBlock]:
     """
-    Generator that yields SrtBlock instances from an iterable of lines from an SRT file.
+    Yields SrtBlock instances from an iterable of lines from an SRT file.
     
     Args:
         text (Iterable[str]): Iterable of strings representing the SRT file content.
@@ -69,9 +69,9 @@ def yield_srt_blocks_from_lines(lines: Iterable[str]) -> Generator[SrtBlock, Non
         yield SrtBlock.from_lines(block_lines)
 
 
-def yield_deduplicated_srt_blocks(blocks: Iterable[SrtBlock]) -> Generator[SrtBlock, None, None]:
+def yield_deduplicated_srt_blocks(blocks: Iterable[SrtBlock]) -> Iterator[SrtBlock]:
     """
-    Generator that yields deduplicated SrtBlock instances from an iterable of SrtBlock instances.
+    Yields deduplicated SrtBlock instances from an iterable of SrtBlock instances.
     
     Args:
         blocks (Iterable[SrtBlock]): Iterable of SrtBlock instances.
@@ -91,9 +91,9 @@ def yield_deduplicated_srt_blocks(blocks: Iterable[SrtBlock]) -> Generator[SrtBl
         yield previous
 
 
-def yield_lines_from_srt_blocks(blocks: Iterable[SrtBlock]) -> Generator[str, None, None]:
+def yield_lines_from_srt_blocks(blocks: Iterable[SrtBlock]) -> Iterator[str]:
     """
-    Generator that yields lines from an iterable of SrtBlock objects.
+    Yields lines from an iterable of SrtBlock objects.
 
     Args:
         blocks (Iterable[SrtBlock]): An iterable of SrtBlock objects.

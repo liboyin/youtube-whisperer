@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import Iterable, Generator
+from typing import Iterable, Iterator
 
 from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
@@ -21,9 +21,9 @@ def segment_to_srt_block(segment: Segment) -> SrtBlock:
     )
 
 
-def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Generator[SrtBlock, None, None]:
+def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Iterator[SrtBlock]:
     """
-    Generate SrtBlock objects from an iterable of Segments.
+    Yield SrtBlock objects from an iterable of Segments. Print each Segment and SrtBlock to stdout.
     """
     for segment in segments:
         print(segment)
