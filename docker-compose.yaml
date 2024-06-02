@@ -10,11 +10,21 @@ services:
       - 5432:5432
     volumes:
       - postgres-vol:/var/lib/postgresql/data
+  minio:
+    image: minio/minio:latest
+    restart: always
+    volumes:
+      - minio-vol:/data
+    ports:
+      - 9000:9000
+      - 9001:9001
+    entrypoint: ["minio", "server", "--address", "0.0.0.0:9000", "--console-address", "0.0.0.0:9001", "/data"]
   prefect-server:
     image: prefecthq/prefect:2.18.1-python3.12-conda
     restart: always
     depends_on:
       - postgres
+      - minio
     volumes:
       - prefect-server-vol:/root/.prefect
     ports:
@@ -48,6 +58,7 @@ services:
       - WHISPER_USE_CUDA=0
 volumes:
   postgres-vol:
+  minio-vol:
   prefect-server-vol:
   prefect-worker-vol:
 networks:
