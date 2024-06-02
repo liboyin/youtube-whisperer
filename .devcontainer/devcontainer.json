@@ -3,7 +3,7 @@
     "service": "devcontainer",
     "overrideCommand": true,
     "remoteUser": "vscode",
-    "workspaceFolder": "/workspace/youtube_whisperer",
+    "workspaceFolder": "/workspace/youtube-whisperer",
     "mounts": [
         "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind"
     ],

@@ -41,7 +41,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/workspace/youtube_whisperer
+      - .:/workspace/youtube-whisperer
       - ~/.whisper:/home/vscode/.whisper
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api

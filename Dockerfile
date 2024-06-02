@@ -6,8 +6,8 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY . /workspace/youtube_whisperer
-WORKDIR /workspace/youtube_whisperer
+COPY . /workspace/youtube-whisperer
+WORKDIR /workspace/youtube-whisperer
 # pin dependency versions by installing from the lock file before installing this project
 RUN pip3 --disable-pip-version-check --no-cache-dir install -r requirements.txt && \
     pip3 --disable-pip-version-check --no-cache-dir install --editable .
