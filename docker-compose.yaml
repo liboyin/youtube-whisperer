@@ -1,5 +1,5 @@
 services:
-  database:
+  postgres:
     image: postgres:16-bookworm
     restart: always
     environment:
@@ -9,12 +9,12 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - prefect-db:/var/lib/postgresql/data
+      - postgres-vol:/var/lib/postgresql/data
   prefect-server:
     image: prefecthq/prefect:2.18.1-python3.12-conda
     restart: always
     depends_on:
-      - database
+      - postgres
     volumes:
       - prefect-server-vol:/root/.prefect
     ports:
@@ -22,7 +22,7 @@ services:
     environment:
       - PREFECT_SERVER_API_HOST=0.0.0.0
       - PREFECT_API_URL=http://127.0.0.1:4200/api
-      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://postgres:postgres@database:5432/prefect
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/prefect
     entrypoint: ["/opt/prefect/entrypoint.sh", "prefect", "server", "start"]
   prefect-worker:
     image: prefecthq/prefect:2.18.1-python3.12-conda
@@ -47,7 +47,7 @@ services:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - WHISPER_USE_CUDA=0
 volumes:
-  prefect-db:
+  postgres-vol:
   prefect-server-vol:
   prefect-worker-vol:
 networks:
