@@ -27,6 +27,7 @@ def get_video_id(url: str) -> str:
 
         https://youtu.be/n9xhJrPXop4?si=sXdajbZPk7Bn2OjD&t=30
         https://www.youtube.com/watch?v=n9xhJrPXop4&si=sXdajbZPk7Bn2OjD&t=30
+        https://www.youtube.com/live/3TufaG29B7w?si=b5DQpvYgzcKJjJ0L
     
     Parameters:
         url (str): The YouTube video URL.
@@ -41,7 +42,10 @@ def get_video_id(url: str) -> str:
     if parsed.netloc == 'youtu.be':
         return parsed.path.strip('/')
     if parsed.netloc == 'www.youtube.com':
-        return parse_qs(parsed.query)['v'][0]
+        if parsed.path == '/watch':
+            return parse_qs(parsed.query)['v'][0]
+        if parsed.path.startswith('/live/'):
+            return parsed.path[6:]
     raise ValueError(url)
 
 

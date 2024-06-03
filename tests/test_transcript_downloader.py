@@ -6,6 +6,7 @@ from youtube_whisperer.transcript_downloader import get_video_id, get_first_matc
 def test_get_video_id():
     assert get_video_id('https://youtu.be/n9xhJrPXop4?si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
     assert get_video_id('https://www.youtube.com/watch?v=n9xhJrPXop4&si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
+    assert get_video_id('https://www.youtube.com/live/3TufaG29B7w?si=b5DQpvYgzcKJjJ0L') == '3TufaG29B7w'
     with pytest.raises(ValueError):
         get_video_id('https://example.com')
 
