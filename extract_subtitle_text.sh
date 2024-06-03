@@ -11,3 +11,6 @@ fi
 # -e '/^[0-9]*$/d' will delete lines that only contain numbers (sequence numbers)
 # -e '/^$/d' will delete empty lines
 sed -e '/-->/d' -e '/^[0-9]*$/d' -e '/^$/d' "$1"
+
+# To run this script over all .srt files:
+# find . -name "*.srt" -exec sh -c './extract_subtitle_text.sh "$1" > "${1%.srt}.txt"' _ {} \;
