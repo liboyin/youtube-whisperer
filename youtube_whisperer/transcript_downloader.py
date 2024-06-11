@@ -111,7 +111,7 @@ def download_transcript_as_srt_text(url: str, lang_codes: Iterable[str] = DEFAUL
     return SRTFormatter().format_transcript(transcript)
 
 
-def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes: Iterable[str] = DEFAULT_LANG_CODES) -> bool:
+def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes: Iterable[str] = DEFAULT_LANG_CODES, overwrite: bool = False) -> bool:
     """
     Downloads the transcript of a YouTube video as an SRT file.
 
@@ -119,10 +119,14 @@ def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes
         url (str): The URL of the YouTube video.
         output_file_path (Path): The path where the SRT file will be saved.
         lang_codes (Iterable[str], optional): A list of language codes to filter available transcripts. Defaults to DEFAULT_LANG_CODES.
+        overwrite (bool, optional): Whether to overwrite the transcript file if it already exists. Defaults to False.
 
     Returns:
         bool: Whether the download is successful.
     """
+    if not overwrite and output_file_path.is_file():
+        print(f'Skipping download because the target transcript file already exists: {output_file_path}')
+        return True
     srt_text = download_transcript_as_srt_text(url, lang_codes)
     if srt_text is None:
         return False
@@ -131,7 +135,7 @@ def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes
     return True
 
 
-def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR, lang_codes: Iterable[str] = DEFAULT_LANG_CODES) -> Path | None:
+def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR, lang_codes: Iterable[str] = DEFAULT_LANG_CODES, overwrite: bool = False) -> Path | None:
     """
     Downloads the transcript of a YouTube video as an SRT file named after the video title.
 
@@ -139,13 +143,14 @@ def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Pat
         url (str): The URL of the YouTube video.
         target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to DEFAULT_HOME_DIR.
         lang_codes (Iterable[str], optional): The language codes of the desired transcript. Defaults to DEFAULT_LANG_CODES.
+        overwrite (bool, optional): Whether to overwrite the transcript file if it already exists. Defaults to False.
 
     Returns:
         Path | None: The path to the downloaded SRT file if successful, or None otherwise.
     """
     title = replace_os_reserved_chars(get_video_title(url))
     output_file_path = target_dir / f'{title}.srt'
-    if download_transcript_as_srt_file(url, output_file_path, lang_codes):
+    if download_transcript_as_srt_file(url, output_file_path, lang_codes, overwrite=overwrite):
         return output_file_path
     return None
 

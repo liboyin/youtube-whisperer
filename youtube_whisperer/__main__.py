@@ -15,12 +15,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("sources", nargs='+', metavar='N', help="Waveform file paths to transcribe, or video URLs to download and transcribe.")
     for source in parser.parse_args().sources:
+        # downloaders do not overwrite by default because they are almost transactional
         if is_url(source):
             waveform_file_path = download_video_with_default_title(source)
             if download_transcript_as_srt_file(source, waveform_file_path.with_suffix('.srt')):
                 continue
         else:
             waveform_file_path = Path(source)
+        # local operations overwrite by default because they may fail half way through
         segment_file_path = transcribe_file_with_default_model(waveform_file_path)
         print('Saved Segments file:', segment_file_path)
         srt_file_path = convert_segments_file_to_srt(segment_file_path, deduplicate=True)
