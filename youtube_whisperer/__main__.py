@@ -26,7 +26,7 @@ def main() -> None:
         else:
             waveform_file_path = Path(source)
         # local operations overwrite by default because they may fail half way through
-        segment_file_path = transcribe_file_with_default_model(waveform_file_path)
+        segment_file_path = transcribe_file_with_default_model(waveform_file_path, language=language)
         print('Saved Segments file:', segment_file_path)
         srt_file_path = convert_segments_file_to_srt(segment_file_path, deduplicate=True)
         print('Saved SRT file:', srt_file_path)
