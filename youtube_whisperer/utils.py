@@ -1,6 +1,8 @@
 from pathlib import Path
 import re
 
+from faster_whisper.tokenizer import _LANGUAGE_CODES as WHISPER_LANG_CODES
+
 DEFAULT_HOME_DIR = Path.home() / ".whisper"
 
 
@@ -15,6 +17,15 @@ def is_url(text: str) -> bool:
         bool: True if the input text is a valid URL, False otherwise.
     """
     return bool(re.match(r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)", text))
+
+
+def get_verified_language(language: str | None) -> str | None:
+    """
+    Verifies if the given language is supported. Ignore None.
+    """
+    if language and language not in WHISPER_LANG_CODES:
+        raise ValueError("Unsupported language:", language)
+    return language
 
 
 def replace_os_reserved_chars(text: str, replacement: str = '_') -> str:

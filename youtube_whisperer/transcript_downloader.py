@@ -7,7 +7,7 @@ from youtube_transcript_api import TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
 from youtube_whisperer.pathlib_extensions import prepare_output_file
-from youtube_whisperer.utils import DEFAULT_HOME_DIR, replace_os_reserved_chars
+from youtube_whisperer.utils import DEFAULT_HOME_DIR, get_verified_language, replace_os_reserved_chars
 from youtube_whisperer.video_downloader import get_video_title
 
 DEFAULT_LANG_CODES = ('en', 'zh')
@@ -70,17 +70,21 @@ def get_first_matching_lang_code(candidate_lang_codes: Collection[str], requeste
     return None
 
 
-def download_transcript(url: str, lang_codes: Iterable[str] = DEFAULT_LANG_CODES) -> list[TranscriptBlock] | None:
+def download_transcript(url: str, lang_codes: Iterable[str] | None = None) -> list[TranscriptBlock] | None:
     """
     Downloads the transcript of a YouTube video.
 
     Args:
         url (str): The URL of the YouTube video.
-        lang_codes (Iterable[str], optional): A list of language codes to filter available transcripts. Defaults to DEFAULT_LANG_CODES.
+        lang_codes (Iterable[str] | None, optional): Language codes to filter available transcripts with.
+            If None, use `DEFAULT_LANG_CODES`. Defaults to None.
 
     Returns:
-        list[TranscriptBlock] | None: Downloaded transcript as a list of TranscriptBlock dicts, or None if no transcript in the requested language is available.
+        list[TranscriptBlock] | None: Downloaded transcript as a list of TranscriptBlock dicts.
+            If no transcript in the requested language is available, return None.
     """
+    if not lang_codes:  # note that the boolean value of an iterator is always True
+        lang_codes = DEFAULT_LANG_CODES
     try:
         transcripts = YouTubeTranscriptApi.list_transcripts(get_video_id(url))
     except TranscriptsDisabled:
@@ -94,13 +98,14 @@ def download_transcript(url: str, lang_codes: Iterable[str] = DEFAULT_LANG_CODES
     return result
 
 
-def download_transcript_as_srt_text(url: str, lang_codes: Iterable[str] = DEFAULT_LANG_CODES) -> str | None:
+def download_transcript_as_srt_text(url: str, lang_codes: Iterable[str] | None = None) -> str | None:
     """
     Downloads the transcript for a YouTube video and returns it as an SRT formatted text.
 
     Args:
         url (str): The URL of the YouTube video.
-        lang_codes (Iterable[str], optional): A list of language codes to filter available transcripts. Defaults to DEFAULT_LANG_CODES.
+        lang_codes (Iterable[str] | None, optional): Language codes to filter available transcripts with.
+            If None, fall back to `DEFAULT_LANG_CODES`. Defaults to None.
 
     Returns:
         str | None: The transcript as an SRT formatted text, or None if no transcript in the requested language is available.
@@ -111,14 +116,15 @@ def download_transcript_as_srt_text(url: str, lang_codes: Iterable[str] = DEFAUL
     return SRTFormatter().format_transcript(transcript)
 
 
-def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes: Iterable[str] = DEFAULT_LANG_CODES, overwrite: bool = False) -> bool:
+def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes: Iterable[str] | None = None, overwrite: bool = False) -> bool:
     """
     Downloads the transcript of a YouTube video as an SRT file.
 
     Args:
         url (str): The URL of the YouTube video.
         output_file_path (Path): The path where the SRT file will be saved.
-        lang_codes (Iterable[str], optional): A list of language codes to filter available transcripts. Defaults to DEFAULT_LANG_CODES.
+        lang_codes (Iterable[str] | None, optional): Language codes to filter available transcripts with.
+            If None, use `DEFAULT_LANG_CODES`. Defaults to None.
         overwrite (bool, optional): Whether to overwrite the transcript file if it already exists. Defaults to False.
 
     Returns:
@@ -135,14 +141,15 @@ def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes
     return True
 
 
-def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR, lang_codes: Iterable[str] = DEFAULT_LANG_CODES, overwrite: bool = False) -> Path | None:
+def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR, lang_codes: Iterable[str] | None = None, overwrite: bool = False) -> Path | None:
     """
     Downloads the transcript of a YouTube video as an SRT file named after the video title.
 
     Args:
         url (str): The URL of the YouTube video.
         target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to DEFAULT_HOME_DIR.
-        lang_codes (Iterable[str], optional): The language codes of the desired transcript. Defaults to DEFAULT_LANG_CODES.
+        lang_codes (Iterable[str] | None, optional): Language codes to filter available transcripts with.
+            If None, use `DEFAULT_LANG_CODES`. Defaults to None.
         overwrite (bool, optional): Whether to overwrite the transcript file if it already exists. Defaults to False.
 
     Returns:
@@ -161,8 +168,12 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs='+', metavar='N', help="URLs of videos to download transcripts for.")
+    parser.add_argument("-l", "--language", type=str, default=None, help="Language to download transcripts in. Defaults to DEFAULT_LANG_CODES.")
+    lang_codes = None
+    if language := get_verified_language(parser.parse_args().language):
+        lang_codes = [language]
     for url in parser.parse_args().urls:
-        download_transcript_as_srt_file_with_default_title(url)
+        download_transcript_as_srt_file_with_default_title(url, lang_codes=lang_codes)
 
 if __name__ == '__main__':
     main()
