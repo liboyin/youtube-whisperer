@@ -167,7 +167,7 @@ def main() -> None:
     CLI entry point to download video transcripts from URLs.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("urls", nargs='+', metavar='N', help="URLs of videos to download transcripts for.")
+    parser.add_argument("urls", nargs='+', metavar='url', help="URLs of videos to download transcripts for.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language to download transcripts in. Defaults to DEFAULT_LANG_CODES.")
     lang_codes = None
     if language := get_verified_language(parser.parse_args().language):

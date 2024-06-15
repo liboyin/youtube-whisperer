@@ -13,7 +13,7 @@ def main() -> None:
     CLI entry point to transcribe waveform files and save each result to a Segment file and an SRT file.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("sources", nargs='+', metavar='N', help="Waveform file paths to transcribe, or video URLs to download and transcribe.")
+    parser.add_argument("sources", nargs='+', metavar='source', help="Waveform file paths to transcribe, or video URLs to download and transcribe.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language for transcription")
     language = get_verified_language(parser.parse_args().language)
     lang_codes = [language] if language else None

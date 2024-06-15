@@ -70,7 +70,7 @@ def main() -> None:
     CLI entry point to download videos from URLs.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("urls", nargs='+', metavar='N', help="URLs of videos to download.")
+    parser.add_argument("urls", nargs='+', metavar='url', help="URLs of videos to download.")
     for url in parser.parse_args().urls:
         download_video_with_default_title(url)
 

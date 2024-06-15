@@ -70,7 +70,7 @@ def main() -> None:
     CLI entry point to transcribe waveform files and save each result to a Segments file.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("paths", type=Path, nargs='+', metavar='N', help="Waveform file paths to transcribe.")
+    parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Waveform file paths to transcribe.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language to transcribe waveform files. Defaults to auto detection.")
     language = get_verified_language(parser.parse_args().language)
     for path in parser.parse_args().paths:
