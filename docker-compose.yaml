@@ -46,6 +46,8 @@ services:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - WHISPER_USE_CUDA=0
     entrypoint: ["/opt/prefect/entrypoint.sh", "prefect", "worker", "start", "--name", "LocalWorker", "--pool", "LocalPool", "--with-healthcheck"]
+  # docker compose run -d --name youtube-whisperer devcontainer
+  # docker exec -it youtube-whisperer /bin/bash
   devcontainer:
     build:
       context: .
