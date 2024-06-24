@@ -2,8 +2,8 @@ from pathlib import Path
 
 import ffmpeg
 import numpy as np
+from pathlib_extensions import prepare_input_file
 
-from youtube_whisperer.pathlib_extensions import prepare_input_file
 from youtube_whisperer.utils import DEFAULT_HOME_DIR
 
 DEFAULT_SAMPLE_RATE = 16000

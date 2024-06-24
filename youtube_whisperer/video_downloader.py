@@ -1,9 +1,9 @@
 import argparse
 from pathlib import Path
 
+from pathlib_extensions import prepare_output_file
 import yt_dlp
 
-from youtube_whisperer.pathlib_extensions import prepare_output_dir, prepare_output_file
 from youtube_whisperer.utils import DEFAULT_HOME_DIR, replace_os_reserved_chars
 
 

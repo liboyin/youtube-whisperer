@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Self
 
-from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_output_file
+from pathlib_extensions import prepare_input_file, prepare_output_file
 
 ARROW = '-->'
 

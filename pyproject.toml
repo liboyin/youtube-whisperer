@@ -17,6 +17,7 @@ dependencies = [
   "prefect==2.18.1",
   "youtube-transcript-api",
   "yt-dlp",
+  "pathlib-extensions@git+https://github.com/liboyin/pathlib-extensions.git",
 ]
 
 [project.optional-dependencies]

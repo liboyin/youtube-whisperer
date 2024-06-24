@@ -76,6 +76,7 @@ onnxruntime==1.18.0
 orjson==3.10.5
 packaging==24.1
 parso==0.8.4
+pathlib-extensions @ git+https://github.com/liboyin/pathlib-extensions.git@5438f7ad347bbc31c03531658fc699dd08bec52b
 pathspec==0.12.1
 pendulum==3.0.0
 pexpect==4.9.0

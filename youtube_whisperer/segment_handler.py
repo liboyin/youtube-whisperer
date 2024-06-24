@@ -2,8 +2,7 @@ from pathlib import Path
 from typing import Iterable, Iterator
 
 from faster_whisper.transcribe import Segment
-
-from youtube_whisperer.pathlib_extensions import prepare_output_file
+from pathlib_extensions import prepare_output_file
 
 
 def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:

@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import ffmpeg
+from pathlib_extensions import prepare_input_file, prepare_output_file
 
-from youtube_whisperer.pathlib_extensions import prepare_input_file, prepare_output_file
 from youtube_whisperer.utils import DEFAULT_HOME_DIR
 
 

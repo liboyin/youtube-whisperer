@@ -67,6 +67,7 @@ oauthlib==3.2.2
 onnxruntime==1.18.0
 orjson==3.10.5
 packaging==24.1
+pathlib-extensions @ git+https://github.com/liboyin/pathlib-extensions.git@5438f7ad347bbc31c03531658fc699dd08bec52b
 pathspec==0.12.1
 pendulum==3.0.0
 prefect==2.18.1
