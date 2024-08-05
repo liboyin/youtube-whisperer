@@ -55,6 +55,8 @@ services:
     volumes:
       - .:/workspace/youtube-whisperer
       - ~/.whisper:/home/vscode/.whisper
+      # Firefox cookies passthrough
+      - ~/snap/firefox/common/.mozilla/firefox:/home/vscode/snap/firefox/common/.mozilla/firefox
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - WHISPER_USE_CUDA=0
