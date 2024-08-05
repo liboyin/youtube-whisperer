@@ -30,11 +30,11 @@ def is_firefox_cookies_file_available() -> bool:
     Return whether the Firefox cookies file is available in the file system.
     """
     for search_dir_path in [
-        Path('~/.mozilla/firefox'),
-        Path('~/snap/firefox/common/.mozilla/firefox'),
-        Path('~/.var/app/org.mozilla.firefox/.mozilla/firefox'),
+        '~/.mozilla/firefox',
+        '~/snap/firefox/common/.mozilla/firefox',
+        '~/.var/app/org.mozilla.firefox/.mozilla/firefox',
     ]:
-        for cookies_file_path in search_dir_path.rglob('cookies.sqlite'):
+        for cookies_file_path in Path(search_dir_path).expanduser().rglob('cookies.sqlite'):
             if cookies_file_path.is_file():
                 print('Found Firefox cookies file:', cookies_file_path)
                 return True
