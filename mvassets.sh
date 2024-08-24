@@ -1,7 +1,7 @@
 #!/bin/bash
 
-REMOTE_DIR="/media/libo/Videos/Transcode"
 LOCAL_DIR="$HOME/.whisper"
+REMOTE_DIR="$LOCAL_DIR/Transcode"
 
 if [ $# -ne 1 ]; then
     echo "Usage: $0 (in|out)"
