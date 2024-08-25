@@ -1,10 +1,10 @@
 import argparse
 from pathlib import Path
 
-from pathlib_extensions import prepare_output_file
+from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
 import yt_dlp
 
-from youtube_whisperer.utils import DEFAULT_HOME_DIR, replace_os_reserved_chars
+from youtube_whisperer.utils import DEFAULT_HOME_DIR
 
 
 def get_video_title(url: str) -> str:

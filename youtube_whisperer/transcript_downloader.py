@@ -3,11 +3,11 @@ from pathlib import Path
 from typing import Collection, Iterable, TypedDict
 from urllib.parse import urlparse, parse_qs
 
-from pathlib_extensions import prepare_output_file
+from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
 from youtube_transcript_api import TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
-from youtube_whisperer.utils import DEFAULT_HOME_DIR, get_verified_language, replace_os_reserved_chars
+from youtube_whisperer.utils import DEFAULT_HOME_DIR, get_verified_language
 from youtube_whisperer.video_downloader import get_video_title
 
 DEFAULT_LANG_CODES = ('en', 'zh')
