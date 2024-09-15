@@ -45,3 +45,20 @@ def strtobool(val: str) -> bool:
             return False
         case _:
             raise ValueError(f"invalid truth value '{val}' of type {type(val)}")
+
+
+def is_firefox_cookies_available() -> bool:
+    """
+    Return whether the Firefox cookies file is available in the file system.
+    """
+    for search_dir_path in [
+        '~/.mozilla/firefox',
+        '~/snap/firefox/common/.mozilla/firefox',
+        '~/.var/app/org.mozilla.firefox/.mozilla/firefox',
+    ]:
+        for cookies_file_path in Path(search_dir_path).expanduser().rglob('cookies.sqlite'):
+            if cookies_file_path.is_file():
+                print('Found Firefox cookies:', cookies_file_path)
+                return True
+    print('No Firefox cookies found')
+    return False

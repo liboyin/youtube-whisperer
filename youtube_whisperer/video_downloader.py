@@ -4,7 +4,7 @@ from pathlib import Path
 from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
 import yt_dlp
 
-from youtube_whisperer.utils import DEFAULT_HOME_DIR
+from youtube_whisperer.utils import DEFAULT_HOME_DIR, is_firefox_cookies_available
 
 
 def get_video_title(url: str) -> str:
@@ -25,23 +25,6 @@ def get_video_title(url: str) -> str:
         return ydl.extract_info(url, download=False)['title']
 
 
-def is_firefox_cookies_file_available() -> bool:
-    """
-    Return whether the Firefox cookies file is available in the file system.
-    """
-    for search_dir_path in [
-        '~/.mozilla/firefox',
-        '~/snap/firefox/common/.mozilla/firefox',
-        '~/.var/app/org.mozilla.firefox/.mozilla/firefox',
-    ]:
-        for cookies_file_path in Path(search_dir_path).expanduser().rglob('cookies.sqlite'):
-            if cookies_file_path.is_file():
-                print('Found Firefox cookies file:', cookies_file_path)
-                return True
-    print('No Firefox cookies file found')
-    return False
-
-
 def download_video(url: str, target_path: Path, overwrite: bool = False) -> None:
     """
     Downloads a video from a given URL and saves it to the target path.
@@ -60,7 +43,7 @@ def download_video(url: str, target_path: Path, overwrite: bool = False) -> None
         'outtmpl': str(target_path),
         'verbose': True,
     }
-    if is_firefox_cookies_file_available():
+    if is_firefox_cookies_available():
         ydl_opts['cookiesfrombrowser'] = ('firefox',)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
