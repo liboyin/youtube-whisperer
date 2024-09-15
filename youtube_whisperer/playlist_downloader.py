@@ -51,8 +51,10 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs='+', metavar='url', help="URLs of playlists to download.")
-    for url in parser.parse_args().urls:
-        download_playlist_with_default_title(url)
+    parser.add_argument("-o", "--overwrite", action='store_true', default=False, help="Overwrite existing video files.")
+    args = parser.parse_args()
+    for url in args.urls:
+        download_playlist_with_default_title(url, overwrite=args.overwrite)
 
 if __name__ == "__main__":
     main()

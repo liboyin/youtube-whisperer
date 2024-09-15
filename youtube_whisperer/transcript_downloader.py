@@ -169,11 +169,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs='+', metavar='url', help="URLs of videos to download transcripts for.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language to download transcripts in. Defaults to DEFAULT_LANG_CODES.")
+    parser.add_argument("-o", "--overwrite", action='store_true', default=False, help="Overwrite existing SRT files.")
+    args = parser.parse_args()
     lang_codes = None
-    if language := get_verified_language(parser.parse_args().language):
+    if language := get_verified_language(args.language):
         lang_codes = [language]
-    for url in parser.parse_args().urls:
-        download_transcript_as_srt_file_with_default_title(url, lang_codes=lang_codes)
+    for url in args.urls:
+        download_transcript_as_srt_file_with_default_title(url, lang_codes=lang_codes, overwrite=args.overwrite)
 
 if __name__ == '__main__':
     main()
