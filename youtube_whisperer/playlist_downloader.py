@@ -4,7 +4,7 @@ from typing import Any
 
 import yt_dlp
 
-from youtube_whisperer.utils import WHISPER_HOME_DIR, is_firefox_cookies_available
+from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE, is_firefox_cookies_available
 from youtube_whisperer.video_downloader import download_video_with_default_title
 
 
@@ -30,14 +30,14 @@ def get_video_urls_from_playlist(url: str) -> list[str]:
         return [f"https://www.youtube.com/watch?v={v['id']}" for v in videos]
 
 
-def download_playlist_with_default_title(url: str, target_dir: Path = WHISPER_HOME_DIR, overwrite: bool = False) -> list[Path]:
+def download_playlist_with_default_title(url: str, target_dir: Path = WHISPER_HOME_DIR, overwrite: bool = WHISPER_OVERWRITE) -> list[Path]:
     """
     Downloads all videos in a YouTube playlist and saves them with default titles in the target directory.
     
     Args:
         url (str): The URL of the YouTube playlist.
         target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to DEFAULT_HOME_DIR.
-        overwrite (bool, optional): Whether to overwrite the video files if they already exist. Defaults to False.
+        overwrite (bool, optional): Whether to overwrite the video files if they already exist. Defaults to WHISPER_OVERWRITE.
     
     Returns:
         List[Path]: A list of paths to downloaded video files.
@@ -51,7 +51,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs='+', metavar='url', help="URLs of playlists to download.")
-    parser.add_argument("-o", "--overwrite", action='store_true', default=False, help="Overwrite existing video files.")
+    parser.add_argument("-o", "--overwrite", action='store_true', default=WHISPER_OVERWRITE, help="Overwrite existing video files. Defaults to WHISPER_OVERWRITE.")
     args = parser.parse_args()
     for url in args.urls:
         download_playlist_with_default_title(url, overwrite=args.overwrite)

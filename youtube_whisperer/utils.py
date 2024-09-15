@@ -7,6 +7,27 @@ from faster_whisper.tokenizer import _LANGUAGE_CODES as WHISPER_LANG_CODES
 WHISPER_HOME_DIR = Path(os.getenv("WHISPER_HOME_DIR", Path.home() / ".whisper"))
 
 
+def strtobool(val: str) -> bool:
+    """
+    Convert a string representation of truth (case insensitive) to boolean type.
+
+    Replaces distutils.util.strtobool, which is no longer included in the standard library since Python 3.10.
+
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'.
+    False values are 'n', 'no', 'f', 'false', 'off', and '0'.
+    Raises ValueError if 'val' is anything else.
+    """
+    match val.lower():
+        case 'y' | 'yes' | 't' | 'true' | 'on' | '1':
+            return True
+        case 'n' | 'no' | 'f' | 'false' | 'off' | '0':
+            return False
+        case _:
+            raise ValueError(f"invalid truth value '{val}' of type {type(val)}")
+
+WHISPER_OVERWRITE = strtobool(os.getenv("WHISPER_OVERWRITE", "false"))
+
+
 def is_url(text: str) -> bool:
     """
     Check if a string is a valid URL.
@@ -27,25 +48,6 @@ def get_verified_language(language: str | None) -> str | None:
     if language and language not in WHISPER_LANG_CODES:
         raise ValueError("Unsupported language:", language)
     return language
-
-
-def strtobool(val: str) -> bool:
-    """
-    Convert a string representation of truth (case insensitive) to boolean type.
-
-    Replaces distutils.util.strtobool, which is no longer included in the standard library since Python 3.10.
-
-    True values are 'y', 'yes', 't', 'true', 'on', and '1'.
-    False values are 'n', 'no', 'f', 'false', 'off', and '0'.
-    Raises ValueError if 'val' is anything else.
-    """
-    match val.lower():
-        case 'y' | 'yes' | 't' | 'true' | 'on' | '1':
-            return True
-        case 'n' | 'no' | 'f' | 'false' | 'off' | '0':
-            return False
-        case _:
-            raise ValueError(f"invalid truth value '{val}' of type {type(val)}")
 
 
 def is_firefox_cookies_available() -> bool:
