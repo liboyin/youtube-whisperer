@@ -62,5 +62,6 @@ def main() -> None:
     for path in parser.parse_args().paths:
         convert_segments_file_to_srt(path)
 
+
 if __name__ == '__main__':
     main()

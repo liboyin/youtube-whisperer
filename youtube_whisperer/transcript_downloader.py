@@ -177,5 +177,6 @@ def main() -> None:
     for url in args.urls:
         download_transcript_as_srt_file_with_default_title(url, lang_codes=lang_codes, overwrite=args.overwrite)
 
+
 if __name__ == '__main__':
     main()

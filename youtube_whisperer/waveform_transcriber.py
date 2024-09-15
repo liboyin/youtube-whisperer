@@ -76,5 +76,6 @@ def main() -> None:
     for path in parser.parse_args().paths:
         transcribe_file_with_default_model(path, language=language)
 
+
 if __name__ == "__main__":
     main()

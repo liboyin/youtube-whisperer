@@ -56,5 +56,6 @@ def main() -> None:
     for url in args.urls:
         download_playlist_with_default_title(url, overwrite=args.overwrite)
 
+
 if __name__ == "__main__":
     main()

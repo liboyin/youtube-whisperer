@@ -147,5 +147,6 @@ def main() -> None:
     for path in parser.parse_args().paths:
         deduplicate_srt_file(path)
 
+
 if __name__ == '__main__':
     main()
