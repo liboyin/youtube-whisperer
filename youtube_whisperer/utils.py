@@ -1,9 +1,10 @@
+import os
 from pathlib import Path
 import re
 
 from faster_whisper.tokenizer import _LANGUAGE_CODES as WHISPER_LANG_CODES
 
-DEFAULT_HOME_DIR = Path.home() / ".whisper"
+WHISPER_HOME_DIR = Path(os.getenv("WHISPER_HOME_DIR", Path.home() / ".whisper"))
 
 
 def is_url(text: str) -> bool:

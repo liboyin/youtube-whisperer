@@ -7,7 +7,7 @@ from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
 from youtube_transcript_api import TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
-from youtube_whisperer.utils import DEFAULT_HOME_DIR, get_verified_language
+from youtube_whisperer.utils import WHISPER_HOME_DIR, get_verified_language
 from youtube_whisperer.video_downloader import get_video_title
 
 DEFAULT_LANG_CODES = ('en', 'zh')
@@ -141,7 +141,7 @@ def download_transcript_as_srt_file(url: str, output_file_path: Path, lang_codes
     return True
 
 
-def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR, lang_codes: Iterable[str] | None = None, overwrite: bool = False) -> Path | None:
+def download_transcript_as_srt_file_with_default_title(url: str, target_dir: Path = WHISPER_HOME_DIR, lang_codes: Iterable[str] | None = None, overwrite: bool = False) -> Path | None:
     """
     Downloads the transcript of a YouTube video as an SRT file named after the video title.
 

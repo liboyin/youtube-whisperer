@@ -4,7 +4,7 @@ from pathlib import Path
 from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
 import yt_dlp
 
-from youtube_whisperer.utils import DEFAULT_HOME_DIR, is_firefox_cookies_available
+from youtube_whisperer.utils import WHISPER_HOME_DIR, is_firefox_cookies_available
 
 
 def get_video_title(url: str) -> str:
@@ -49,7 +49,7 @@ def download_video(url: str, target_path: Path, overwrite: bool = False) -> None
         ydl.download([url])
 
 
-def download_video_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR, overwrite: bool = False) -> Path:
+def download_video_with_default_title(url: str, target_dir: Path = WHISPER_HOME_DIR, overwrite: bool = False) -> Path:
     """
     Downloads a video from the given URL and saves it with a default title in the target directory.
 

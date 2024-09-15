@@ -4,7 +4,7 @@ from typing import Any
 
 import yt_dlp
 
-from youtube_whisperer.utils import DEFAULT_HOME_DIR, is_firefox_cookies_available
+from youtube_whisperer.utils import WHISPER_HOME_DIR, is_firefox_cookies_available
 from youtube_whisperer.video_downloader import download_video_with_default_title
 
 
@@ -30,7 +30,7 @@ def get_video_urls_from_playlist(url: str) -> list[str]:
         return [f"https://www.youtube.com/watch?v={v['id']}" for v in videos]
 
 
-def download_playlist_with_default_title(url: str, target_dir: Path = DEFAULT_HOME_DIR, overwrite: bool = False) -> list[Path]:
+def download_playlist_with_default_title(url: str, target_dir: Path = WHISPER_HOME_DIR, overwrite: bool = False) -> list[Path]:
     """
     Downloads all videos in a YouTube playlist and saves them with default titles in the target directory.
     
