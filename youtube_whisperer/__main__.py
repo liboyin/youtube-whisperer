@@ -2,51 +2,32 @@ import argparse
 from pathlib import Path
 from typing import Iterable
 
-from youtube_whisperer.downloaders.playlist_downloader import yield_video_urls_from_playlist
-from youtube_whisperer.downloaders.transcript_downloader import download_transcript_as_srt_file
-from youtube_whisperer.downloaders.video_downloader import download_video_with_default_title
+from youtube_whisperer.downloaders import download_videos_and_transcripts_with_default_titles
 from youtube_whisperer.segment_to_srt_adaptor import convert_segments_file_to_srt
 from youtube_whisperer.utils import is_url, get_verified_language
 from youtube_whisperer.waveform_transcriber import transcribe_file_with_default_model
 
 
-def get_urls_and_file_paths(sources: list[str]) -> tuple[list[str], list[Path]]:
+def separate_urls_and_file_paths(sources: Iterable[str]) -> tuple[list[str], list[Path]]:
     """
-    Extract video URLs and waveform file paths from a list of sources.
+    Separates waveform sources into URLs and file paths.
 
     Args:
-        sources (list[str]): A list containing video URLs, playlist URLs, or paths to waveform files.
+        sources (Iterable[str]): An iterable of waveform sources which can be URLs or file paths.
 
     Returns:
-        tuple[list[str], list[Path]]: A tuple containing a list of video URLs and a list of waveform file paths.
+        tuple[list[str], list[Path]]: A tuple of two lists:
+            - The first list contains URLs.
+            - The second list contains file paths as Path objects.
     """
-    video_urls: list[str] = []
-    file_paths: list[Path] = []
+    urls = []
+    paths = []
     for source in sources:
         if is_url(source):
-            if 'playlist' in source:
-                video_urls.extend(yield_video_urls_from_playlist(source))
-            else:
-                video_urls.append(source)
+            urls.append(source)
         else:
-            file_paths.append(Path(source))
-    return video_urls, file_paths
-
-
-def download_video_and_transcript(url: str, lang_codes: Iterable[str] | None) -> tuple[Path, bool]:
-    """
-    Downloads a video and its transcript from a given URL.
-
-    Args:
-        url (str): The URL of the video to download.
-        lang_codes (Iterable[str] | None): Language codes to filter available transcripts with. If None, use `DEFAULT_LANG_CODES`.
-
-    Returns:
-        tuple[Path, bool]: A tuple containing the path to the downloaded video file and a boolean indicating whether the transcript was successfully downloaded.
-    """
-    video_file_path = download_video_with_default_title(url)
-    transcript_flag = download_transcript_as_srt_file(url, video_file_path.with_suffix('.srt'), lang_codes)
-    return video_file_path, transcript_flag
+            paths.append(Path(source))
+    return urls, paths
 
 
 def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: Iterable[str] | None) -> list[Path]:
@@ -54,15 +35,14 @@ def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: Iterabl
     Attempts to download videos and their transcripts from a list of URLs.
 
     Args:
-        urls (Iterable[str]): A collection of video URLs to download.
+        urls (Iterable[str]): An iterable of YouTube video or playlist URLs to download.
         lang_codes (Iterable[str] | None): Language codes to filter available transcripts with. If None, use `DEFAULT_LANG_CODES`.
 
     Returns:
         list[Path]: A list of Paths to video files that were downloaded but did not have transcripts.
     """
     video_files_without_transcripts: list[Path] = []
-    for url in urls:
-        video_file_path, transcript_flag = download_video_and_transcript(url, lang_codes)
+    for video_file_path, transcript_flag in download_videos_and_transcripts_with_default_titles(urls, lang_codes):
         if not transcript_flag:
             video_files_without_transcripts.append(video_file_path)
     return video_files_without_transcripts
@@ -92,7 +72,7 @@ def main() -> None:
     parser.add_argument("-l", "--language", type=str, default=None, help="Language for transcription")
     args = parser.parse_args()
     language = get_verified_language(args.language)
-    video_urls, file_paths = get_urls_and_file_paths(args.sources)
+    video_urls, file_paths = separate_urls_and_file_paths(args.sources)
     file_paths.extend(try_download_videos_and_transcripts(video_urls, [language] if language else None))
     transcribe_to_srt_files(file_paths, language)
 
