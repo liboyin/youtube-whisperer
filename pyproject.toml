@@ -14,7 +14,6 @@ dependencies = [
   "ctranslate2",
   "faster-whisper",
   "ffmpeg-python",
-  "prefect==2.18.1",
   "youtube-transcript-api",
   "yt-dlp",
   "pathlib-extensions@git+https://github.com/liboyin/pathlib-extensions.git",

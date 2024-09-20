@@ -1,51 +1,5 @@
 services:
-  postgres:
-    image: postgres:16-bookworm
-    restart: always
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=prefect
-    ports:
-      - 5432:5432
-    volumes:
-      - postgres-vol:/var/lib/postgresql/data
-  minio:
-    image: minio/minio:latest
-    restart: always
-    volumes:
-      - minio-vol:/data
-    ports:
-      - 9000:9000
-      - 9001:9001
-    entrypoint: ["minio", "server", "--address", "0.0.0.0:9000", "--console-address", "0.0.0.0:9001", "/data"]
-  prefect-server:
-    image: prefecthq/prefect:2.18.1-python3.12-conda
-    restart: always
-    depends_on:
-      - postgres
-      - minio
-    volumes:
-      - prefect-server-vol:/root/.prefect
-    ports:
-      - 4200:4200
-    environment:
-      - PREFECT_SERVER_API_HOST=0.0.0.0
-      - PREFECT_API_URL=http://127.0.0.1:4200/api
-      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/prefect
-    entrypoint: ["/opt/prefect/entrypoint.sh", "prefect", "server", "start"]
-  prefect-worker:
-    image: prefecthq/prefect:2.18.1-python3.12-conda
-    restart: always
-    depends_on:
-      - prefect-server
-    volumes:
-      - prefect-worker-vol:/root/.prefect
-      - ~/.whisper:/root/.whisper
-    environment:
-      - PREFECT_API_URL=http://prefect-server:4200/api
-      - WHISPER_USE_CUDA=0
-    entrypoint: ["/opt/prefect/entrypoint.sh", "prefect", "worker", "start", "--name", "LocalWorker", "--pool", "LocalPool", "--with-healthcheck"]
+  # docker kill youtube-whisperer && docker rm youtube-whisperer
   # docker compose run --build --detach --name youtube-whisperer devcontainer
   # docker exec -it youtube-whisperer /bin/bash
   devcontainer:
@@ -58,14 +12,4 @@ services:
       # Firefox cookies passthrough
       - ~/snap/firefox/common/.mozilla/firefox:/home/vscode/snap/firefox/common/.mozilla/firefox
     environment:
-      - PREFECT_API_URL=http://prefect-server:4200/api
       - WHISPER_USE_CUDA=0
-volumes:
-  postgres-vol:
-  minio-vol:
-  prefect-server-vol:
-  prefect-worker-vol:
-networks:
-  default:
-    name: prefect-network
-    driver: bridge
