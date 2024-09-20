@@ -12,11 +12,14 @@ authors = [
 ]
 dependencies = [
   "ctranslate2",
+  "fastapi[standard]",
   "faster-whisper",
   "ffmpeg-python",
+  "pathlib-extensions@git+https://github.com/liboyin/pathlib-extensions.git",
+  "redis",
+  "uvicorn",
   "youtube-transcript-api",
   "yt-dlp",
-  "pathlib-extensions@git+https://github.com/liboyin/pathlib-extensions.git",
 ]
 
 [project.optional-dependencies]
