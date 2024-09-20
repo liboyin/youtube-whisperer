@@ -4,8 +4,8 @@ from typing import Any, Iterable
 
 import yt_dlp
 
+from youtube_whisperer.downloaders.video_downloader import download_video_with_default_title
 from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE, is_firefox_cookies_available
-from youtube_whisperer.video_downloader import download_video_with_default_title
 
 
 def yield_video_urls_from_playlist(url: str) -> Iterable[str]:

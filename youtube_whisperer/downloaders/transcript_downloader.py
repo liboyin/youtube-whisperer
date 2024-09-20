@@ -7,8 +7,8 @@ from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
 from youtube_transcript_api import TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
+from youtube_whisperer.downloaders.utils import get_video_title
 from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE, get_verified_language
-from youtube_whisperer.video_downloader import get_video_title
 
 DEFAULT_LANG_CODES = ('en', 'zh')
 

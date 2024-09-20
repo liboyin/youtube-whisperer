@@ -4,25 +4,8 @@ from pathlib import Path
 from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
 import yt_dlp
 
+from youtube_whisperer.downloaders.utils import get_video_title
 from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE, is_firefox_cookies_available
-
-
-def get_video_title(url: str) -> str:
-    """
-    Retrieves the title of a video given its URL.
-
-    Args:
-        url (str): The URL of the video.
-
-    Returns:
-        str: The title of the video.
-    """
-    ydl_opts = {
-        'simulate': True,
-        'verbose': True,
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        return ydl.extract_info(url, download=False)['title']
 
 
 def download_video(url: str, target_path: Path, overwrite: bool = WHISPER_OVERWRITE) -> None:

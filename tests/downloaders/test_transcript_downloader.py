@@ -1,6 +1,6 @@
 import pytest
 
-from youtube_whisperer.transcript_downloader import get_video_id, get_first_matching_lang_code
+from youtube_whisperer.downloaders.transcript_downloader import get_video_id, get_first_matching_lang_code
 
 
 def test_get_video_id():
