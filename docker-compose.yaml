@@ -1,7 +1,4 @@
 services:
-  # docker kill youtube-whisperer && docker rm youtube-whisperer
-  # docker compose run --build --detach --name youtube-whisperer devcontainer
-  # docker exec -it youtube-whisperer /bin/bash
   devcontainer:
     build:
       context: .
@@ -15,6 +12,22 @@ services:
       - WHISPER_USE_CUDA=0
     depends_on:
       - redis
+    ports:
+      - "8000:8000"
+    entrypoint: ["uvicorn", "youtube_whisperer.fastapi_app:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ~/.whisper:/home/vscode/.whisper
+      # Firefox cookies passthrough
+      - ~/snap/firefox/common/.mozilla/firefox:/home/vscode/snap/firefox/common/.mozilla/firefox
+    environment:
+      - WHISPER_USE_CUDA=0
+    depends_on:
+      - redis
+    entrypoint: ["python", "youtube_whisperer/worker.py"]
   redis:
     image: redis:latest
     ports:
