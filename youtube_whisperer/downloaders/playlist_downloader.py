@@ -32,6 +32,23 @@ def yield_video_urls_from_playlist(url: str) -> Iterable[str]:
             yield f"https://www.youtube.com/watch?v={v['id']}"
 
 
+def yield_flattened_video_urls(urls: Iterable[str]) -> Iterable[str]:
+    """
+    Yields individual YouTube video URLs from an iterable of URLs, flattening any playlist URLs.
+
+    Args:
+        urls (Iterable[str]): An iterable of YouTube URLs, which may include individual video URLs or playlist URLs.
+
+    Yields:
+        Iterable[str]: An iterable of individual YouTube video URLs.
+    """
+    for url in urls:
+        if 'playlist' in url:
+            yield from yield_video_urls_from_playlist(url)
+        else:
+            yield url
+
+
 def download_playlist_with_default_titles(url: str, target_dir: Path = WHISPER_HOME_DIR, overwrite: bool = WHISPER_OVERWRITE) -> list[Path]:
     """
     Downloads all videos in a YouTube playlist and saves them with default titles in the target directory.

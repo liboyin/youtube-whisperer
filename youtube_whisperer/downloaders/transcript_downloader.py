@@ -62,10 +62,11 @@ def get_first_matching_lang_code(candidate_lang_codes: Collection[str], requeste
     """
     print(f"Candidate language codes: {candidate_lang_codes}; requested language codes: {requested_lang_codes}")
     for request in requested_lang_codes.split(';'):
-        for candidate in candidate_lang_codes:
-            if candidate.startswith(request):  # match dialects, e.g. en-US, zh-Hans
-                print("Matched language code:", candidate)
-                return candidate
+        if request:  # ignore empty language codes
+            for candidate in candidate_lang_codes:
+                if candidate.startswith(request):  # match dialects, e.g. en-US, zh-Hans
+                    print("Matched language code:", candidate)
+                    return candidate
     print("No matching language code found")
     return None
 

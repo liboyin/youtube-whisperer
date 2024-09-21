@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Iterable
 
+from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
 from youtube_whisperer.downloaders.transcript_downloader import DEFAULT_LANG_CODES, download_transcript_as_srt_file
-from youtube_whisperer.downloaders.utils import yield_flattened_video_urls
 from youtube_whisperer.downloaders.video_downloader import download_video_with_default_title
 from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE
 
