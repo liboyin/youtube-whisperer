@@ -1,6 +1,9 @@
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
+
+import redis
 
 from faster_whisper.tokenizer import _LANGUAGE_CODES as WHISPER_LANG_CODES
 
@@ -47,3 +50,24 @@ def verify_language_code(language: str | None) -> None:
     """
     if language and language not in WHISPER_LANG_CODES:
         raise ValueError("Unsupported language:", language)
+
+
+@contextmanager
+def redis_connection():
+    """
+    Context manager for establishing a Redis connection.
+
+    Yields:
+        redis.StrictRedis: A Redis client instance.
+
+    Raises:
+        redis.ConnectionError: If there is an issue connecting to the Redis server.
+    """
+    client = redis.StrictRedis(host='redis')
+    try:
+        client.ping()
+        yield client
+    except redis.ConnectionError:
+        raise
+    finally:
+        client.close()
