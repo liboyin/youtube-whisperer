@@ -4,7 +4,7 @@ from typing import Iterable
 
 from youtube_whisperer.downloaders import download_videos_and_transcripts_with_default_titles
 from youtube_whisperer.segment_to_srt_adaptor import convert_segments_file_to_srt
-from youtube_whisperer.utils import is_url, get_verified_language
+from youtube_whisperer.utils import is_url, verify_language_code
 from youtube_whisperer.waveform_transcriber import transcribe_file_with_default_model
 
 
@@ -30,13 +30,13 @@ def separate_urls_and_file_paths(sources: Iterable[str]) -> tuple[list[str], lis
     return urls, paths
 
 
-def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: Iterable[str] | None) -> list[Path]:
+def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: str | None) -> list[Path]:
     """
     Attempts to download videos and their transcripts from a list of URLs.
 
     Args:
         urls (Iterable[str]): An iterable of YouTube video or playlist URLs to download.
-        lang_codes (Iterable[str] | None): Language codes to filter available transcripts with. If None, use `DEFAULT_LANG_CODES`.
+        lang_codes (str | None): Language codes to filter available transcripts with.
 
     Returns:
         list[Path]: A list of Paths to video files that were downloaded but did not have transcripts.
@@ -53,7 +53,7 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | No
     Transcribes a list of waveform files using the default model and converts the transcriptions to SRT format.
 
     Args:
-        input_file_paths (Iterable[Path]): An iterable of file paths to the waveform files to be transcribed.
+        input_file_paths (Iterable[Path]): An iterable of waveform file paths to be transcribed.
         language (str | None): The language code for the transcription. If None, the language will be automatically detected.
     """
     for input_file_path in input_file_paths:
@@ -65,15 +65,16 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | No
 
 def main() -> None:
     """
-    CLI entry point to transcribe waveform files and save each result to a Segment file and an SRT file.
+    CLI entry point to download videos with transcripts or transcribe waveform files to Segments and SRT files.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("sources", nargs='+', metavar='source', help="Waveform file paths to transcribe, or video/playlist URLs to download and transcribe.")
-    parser.add_argument("-l", "--language", type=str, default=None, help="Language for transcription")
+    parser.add_argument("-l", "--language", type=str, default=None, help="Language code for transcript download or waveform transcription.")
     args = parser.parse_args()
-    language = get_verified_language(args.language)
     video_urls, file_paths = separate_urls_and_file_paths(args.sources)
-    file_paths.extend(try_download_videos_and_transcripts(video_urls, [language] if language else None))
+    language = args.language
+    verify_language_code(language)
+    file_paths.extend(try_download_videos_and_transcripts(video_urls, language))
     transcribe_to_srt_files(file_paths, language)
 
 

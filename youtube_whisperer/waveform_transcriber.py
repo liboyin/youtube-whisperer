@@ -8,7 +8,7 @@ import numpy as np
 
 from youtube_whisperer.model_parameters import get_default_whisper_model_parameters
 from youtube_whisperer.segment_handler import duplicate_segments_to_file
-from youtube_whisperer.utils import get_verified_language
+from youtube_whisperer.utils import verify_language_code
 from youtube_whisperer.waveform_loader import load_waveform_from_file
 
 
@@ -72,8 +72,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Waveform file paths to transcribe.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language to transcribe waveform files. Defaults to auto detection.")
-    language = get_verified_language(parser.parse_args().language)
-    for path in parser.parse_args().paths:
+    args = parser.parse_args()
+    language = args.language
+    verify_language_code(language)
+    for path in args.paths:
         transcribe_file_with_default_model(path, language=language)
 
 

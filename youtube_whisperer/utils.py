@@ -41,10 +41,9 @@ def is_url(text: str) -> bool:
     return bool(re.match(r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)", text))
 
 
-def get_verified_language(language: str | None) -> str | None:
+def verify_language_code(language: str | None) -> None:
     """
-    Verifies if the given language is supported. Ignore None.
+    Verifies if the given language code is supported by Whisper. Ignore empty string or `None`.
     """
     if language and language not in WHISPER_LANG_CODES:
         raise ValueError("Unsupported language:", language)
-    return language
