@@ -2,32 +2,12 @@ import argparse
 from pathlib import Path
 from typing import Iterable
 
+import more_itertools
+
 from youtube_whisperer.downloaders import download_videos_and_transcripts_with_default_titles
 from youtube_whisperer.segment_to_srt_adaptor import convert_segments_file_to_srt
 from youtube_whisperer.utils import is_url, verify_language_code
 from youtube_whisperer.waveform_transcriber import transcribe_file_with_default_model
-
-
-def separate_urls_and_file_paths(sources: Iterable[str]) -> tuple[list[str], list[Path]]:
-    """
-    Separates waveform sources into URLs and file paths.
-
-    Args:
-        sources (Iterable[str]): An iterable of waveform sources which can be URLs or file paths.
-
-    Returns:
-        tuple[list[str], list[Path]]: A tuple of two lists:
-            - The first list contains URLs.
-            - The second list contains file paths as Path objects.
-    """
-    urls = []
-    paths = []
-    for source in sources:
-        if is_url(source):
-            urls.append(source)
-        else:
-            paths.append(Path(source))
-    return urls, paths
 
 
 def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: str | None) -> list[Path]:
@@ -71,7 +51,7 @@ def main() -> None:
     parser.add_argument("sources", nargs='+', metavar='source', help="Waveform file paths to transcribe, or video/playlist URLs to download and transcribe.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language code for transcript download or waveform transcription.")
     args = parser.parse_args()
-    video_urls, file_paths = separate_urls_and_file_paths(args.sources)
+    file_paths, video_urls = tuple(map(list, more_itertools.partition(is_url, args.sources)))
     language = args.language
     verify_language_code(language)
     file_paths.extend(try_download_videos_and_transcripts(video_urls, language))
