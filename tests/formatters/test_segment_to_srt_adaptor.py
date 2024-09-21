@@ -1,11 +1,11 @@
 from faster_whisper.transcribe import Segment
 
-from youtube_whisperer.segment_to_srt_adaptor import (
+from youtube_whisperer.formatters.segment_to_srt_adaptor import (
     convert_segments_file_to_srt,
     segment_to_srt_block,
     yield_srt_blocks_from_segments,
 )
-from youtube_whisperer.srt_deduplicator import SrtBlock
+from youtube_whisperer.formatters.srt_deduplicator import SrtBlock
 
 SEGMENTS = [
     Segment(id=1, seek=2704, start=0.0, end=1.24, text='Segment', tokens=[50365, 4511], temperature=0.0, avg_logprob=-0.309651929245898, compression_ratio=1.2782608695652173, no_speech_prob=0.72765052318573, words=None),

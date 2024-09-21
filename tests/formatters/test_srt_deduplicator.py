@@ -1,4 +1,4 @@
-from youtube_whisperer.srt_deduplicator import (
+from youtube_whisperer.formatters.srt_deduplicator import (
     SrtBlock,
     convert_srt_blocks_to_str,
     deduplicate_srt_file,

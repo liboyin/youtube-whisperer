@@ -6,8 +6,8 @@ from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
 import numpy as np
 
+from youtube_whisperer.formatters.segment_handler import duplicate_segments_to_file
 from youtube_whisperer.model_parameters import get_default_whisper_model_parameters
-from youtube_whisperer.segment_handler import duplicate_segments_to_file
 from youtube_whisperer.utils import verify_language_code
 from youtube_whisperer.waveform_loader import load_waveform_from_file
 

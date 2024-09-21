@@ -1,7 +1,7 @@
 from faster_whisper.transcribe import Segment
 import pytest
 
-from youtube_whisperer.segment_handler import (
+from youtube_whisperer.formatters.segment_handler import (
     duplicate_segments_to_file,
     load_segments_from_file,
     load_segments_from_lines,

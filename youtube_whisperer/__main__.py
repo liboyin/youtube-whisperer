@@ -6,7 +6,7 @@ from typing import Iterable
 import more_itertools
 
 from youtube_whisperer.downloaders import download_videos_and_transcripts_with_default_titles
-from youtube_whisperer.segment_to_srt_adaptor import convert_segments_file_to_srt
+from youtube_whisperer.formatters.segment_to_srt_adaptor import convert_segments_file_to_srt
 from youtube_whisperer.utils import is_url, verify_language_code
 from youtube_whisperer.waveform_transcriber import transcribe_file_with_default_model
 
