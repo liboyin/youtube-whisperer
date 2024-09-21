@@ -59,7 +59,7 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | No
     for input_file_path in input_file_paths:
         segment_file_path = transcribe_file_with_default_model(input_file_path, language=language)
         print('Saved Segments file:', segment_file_path)
-        srt_file_path = convert_segments_file_to_srt(segment_file_path, deduplicate=True)
+        srt_file_path = convert_segments_file_to_srt(segment_file_path)
         print('Saved SRT file:', srt_file_path)
 
 
