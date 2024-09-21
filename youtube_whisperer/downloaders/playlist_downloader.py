@@ -4,8 +4,9 @@ from typing import Any, Iterable
 
 import yt_dlp
 
+from youtube_whisperer.downloaders.utils import is_firefox_cookies_available
 from youtube_whisperer.downloaders.video_downloader import download_video_with_default_title
-from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE, is_firefox_cookies_available
+from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE
 
 
 def yield_video_urls_from_playlist(url: str) -> Iterable[str]:
@@ -37,8 +38,8 @@ def download_playlist_with_default_titles(url: str, target_dir: Path = WHISPER_H
     
     Args:
         url (str): The URL of the YouTube playlist.
-        target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to DEFAULT_HOME_DIR.
-        overwrite (bool, optional): Whether to overwrite the video files if they already exist. Defaults to WHISPER_OVERWRITE.
+        target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to `DEFAULT_HOME_DIR`.
+        overwrite (bool, optional): Whether to overwrite the video files if they already exist. Defaults to `WHISPER_OVERWRITE`.
     
     Returns:
         list[Path]: A list of paths to downloaded video files.

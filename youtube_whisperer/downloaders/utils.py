@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Iterable
 
 import yt_dlp
@@ -38,3 +39,20 @@ def yield_flattened_video_urls(urls: Iterable[str]) -> Iterable[str]:
             yield from yield_video_urls_from_playlist(url)
         else:
             yield url
+
+
+def is_firefox_cookies_available() -> bool:
+    """
+    Return whether the Firefox cookies file is available in the file system.
+    """
+    for search_dir_path in [
+        '~/.mozilla/firefox',
+        '~/snap/firefox/common/.mozilla/firefox',
+        '~/.var/app/org.mozilla.firefox/.mozilla/firefox',
+    ]:
+        for cookies_file_path in Path(search_dir_path).expanduser().rglob('cookies.sqlite'):
+            if cookies_file_path.is_file():
+                print('Found Firefox cookies:', cookies_file_path)
+                return True
+    print('No Firefox cookies found')
+    return False

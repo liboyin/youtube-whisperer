@@ -4,8 +4,8 @@ from pathlib import Path
 from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
 import yt_dlp
 
-from youtube_whisperer.downloaders.utils import get_video_title
-from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE, is_firefox_cookies_available
+from youtube_whisperer.downloaders.utils import get_video_title, is_firefox_cookies_available
+from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE
 
 
 def download_video(url: str, target_path: Path, overwrite: bool = WHISPER_OVERWRITE) -> None:
@@ -15,7 +15,7 @@ def download_video(url: str, target_path: Path, overwrite: bool = WHISPER_OVERWR
     Args:
         url (str): The URL of the video.
         target_path (Path): The path where the downloaded video will be saved.
-        overwrite (bool, optional): Whether to overwrite the video file if it already exists. Defaults to WHISPER_OVERWRITE.
+        overwrite (bool, optional): Whether to overwrite the video file if it already exists. Defaults to `WHISPER_OVERWRITE`.
     """
     if not overwrite and target_path.is_file():
         print(f'Skipping download because the target video file already exists: {target_path}')
@@ -38,8 +38,8 @@ def download_video_with_default_title(url: str, target_dir: Path = WHISPER_HOME_
 
     Args:
         url (str): The URL of the video to download.
-        target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to DEFAULT_HOME_DIR.
-        overwrite (bool, optional): Whether to overwrite the video file if it already exists. Defaults to WHISPER_OVERWRITE.
+        target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to `DEFAULT_HOME_DIR`.
+        overwrite (bool, optional): Whether to overwrite the video file if it already exists. Defaults to `WHISPER_OVERWRITE`.
 
     Returns:
         Path: The path to the downloaded video file.

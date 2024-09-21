@@ -48,20 +48,3 @@ def get_verified_language(language: str | None) -> str | None:
     if language and language not in WHISPER_LANG_CODES:
         raise ValueError("Unsupported language:", language)
     return language
-
-
-def is_firefox_cookies_available() -> bool:
-    """
-    Return whether the Firefox cookies file is available in the file system.
-    """
-    for search_dir_path in [
-        '~/.mozilla/firefox',
-        '~/snap/firefox/common/.mozilla/firefox',
-        '~/.var/app/org.mozilla.firefox/.mozilla/firefox',
-    ]:
-        for cookies_file_path in Path(search_dir_path).expanduser().rglob('cookies.sqlite'):
-            if cookies_file_path.is_file():
-                print('Found Firefox cookies:', cookies_file_path)
-                return True
-    print('No Firefox cookies found')
-    return False
