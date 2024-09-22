@@ -2,6 +2,7 @@ import glob
 import json
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
@@ -76,5 +77,43 @@ async def clear_tasks() -> dict:
     try:
         redis_client.delete('tasks')
         return {"message": "All tasks cleared successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/assets_in")
+async def assets_in() -> dict:
+    """
+    Move all 2024*.mp4 files from ~/.whisper/Transcode to ~/.whisper.
+    """
+    source_dir = Path.home() / ".whisper" / "Transcode"
+    dest_dir = Path.home() / ".whisper"
+    try:
+        for file_path in source_dir.glob("2024*.mp4"):
+            dest_path = dest_dir / file_path.name
+            if not dest_path.exists():
+                file_path.rename(dest_path)
+        return {"message": "Assets moved in successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/assets_out")
+async def assets_out() -> dict:
+    """
+    Move all *.mp4 and *.srt files from ~/.whisper to ~/.whisper/Transcode. Delete all *.seg files from ~/.whisper.
+    """
+    source_dir = Path.home() / ".whisper"
+    dest_dir = Path.home() / ".whisper" / "Transcode"
+    try:
+        # move .mp4 and .srt files
+        for file_path in source_dir.glob("*.[ms][pr][t4]"):
+            dest_path = dest_dir / file_path.name
+            if not dest_path.exists():
+                file_path.rename(dest_path)
+        # delete .seg files
+        for seg_file in source_dir.glob("*.seg"):
+            seg_file.unlink()
+        return {"message": "Assets moved out successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
