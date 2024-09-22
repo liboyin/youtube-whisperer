@@ -3,7 +3,7 @@ import json
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 import redis
 
@@ -43,7 +43,7 @@ async def get_tasks() -> list[Task]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/new")
+@app.post("/new", status_code=status.HTTP_201_CREATED)
 async def add_tasks(tasks: list[Task]) -> dict:
     """
     Add new tasks to the Redis database.
