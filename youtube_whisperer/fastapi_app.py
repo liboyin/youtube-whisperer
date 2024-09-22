@@ -16,11 +16,13 @@ redis_client = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global redis_client
-    redis_client = redis.StrictRedis(host='redis')
-    redis_client.ping()
-    yield
-    if redis_client:
-        redis_client.close()
+    try:
+        redis_client = redis.StrictRedis(host='redis')
+        redis_client.ping()
+        yield
+    finally:
+        if redis_client:
+            redis_client.close()
 
 app = FastAPI(lifespan=lifespan)
 
