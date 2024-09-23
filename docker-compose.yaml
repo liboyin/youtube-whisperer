@@ -2,41 +2,40 @@ services:
   devcontainer:
     build:
       context: .
-      dockerfile: Dockerfile
       args:
-        - APT_PROXY=http://192.168.0.4:3142
+        APT_PROXY: http://192.168.0.4:3142
     volumes:
       - .:/workspace/youtube-whisperer
       - ~/.whisper:/home/vscode/.whisper
-      # Firefox cookies passthrough
       - ~/snap/firefox/common/.mozilla/firefox:/home/vscode/snap/firefox/common/.mozilla/firefox
     environment:
-      - WHISPER_USE_CUDA=0
+      WHISPER_USE_CUDA: '0'
     depends_on:
       - redis
     ports:
       - "8000:8000"
     entrypoint: ["uvicorn", "youtube_whisperer.fastapi_app:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
+
   worker:
     build:
       context: .
-      dockerfile: Dockerfile
       args:
-        - APT_PROXY=http://192.168.0.4:3142
+        APT_PROXY: http://192.168.0.4:3142
     volumes:
       - ~/.whisper:/home/vscode/.whisper
-      # Firefox cookies passthrough
       - ~/snap/firefox/common/.mozilla/firefox:/home/vscode/snap/firefox/common/.mozilla/firefox
     environment:
-      - WHISPER_USE_CUDA=0
+      WHISPER_USE_CUDA: '0'
     depends_on:
       - redis
     entrypoint: ["python", "youtube_whisperer/worker.py"]
+
   redis:
     image: redis:latest
     ports:
       - "6379:6379"
     volumes:
       - redis_vol:/data
+
 volumes:
   redis_vol:

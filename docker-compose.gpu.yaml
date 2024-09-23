@@ -4,7 +4,7 @@ services:
       file: docker-compose.yaml
       service: devcontainer
     environment:
-      - WHISPER_USE_CUDA=1
+      WHISPER_USE_CUDA: '1'
     deploy:
       resources:
         reservations:
@@ -12,12 +12,13 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
   worker:
     extends:
       file: docker-compose.yaml
       service: worker
     environment:
-      - WHISPER_USE_CUDA=1
+      WHISPER_USE_CUDA: '1'
     deploy:
       resources:
         reservations:
@@ -25,6 +26,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
   redis:
     extends:
       file: docker-compose.yaml
