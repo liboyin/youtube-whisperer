@@ -1,7 +1,12 @@
 # https://github.com/devcontainers/images/blob/main/src/python/.devcontainer/Dockerfile
 FROM mcr.microsoft.com/devcontainers/python:1-3.12-bullseye
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
+ARG APT_PROXY
+RUN if [ -n "$APT_PROXY" ]; then \
+      echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy; \
+    #   echo "Using APT proxy: $APT_PROXY"; \
+    fi && \
+    apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

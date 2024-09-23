@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - APT_PROXY=http://192.168.0.4:3142
     volumes:
       - .:/workspace/youtube-whisperer
       - ~/.whisper:/home/vscode/.whisper
@@ -19,6 +21,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - APT_PROXY=http://192.168.0.4:3142
     volumes:
       - ~/.whisper:/home/vscode/.whisper
       # Firefox cookies passthrough
