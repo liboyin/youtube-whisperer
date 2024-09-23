@@ -7,6 +7,8 @@ services:
     volumes:
       - .:/workspace/youtube-whisperer
       - ~/.whisper:/home/vscode/.whisper
+      # TODO: is there a better way?
+      - /media/libo/Videos/Transcode:/media/libo/Videos/Transcode
       - ~/snap/firefox/common/.mozilla/firefox:/home/vscode/snap/firefox/common/.mozilla/firefox
     environment:
       WHISPER_USE_CUDA: '0'
@@ -23,6 +25,7 @@ services:
         APT_PROXY: http://192.168.0.4:3142
     volumes:
       - ~/.whisper:/home/vscode/.whisper
+      - /media/libo/Videos/Transcode:/media/libo/Videos/Transcode
       - ~/snap/firefox/common/.mozilla/firefox:/home/vscode/snap/firefox/common/.mozilla/firefox
     environment:
       WHISPER_USE_CUDA: '0'
