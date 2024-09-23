@@ -4,6 +4,7 @@ services:
       context: .
       args:
         APT_PROXY: http://192.168.0.4:3142
+        PYPI_PROXY: http://192.168.0.4:3141/root/pypi/+simple/
     container_name: youtube-whisperer-app
     volumes:
       - .:/workspace/youtube-whisperer
@@ -24,6 +25,7 @@ services:
       context: .
       args:
         APT_PROXY: http://192.168.0.4:3142
+        PYPI_PROXY: http://192.168.0.4:3141/root/pypi/+simple/
     container_name: youtube-whisperer-worker
     volumes:
       - ~/.whisper:/home/vscode/.whisper
