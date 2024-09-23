@@ -12,7 +12,7 @@ from youtube_whisperer.formatters.srt_deduplicator import SrtBlock, convert_srt_
 
 def segment_to_srt_block(segment: Segment) -> SrtBlock:
     """
-    Convert a Segment object to an SrtBlock object.
+    Converts a Segment object to an SrtBlock object.
     """
     return SrtBlock(
         format_timestamp(segment.start, always_include_hours=True, decimal_marker=','),
@@ -23,7 +23,7 @@ def segment_to_srt_block(segment: Segment) -> SrtBlock:
 
 def yield_srt_blocks_from_segments(segments: Iterable[Segment]) -> Iterator[SrtBlock]:
     """
-    Yield SrtBlock objects from an iterable of Segments. Print each Segment and SrtBlock to stdout.
+    Yields SrtBlock objects from an iterable of Segments. Print each Segment and SrtBlock to stdout.
     """
     for segment in segments:
         print(segment)

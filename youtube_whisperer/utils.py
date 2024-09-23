@@ -12,7 +12,7 @@ WHISPER_HOME_DIR = Path(os.getenv("WHISPER_HOME_DIR", Path.home() / ".whisper"))
 
 def strtobool(val: str) -> bool:
     """
-    Convert a string representation of truth (case insensitive) to boolean type.
+    Converts a string representation of truth (case insensitive) to boolean type.
 
     Replaces distutils.util.strtobool, which is no longer included in the standard library since Python 3.10.
 
@@ -33,7 +33,7 @@ WHISPER_OVERWRITE = strtobool(os.getenv("WHISPER_OVERWRITE", "false"))
 
 def is_url(text: str) -> bool:
     """
-    Check if a string is a valid URL.
+    Checks if a string is a valid URL.
 
     Args:
         text (str): The input text.

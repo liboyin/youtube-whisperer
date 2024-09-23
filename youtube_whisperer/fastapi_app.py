@@ -35,7 +35,7 @@ class Task(BaseModel):
 @app.get("/tasks")
 async def get_tasks() -> list[Task]:
     """
-    Retrieve all tasks from the Redis database.
+    Retrieve all tasks from the Redis queue.
     """
     global redis_client
     try:
@@ -48,7 +48,7 @@ async def get_tasks() -> list[Task]:
 @app.post("/new", status_code=status.HTTP_201_CREATED)
 async def add_tasks(tasks: list[Task]) -> dict:
     """
-    Add new tasks to the Redis database.
+    Add new tasks to the Redis queue.
     """
     global redis_client
     try:

@@ -8,7 +8,7 @@ from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE
 
 def encode_video_from_file(input_file_path: Path, output_file_path: Path | None = None) -> Path:
     """
-    Encode a video file to MP4 with H.264 video codec and AAC audio codec.
+    Encodes a video file to MP4 with H.264 video codec and AAC audio codec.
 
     cmd = [
         'ffmpeg',

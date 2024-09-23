@@ -21,7 +21,7 @@ class TranscriptBlock(TypedDict):
 
 def get_video_id(url: str) -> str:
     """
-    Extract the video ID from a YouTube video URL.
+    Extracts the video ID from a YouTube video URL.
     
     Support URLs in the following formats:
 

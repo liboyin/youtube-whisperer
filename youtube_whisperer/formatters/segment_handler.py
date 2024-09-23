@@ -7,7 +7,7 @@ from pathlib_extensions import prepare_output_file
 
 def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:
     """
-    Load Segments from an iterable of lines.
+    Loads Segments from an iterable of lines.
     """
     result = []
     for line in lines:
@@ -18,7 +18,7 @@ def load_segments_from_lines(lines: Iterable[str]) -> list[Segment]:
 
 def load_segments_from_file(file_path: Path) -> list[Segment]:
     """
-    Load Segments from a file.
+    Loads Segments from a file.
     """
     with file_path.open() as file_handler:
         return load_segments_from_lines(file_handler)
@@ -26,7 +26,7 @@ def load_segments_from_file(file_path: Path) -> list[Segment]:
 
 def write_segments_to_file(segments: Iterable[Segment], file_path: Path) -> None:
     """
-    Write Segments to a file.
+    Writes Segments to a file.
 
     Args:
         segments (Iterable[Segment]): The Segments to write.
@@ -37,7 +37,7 @@ def write_segments_to_file(segments: Iterable[Segment], file_path: Path) -> None
 
 def duplicate_segments_to_file(segments: Iterable[Segment], file_path: Path, flush: bool = False) -> Iterator[Segment]:
     """
-    Write Segments to a file, and yield them.
+    Writes Segments to a file, and yield them.
 
     Args:
         segments (Iterable[Segment]): The Segments to write.

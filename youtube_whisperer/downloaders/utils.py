@@ -23,7 +23,7 @@ def get_video_title(url: str) -> str:
 
 def is_firefox_cookies_available() -> bool:
     """
-    Return whether the Firefox cookies file is available in the file system.
+    Returns whether the Firefox cookies file is available in the file system.
     """
     for search_dir_path in [
         '~/.mozilla/firefox',

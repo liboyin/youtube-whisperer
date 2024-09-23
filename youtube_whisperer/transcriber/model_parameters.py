@@ -10,9 +10,7 @@ from youtube_whisperer.utils import WHISPER_HOME_DIR, strtobool
 
 def get_default_cuda_flag() -> bool:
     """
-    This function checks the environment variable WHISPER_USE_CUDA to determine whether to use CUDA for GPU acceleration.
-    If the environment variable is not set, it checks if there is a CUDA device available on the system.
-    If a CUDA device is available, it returns True; otherwise, it returns False.
+    Determines whether to use CUDA for GPU acceleration.
 
     Returns:
         bool: True if CUDA should be used, False otherwise.
@@ -25,7 +23,7 @@ def get_default_cuda_flag() -> bool:
 
 def get_default_whisper_model_parameters() -> dict[str, Any]:
     """
-    Get the default parameters for the WhisperModel.
+    Returns default parameters for the WhisperModel.
 
     The parameters are determined based on the environment variables and the available hardware.
     """
