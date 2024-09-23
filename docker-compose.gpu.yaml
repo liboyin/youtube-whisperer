@@ -1,8 +1,8 @@
 services:
-  devcontainer:
+  app:
     extends:
       file: docker-compose.yaml
-      service: devcontainer
+      service: app
     environment:
       WHISPER_USE_CUDA: '1'
     deploy:

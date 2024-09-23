@@ -1,9 +1,10 @@
 services:
-  devcontainer:
+  app:
     build:
       context: .
       args:
         APT_PROXY: http://192.168.0.4:3142
+    container_name: youtube-whisperer-app
     volumes:
       - .:/workspace/youtube-whisperer
       - ~/.whisper:/home/vscode/.whisper
@@ -23,6 +24,7 @@ services:
       context: .
       args:
         APT_PROXY: http://192.168.0.4:3142
+    container_name: youtube-whisperer-worker
     volumes:
       - ~/.whisper:/home/vscode/.whisper
       - /media/libo/Videos/Transcode:/media/libo/Videos/Transcode
@@ -35,6 +37,7 @@ services:
 
   redis:
     image: redis:latest
+    container_name: youtube-whisperer-redis
     ports:
       - "6379:6379"
     volumes:
