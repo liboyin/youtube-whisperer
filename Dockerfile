@@ -2,9 +2,10 @@
 FROM mcr.microsoft.com/devcontainers/python:1-3.12-bullseye
 ENV DEBIAN_FRONTEND=noninteractive
 ARG APT_PROXY
+ARG APT_CONF_PATH=/etc/apt/apt.conf.d/01proxy
 RUN if [ -n "$APT_PROXY" ]; then \
-      echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy; \
-    #   echo "Using APT proxy: $APT_PROXY"; \
+      echo "Acquire::http::Proxy \"$APT_PROXY\";" > $APT_CONF_PATH; \
+      cat $APT_CONF_PATH; \
     fi && \
     apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg && \
@@ -23,6 +24,6 @@ RUN if [ -n "$PYPI_PROXY" ]; then \
       echo "trusted-host = $PYPI_HOST" >> $PIP_CONF_PATH; \
       cat $PIP_CONF_PATH; \
     fi && \
-    pip3 --disable-pip-version-check --no-cache-dir install -r requirements.txt && \
-    pip3 --disable-pip-version-check --no-cache-dir install --editable .
+    pip --disable-pip-version-check --no-cache-dir install -r requirements.txt && \
+    pip --disable-pip-version-check --no-cache-dir install --editable .
 USER vscode
