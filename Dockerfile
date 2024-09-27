@@ -6,8 +6,8 @@ ARG APT_CONF_PATH=/etc/apt/apt.conf.d/01proxy
 RUN if [ -n "$APT_PROXY" ]; then \
       echo "Acquire::http::Proxy \"$APT_PROXY\";" > $APT_CONF_PATH; \
       cat $APT_CONF_PATH; \
-    fi && \
-    apt-get update && \
+    fi
+RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -23,7 +23,7 @@ RUN if [ -n "$PYPI_PROXY" ]; then \
       echo "index-url = $PYPI_PROXY" >> $PIP_CONF_PATH; \
       echo "trusted-host = $PYPI_HOST" >> $PIP_CONF_PATH; \
       cat $PIP_CONF_PATH; \
-    fi && \
-    pip --disable-pip-version-check --no-cache-dir install -r requirements.txt && \
+    fi
+RUN pip --disable-pip-version-check --no-cache-dir install -r requirements.txt && \
     pip --disable-pip-version-check --no-cache-dir install --editable .
 USER vscode
