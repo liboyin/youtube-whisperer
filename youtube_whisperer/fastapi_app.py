@@ -45,8 +45,8 @@ async def get_tasks() -> list[Task]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/new", status_code=status.HTTP_201_CREATED)
-async def add_tasks(tasks: list[Task]) -> dict:
+@app.post("/tasks", status_code=status.HTTP_201_CREATED)
+async def add_tasks(tasks: list[Task]) -> list[Task]:
     """
     Add new tasks to the Redis queue.
     """
@@ -62,20 +62,20 @@ async def add_tasks(tasks: list[Task]) -> dict:
                     task_jsons.append(json.dumps({"source": str(path), "language": task.language}))
         if task_jsons:
             redis_client.rpush('tasks', *task_jsons)
-        return {"message": "Tasks added successfully"}
+        return task_jsons
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/clear")
-async def clear_tasks() -> dict:
+@app.delete("/tasks", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_tasks() -> None:
     """
     Clear all tasks from the Redis queue.
     """
     global redis_client
     try:
         redis_client.delete('tasks')
-        return {"message": "All tasks cleared successfully"}
+        return None
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
