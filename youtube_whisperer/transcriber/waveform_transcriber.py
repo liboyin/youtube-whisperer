@@ -50,7 +50,7 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
 
     Args:
         input_file_path (Path): The path to the input file containing the waveform.
-        output_file_path (Path, optional): The path to the output file where the transcribed Segments will be saved.
+        output_file_path (Path | None, optional): The path to the output file where the transcribed Segments will be saved.
             If not provided, a file with the same name as the input file and a '.seg' extension will be created.
         kwargs: Additional arguments to pass to `model.transcribe()`.
 
