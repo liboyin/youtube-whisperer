@@ -1,6 +1,7 @@
 from unittest import mock
 
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag, get_default_whisper_model_parameters
+from youtube_whisperer.utils import WHISPER_MODELS_DIR
 
 
 @mock.patch('ctranslate2.get_cuda_device_count')
@@ -26,12 +27,11 @@ def test_get_default_cuda_flag_without_env_var_cuda(mock_get_cuda_device_count, 
 
 def test_get_default_whisper_model_parameters_with_env_var_cpu(monkeypatch, mocker):
     monkeypatch.setenv("WHISPER_MODEL", "small")
-    monkeypatch.setenv("WHISPER_MODEL_PATH", "test/path")
     monkeypatch.setenv("WHISPER_USE_CUDA", "false")
     mocker.patch('multiprocessing.cpu_count', return_value=8)
     assert get_default_whisper_model_parameters() == {
         "model_size_or_path": "small",
-        "download_root": "test/path",
+        "download_root": str(WHISPER_MODELS_DIR),
         "device": "cpu",
         "compute_type": "int8",
         "cpu_threads": 8,
@@ -40,23 +40,21 @@ def test_get_default_whisper_model_parameters_with_env_var_cpu(monkeypatch, mock
 
 def test_get_default_whisper_model_parameters_with_env_var_cuda(monkeypatch):
     monkeypatch.setenv("WHISPER_MODEL", "small")
-    monkeypatch.setenv("WHISPER_MODEL_PATH", "test/path")
     monkeypatch.setenv("WHISPER_USE_CUDA", "true")
     assert get_default_whisper_model_parameters() == {
         "model_size_or_path": "small",
-        "download_root": "test/path",
+        "download_root": str(WHISPER_MODELS_DIR),
         "device": "cuda",
         "compute_type": "float32",
     }
 
 
 def test_get_default_whisper_model_parameters_without_env_var_cpu(monkeypatch, mocker):
-    monkeypatch.setenv('WHISPER_MODEL_PATH', "/test/.whisper")
     mocker.patch('youtube_whisperer.transcriber.model_parameters.get_default_cuda_flag', return_value=False)
     mocker.patch('multiprocessing.cpu_count', return_value=8)
     assert get_default_whisper_model_parameters() == {
         "model_size_or_path": "large-v3",
-        "download_root": "/test/.whisper",
+        "download_root": str(WHISPER_MODELS_DIR),
         "device": "cpu",
         "compute_type": "int8",
         "cpu_threads": 8,
@@ -65,11 +63,10 @@ def test_get_default_whisper_model_parameters_without_env_var_cpu(monkeypatch, m
 
 def test_get_default_whisper_model_parameters_without_env_var_cuda(monkeypatch, mocker):
     monkeypatch.setenv('WHISPER_MODEL', "test_model")
-    monkeypatch.setenv('WHISPER_MODEL_PATH', "/test/.whisper")
     mocker.patch('youtube_whisperer.transcriber.model_parameters.get_default_cuda_flag', return_value=True)
     assert get_default_whisper_model_parameters() == {
         "model_size_or_path": "test_model",
-        "download_root": "/test/.whisper",
+        "download_root": str(WHISPER_MODELS_DIR),
         "device": "cuda",
         "compute_type": "float32",
     }

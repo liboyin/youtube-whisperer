@@ -7,7 +7,8 @@ import redis
 
 from faster_whisper.tokenizer import _LANGUAGE_CODES as WHISPER_LANG_CODES
 
-WHISPER_HOME_DIR = Path(os.getenv("WHISPER_HOME_DIR", Path.home() / ".whisper"))
+WHISPER_ASSETS_DIR = Path(os.getenv("WHISPER_ASSETS_DIR", Path(__file__).parents[1] / "assets"))
+WHISPER_MODELS_DIR = Path(os.getenv("WHISPER_MODELS_DIR", Path.home() / ".whisper"))
 
 
 def strtobool(val: str) -> bool:

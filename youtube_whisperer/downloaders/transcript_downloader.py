@@ -8,7 +8,7 @@ from youtube_transcript_api import TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
 from youtube_whisperer.downloaders.utils import get_video_title
-from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_OVERWRITE
 
 DEFAULT_LANG_CODES = 'en;zh'
 
@@ -138,14 +138,14 @@ def download_transcript_as_srt_file(url: str, lang_codes: str, output_file_path:
     return True
 
 
-def download_transcript_as_srt_file_with_default_title(url: str, lang_codes: str = DEFAULT_LANG_CODES, target_dir: Path = WHISPER_HOME_DIR, overwrite: bool = WHISPER_OVERWRITE) -> Path | None:
+def download_transcript_as_srt_file_with_default_title(url: str, lang_codes: str = DEFAULT_LANG_CODES, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: bool = WHISPER_OVERWRITE) -> Path | None:
     """
     Downloads the transcript of a YouTube video as an SRT file named after the video title.
 
     Args:
         url (str): The URL of the YouTube video.
         lang_codes (str, optional): Language codes to filter available transcripts with. Defaults to `DEFAULT_LANG_CODES`.
-        target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to `DEFAULT_HOME_DIR`.
+        target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to `WHISPER_ASSET_DIR`.
         overwrite (bool, optional): Whether to overwrite the transcript file if it already exists. Defaults to `WHISPER_OVERWRITE`.
 
     Returns:

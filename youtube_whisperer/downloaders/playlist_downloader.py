@@ -6,7 +6,7 @@ import yt_dlp
 
 from youtube_whisperer.downloaders.utils import is_firefox_cookies_available
 from youtube_whisperer.downloaders.video_downloader import download_video_with_default_title
-from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_OVERWRITE
 
 
 def yield_video_urls_from_playlist(url: str) -> Iterable[str]:
@@ -49,13 +49,13 @@ def yield_flattened_video_urls(urls: Iterable[str]) -> Iterable[str]:
             yield url
 
 
-def download_playlist_with_default_titles(url: str, target_dir: Path = WHISPER_HOME_DIR, overwrite: bool = WHISPER_OVERWRITE) -> list[Path]:
+def download_playlist_with_default_titles(url: str, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: bool = WHISPER_OVERWRITE) -> list[Path]:
     """
     Downloads all videos in a YouTube playlist and saves them with default titles in the target directory.
     
     Args:
         url (str): The URL of the YouTube playlist.
-        target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to `DEFAULT_HOME_DIR`.
+        target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to `WHISPER_ASSET_DIR`.
         overwrite (bool, optional): Whether to overwrite the video files if they already exist. Defaults to `WHISPER_OVERWRITE`.
     
     Returns:

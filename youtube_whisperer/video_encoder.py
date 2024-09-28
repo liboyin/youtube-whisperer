@@ -3,7 +3,7 @@ from pathlib import Path
 import ffmpeg
 from pathlib_extensions import prepare_input_file, prepare_output_file
 
-from youtube_whisperer.utils import WHISPER_HOME_DIR, WHISPER_OVERWRITE
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_OVERWRITE
 
 
 def encode_video_from_file(input_file_path: Path, output_file_path: Path | None = None) -> Path:
@@ -47,6 +47,6 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
 
 
 if __name__ == '__main__':
-    input_file_path = WHISPER_HOME_DIR / 'test.mp4'
-    output_file_path = WHISPER_HOME_DIR / 'test.out.mp4'
+    input_file_path = WHISPER_ASSETS_DIR / 'test.mp4'
+    output_file_path = WHISPER_ASSETS_DIR / 'test.out.mp4'
     encode_video_from_file(input_file_path, output_file_path)
