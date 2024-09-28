@@ -90,17 +90,3 @@ async def list_assets(dir_path: str = str(WHISPER_ASSETS_DIR)) -> list[str]:
         return sorted(map(str, Path(dir_path).iterdir()))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.put("/assets", status_code=status.HTTP_201_CREATED)
-async def move_assets(direction: str = Query(..., enum=["in", "out"])) -> dict:
-    """
-    Execute `./mvassets.sh in` or `./mvassets.sh out`.
-    """
-    try:
-        result = os.system(f"./mvassets.sh {direction}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    if result != 0:
-        raise HTTPException(status_code=500, detail=f"Failed to move assets {direction}")
-    return {"message": f"Assets moved {direction} successfully"}
