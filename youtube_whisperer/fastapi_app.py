@@ -1,14 +1,15 @@
+from contextlib import asynccontextmanager
 import glob
 import json
 import os
-from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, status
 from pydantic import BaseModel
 import redis
 
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
-from youtube_whisperer.utils import is_url
+from youtube_whisperer.utils import WHISPER_HOME_DIR, is_url
 
 redis_client = None
 
@@ -76,6 +77,17 @@ async def clear_tasks() -> None:
     try:
         redis_client.delete('tasks')
         return None
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/assets")
+async def list_assets(dir_path: str = str(WHISPER_HOME_DIR)) -> list[str]:
+    """
+    List all contents of the specified directory.
+    """
+    try:
+        return sorted(map(str, Path(dir_path).iterdir()))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
