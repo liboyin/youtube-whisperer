@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Configure PyPI proxy. Note PIP_CONF_PATH depends on the current user
-if [ -n "$PYPI_PROXY" ] && [ -n "$PIP_CONF_PATH" ]; then
+# Configure PyPI proxy
+if [ -n "$PYPI_PROXY" ]; then
+    PIP_CONF_PATH=$HOME/.pip/pip.conf
     mkdir -p "$(dirname "$PIP_CONF_PATH")"
     cat <<EOF > "$PIP_CONF_PATH"
 [global]
