@@ -41,3 +41,6 @@ strict_optional = true
 
 [tool.pytest.ini_options]
 addopts = "--cov=youtube_whisperer --cov-report html --cov-report=term"
+
+[tool.setuptools.packages]
+find = {where = ["youtube_whisperer"]}
