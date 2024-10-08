@@ -47,23 +47,23 @@ async def get_tasks() -> list[Task]:
 
 
 @app.post("/tasks", status_code=status.HTTP_201_CREATED)
-async def add_tasks(tasks: list[Task]) -> list[Task]:
+async def add_tasks(tasks: list[Task]) -> list[dict[str, str]]:
     """
     Add new tasks to the Redis queue.
     """
     global redis_client
     try:
-        task_jsons = []
+        task_dicts: list[dict[str, str]] = []
         for task in tasks:
             if is_url(task.source):
                 for url in yield_flattened_video_urls([task.source]):
-                    task_jsons.append(json.dumps({"source": url, "language": task.language}))
+                    task_dicts.append({"source": url, "language": task.language})
             else:
                 for path in glob.glob(os.path.expanduser(task.source)):
-                    task_jsons.append(json.dumps({"source": str(path), "language": task.language}))
-        if task_jsons:
-            redis_client.rpush('tasks', *task_jsons)
-        return task_jsons
+                    task_dicts.append({"source": str(path), "language": task.language})
+        if task_dicts:
+            redis_client.rpush('tasks', *(json.dumps(task) for task in task_dicts))
+        return task_dicts
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
