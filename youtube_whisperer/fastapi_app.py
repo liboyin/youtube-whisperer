@@ -47,7 +47,7 @@ async def get_tasks() -> list[Task]:
 
 
 @app.post("/tasks", status_code=status.HTTP_201_CREATED)
-async def add_tasks(tasks: list[Task] = [Task('assets/*.mp4', 'en')]) -> list[dict[str, str]]:
+async def add_tasks(tasks: list[Task]) -> list[dict[str, str]]:
     """
     Add new tasks to the Redis queue.
     """
