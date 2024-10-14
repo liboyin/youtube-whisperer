@@ -1,12 +1,12 @@
 from pathlib import Path
 
 import ffmpeg
-from pathlib_extensions import prepare_input_file, prepare_output_file
+from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
 
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_OVERWRITE
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 
-def encode_video_from_file(input_file_path: Path, output_file_path: Path | None = None) -> Path:
+def encode_video_from_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
     """
     Encodes a video file to MP4 with H.264 video codec and AAC audio codec. Equivalent to the following command:
 
@@ -24,13 +24,16 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
     Args:
         input_file_path (Path): The path to the input video file.
         output_file_path (Path, optional): The path to the output MP4 file. If not provided, a path with the same name as the input file and .mp4 extension will be used.
+        overwrite (OverwriteMode, optional): Whether to overwrite `output_file_path` if it already exists. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
         Path: The path to the encoded MP4 file.
     """
     prepare_input_file(input_file_path)
     output_file_path = prepare_output_file(output_file_path or input_file_path.with_suffix('.mp4'))
-    assert input_file_path != output_file_path
+    if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
+        return output_file_path
+    prepare_output_file(output_file_path)
     stream = (
         ffmpeg
         .input(str(input_file_path), threads=0)
@@ -39,7 +42,7 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
     )
     print('ffmpeg args:', stream.get_args())
     try:
-        stream.run(input=input_file_path.read_bytes(), capture_stdout=True, capture_stderr=True, overwrite_output=WHISPER_OVERWRITE)
+        stream.run(input=input_file_path.read_bytes(), capture_stdout=True, capture_stderr=True, overwrite_output=True)
     except ffmpeg.Error as e:
         print(e.stderr.decode())
         raise

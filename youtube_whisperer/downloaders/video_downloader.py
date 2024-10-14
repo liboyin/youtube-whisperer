@@ -1,24 +1,23 @@
 import argparse
 from pathlib import Path
 
-from pathlib_extensions import prepare_output_file, replace_os_reserved_chars
+from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars
 import yt_dlp
 
 from youtube_whisperer.downloaders.utils import get_video_title, is_firefox_cookies_available
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_OVERWRITE
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 
-def download_video(url: str, target_path: Path, overwrite: bool = WHISPER_OVERWRITE) -> None:
+def download_video(url: str, target_path: Path, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
     """
     Downloads a video from a given URL and saves it to the target path.
 
     Args:
         url (str): The URL of the video.
         target_path (Path): The path where the downloaded video will be saved.
-        overwrite (bool, optional): Whether to overwrite the video file if it already exists. Defaults to `WHISPER_OVERWRITE`.
+        overwrite (OverwriteMode, optional): Whether to overwrite the video file if it already exists. Defaults to `OverwriteMode.PROMPT`.
     """
-    if not overwrite and target_path.is_file():
-        print(f'Skipping download because the target video file already exists: {target_path}')
+    if target_path.is_file() and not overwrite_existing_path(target_path, overwrite):
         return
     prepare_output_file(target_path)
     ydl_opts = {
@@ -32,14 +31,14 @@ def download_video(url: str, target_path: Path, overwrite: bool = WHISPER_OVERWR
         ydl.download([url])
 
 
-def download_video_with_default_title(url: str, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: bool = WHISPER_OVERWRITE) -> Path:
+def download_video_with_default_title(url: str, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
     """
     Downloads a video from the given URL and saves it with a default title in the target directory.
 
     Args:
         url (str): The URL of the video to download.
         target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to `WHISPER_ASSET_DIR`.
-        overwrite (bool, optional): Whether to overwrite the video file if it already exists. Defaults to `WHISPER_OVERWRITE`.
+        overwrite (OverwriteMode, optional): Whether to overwrite the video file if it already exists. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
         Path: The path to the downloaded video file.
@@ -56,10 +55,11 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs='+', metavar='url', help="URLs of videos to download.")
-    parser.add_argument("-o", "--overwrite", action='store_true', default=WHISPER_OVERWRITE, help="Overwrite existing video files. Defaults to WHISPER_OVERWRITE.")
+    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing video files. Defaults to `OverwriteMode.PROMPT`.")
     args = parser.parse_args()
+    overwrite  =OverwriteMode(args.overwrite.lower())
     for url in args.urls:
-        download_video_with_default_title(url, overwrite=args.overwrite)
+        download_video_with_default_title(url, overwrite=overwrite)
 
 
 if __name__ == '__main__':

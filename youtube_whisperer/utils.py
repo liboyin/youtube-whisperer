@@ -29,8 +29,6 @@ def strtobool(val: str) -> bool:
         case _:
             raise ValueError(f"invalid truth value '{val}' of type {type(val)}")
 
-WHISPER_OVERWRITE = strtobool(os.getenv("WHISPER_OVERWRITE", "false"))
-
 
 def is_url(text: str) -> bool:
     """
