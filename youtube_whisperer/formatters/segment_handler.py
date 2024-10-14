@@ -35,26 +35,22 @@ def write_segments_to_file(segments: Iterable[Segment], file_path: Path) -> None
     prepare_output_file(file_path).write_text('\n'.join(map(str, segments)))
 
 
-def duplicate_segments_to_file(segments: Iterable[Segment], file_path: Path, flush: bool = False) -> Iterator[Segment]:
+def duplicate_segments_to_file(segments: Iterable[Segment], output_file_path: Path) -> Iterator[Segment]:
     """
     Writes Segments to a file, and yield them.
 
     Args:
         segments (Iterable[Segment]): The Segments to write.
         file_path (Path): The path to the file to write to.
-        flush (bool, optional): Whether to flush the file after writing each Segment. Defaults to False.
 
     Yields:
         Segments from input as-is.
     """
-    with prepare_output_file(file_path).open('w') as file_handler:
+    with prepare_output_file(output_file_path).open('w') as file_handler:
         for i, x in enumerate(segments):
             # write a newline between Segments, but not after the last one
             if i:
                 file_handler.write(f'\n{x}')
             else:
                 file_handler.write(str(x))
-            if flush:
-                # wait until the current Segment is written to disk
-                file_handler.flush()
             yield x
