@@ -45,7 +45,7 @@ numpy==2.1.2
 onnxruntime==1.19.2
 packaging==24.1
 parso==0.8.4
-pathlib-extensions @ git+https://github.com/liboyin/pathlib-extensions.git@68ef8fd8bd94e0e4621a01fff6fc4c8a7244ec8b
+pathlib-extensions @ git+https://github.com/liboyin/pathlib-extensions.git@43bd97989f49f5542808be12a4ad89e3415363f5
 pexpect==4.9.0
 pluggy==1.5.0
 prompt_toolkit==3.0.48
