@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 import redis
 

@@ -16,7 +16,7 @@ def process_queue():
         while True:
             task = client.lindex('tasks', 0)
             if task:
-                print(f"Processing task: {task}")
+                print(f"Picked up task: {task}")
                 task = json.loads(task)
                 source = task['source']
                 language = task['language']
@@ -30,7 +30,7 @@ def process_queue():
                     transcribe_to_srt_files([video_file_path], language)
                 client.lpop('tasks')
             else:
-                print("Queue is empty")
+                print("Queue is empty. Sleeping for 60 seconds...")
                 time.sleep(60)
 
 
