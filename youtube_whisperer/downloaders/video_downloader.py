@@ -8,14 +8,14 @@ from youtube_whisperer.downloaders.utils import get_video_title, is_firefox_cook
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 
-def download_video(url: str, target_path: Path, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
+def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> None:
     """
     Downloads a video from a given URL and saves it to the target path.
 
     Args:
         url (str): The URL of the video.
         target_path (Path): The path where the downloaded video will be saved.
-        overwrite (OverwriteMode, optional): Whether to overwrite the video file if it already exists. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite the video file if it already exists.
     """
     if target_path.is_file() and not overwrite_existing_path(target_path, overwrite):
         return

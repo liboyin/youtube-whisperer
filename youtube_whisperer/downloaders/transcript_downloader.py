@@ -113,8 +113,7 @@ def download_transcript_as_srt_text(url: str, lang_codes: str) -> str | None:
     return SRTFormatter().format_transcript(transcript)
 
 
-# TODO: is it possible to assign a default value to lang_codes here?
-def download_transcript_as_srt_file(url: str, lang_codes: str, output_file_path: Path, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> bool:
+def download_transcript_as_srt_file(url: str, lang_codes: str, output_file_path: Path, overwrite: OverwriteMode) -> bool:
     """
     Downloads the transcript of a YouTube video as an SRT file.
 
@@ -122,7 +121,7 @@ def download_transcript_as_srt_file(url: str, lang_codes: str, output_file_path:
         url (str): The URL of the YouTube video.
         lang_codes (str): Language codes to filter available transcripts with.
         output_file_path (Path): The path where the SRT file will be saved.
-        overwrite (OverwriteMode, optional): Whether to overwrite the transcript file if it already exists. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite the transcript file if it already exists.
 
     Returns:
         bool: Whether the download is successful.
