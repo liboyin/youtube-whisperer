@@ -50,6 +50,7 @@ def convert_segments_file_to_srt(input_file_path: Path, output_file_path: Path |
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return output_file_path
     output_file_path = prepare_output_file(output_file_path)
+    assert isinstance(output_file_path, Path)  # narrow down type from `Path | None` to `Path`
     srt_blocks_generator = yield_srt_blocks_from_segments(load_segments_from_file(input_file_path))
     if deduplicate:
         srt_blocks_generator = yield_deduplicated_srt_blocks(srt_blocks_generator)

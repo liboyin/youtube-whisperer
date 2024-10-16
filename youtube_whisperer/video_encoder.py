@@ -30,10 +30,11 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
         Path: The path to the encoded MP4 file.
     """
     prepare_input_file(input_file_path)
-    output_file_path = prepare_output_file(output_file_path or input_file_path.with_suffix('.mp4'))
+    output_file_path = output_file_path or input_file_path.with_suffix('.mp4')
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return output_file_path
     prepare_output_file(output_file_path)
+    assert isinstance(output_file_path, Path)  # narrow down type from `Path | None` to `Path`
     stream = (
         ffmpeg
         .input(str(input_file_path), threads=0)

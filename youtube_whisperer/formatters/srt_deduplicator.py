@@ -135,6 +135,7 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return output_file_path
     output_file_path = prepare_output_file(output_file_path)
+    assert isinstance(output_file_path, Path)  # narrow down type from `Path | None` to `Path`
     with prepare_input_file(input_file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
