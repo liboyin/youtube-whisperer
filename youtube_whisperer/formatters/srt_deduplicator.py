@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Self
 
-from pathlib_extensions import prepare_input_file, prepare_output_file
+from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
 
 ARROW = '-->'
 
@@ -118,19 +118,23 @@ def convert_srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
     return '\n'.join(yield_lines_from_srt_blocks(blocks))
 
 
-def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None) -> Path:
+def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
     """
     Deduplicates the contents of an SRT file and writes the deduplicated content to a new file.
 
     Args:
         input_file_path (Path): The path to the input SRT file.
         output_file_path (Path | None, optional): The path to the output file. If not provided, the input file will be overwritten. Defaults to None.
+        overwrite (OverwriteMode, optional): Whether to overwrite the SRT file if it already exists. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
         Path: The path to the output file.
     """
     print("Deduplicating SRT file:", input_file_path)
-    output_file_path = prepare_output_file(output_file_path or input_file_path)
+    output_file_path = output_file_path or input_file_path
+    if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
+        return output_file_path
+    output_file_path = prepare_output_file(output_file_path)
     with prepare_input_file(input_file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
@@ -144,8 +148,11 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="SRT file paths to deduplicate.")
-    for path in parser.parse_args().paths:
-        deduplicate_srt_file(path)
+    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing video files. Defaults to `OverwriteMode.PROMPT`.")
+    args = parser.parse_args()
+    overwrite = OverwriteMode(args.overwrite.lower())
+    for path in args.paths:
+        deduplicate_srt_file(path, overwrite=overwrite)
 
 
 if __name__ == '__main__':
