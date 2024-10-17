@@ -25,12 +25,12 @@ async def lifespan(app: FastAPI):
         if redis_client:
             redis_client.close()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, title="YouTube Whisperer")
 
 
 class Task(BaseModel):
-    source: str
-    language: str
+    source: str = 'assets/*.mp4'
+    language: str = 'en'
 
 
 @app.get("/tasks")
