@@ -40,7 +40,7 @@ def convert_segments_file_to_srt(input_file_path: Path, output_file_path: Path |
         input_file_path (Path): The path to the input segments file.
         output_file_path (Path | None, optional): The path to the output SRT file. If not provided, a file with the same name as the input file and the .srt extension will be created. Defaults to None.
         deduplicate (bool, optional): Whether to deduplicate the segments. Defaults to True.
-        overwrite (OverwriteMode, optional): Whether to overwrite the SRT file if it already exists. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
         Path: The path to the output SRT file.
@@ -64,7 +64,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Segment file paths to convert to SRT.")
-    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing video files. Defaults to `OverwriteMode.PROMPT`.")
+    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.")
     args = parser.parse_args()
     overwrite = OverwriteMode(args.overwrite.lower())
     for path in args.paths:

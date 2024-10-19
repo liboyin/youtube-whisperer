@@ -121,7 +121,7 @@ def download_transcript_as_srt_file(url: str, lang_codes: str, output_file_path:
         url (str): The URL of the YouTube video.
         lang_codes (str): Language codes to filter available transcripts with.
         output_file_path (Path): The path where the SRT file will be saved.
-        overwrite (OverwriteMode, optional): Whether to overwrite the transcript file if it already exists.
+        overwrite (OverwriteMode): Whether to overwrite existing SRT files.
 
     Returns:
         bool: Whether the download is successful.
@@ -144,7 +144,7 @@ def download_transcript_as_srt_file_with_default_title(url: str, lang_codes: str
         url (str): The URL of the YouTube video.
         lang_codes (str, optional): Language codes to filter available transcripts with. Defaults to `DEFAULT_LANG_CODES`.
         target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to `WHISPER_ASSET_DIR`.
-        overwrite (OverwriteMode, optional): Whether to overwrite the transcript file if it already exists. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
         Path | None: The path to the downloaded SRT file if successful, or None otherwise.

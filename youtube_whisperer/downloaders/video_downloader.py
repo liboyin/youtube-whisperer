@@ -15,7 +15,7 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
     Args:
         url (str): The URL of the video.
         target_path (Path): The path where the downloaded video will be saved.
-        overwrite (OverwriteMode, optional): Whether to overwrite the video file if it already exists.
+        overwrite (OverwriteMode): Whether to overwrite existing video files.
     """
     if target_path.is_file() and not overwrite_existing_path(target_path, overwrite):
         return
@@ -38,7 +38,7 @@ def download_video_with_default_title(url: str, target_dir: Path = WHISPER_ASSET
     Args:
         url (str): The URL of the video to download.
         target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to `WHISPER_ASSET_DIR`.
-        overwrite (OverwriteMode, optional): Whether to overwrite the video file if it already exists. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing video files. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
         Path: The path to the downloaded video file.

@@ -57,7 +57,7 @@ def download_playlist_with_default_titles(url: str, target_dir: Path = WHISPER_A
     Args:
         url (str): The URL of the YouTube playlist.
         target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to `WHISPER_ASSET_DIR`.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing output files. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing video files. Defaults to `OverwriteMode.PROMPT`.
     
     Returns:
         list[Path]: A list of paths to downloaded video files.

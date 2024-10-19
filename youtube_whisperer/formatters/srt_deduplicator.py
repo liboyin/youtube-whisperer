@@ -125,7 +125,7 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
     Args:
         input_file_path (Path): The path to the input SRT file.
         output_file_path (Path | None, optional): The path to the output file. If not provided, the input file will be overwritten. Defaults to None.
-        overwrite (OverwriteMode, optional): Whether to overwrite the SRT file if it already exists. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
         Path: The path to the output file.
@@ -149,7 +149,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="SRT file paths to deduplicate.")
-    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing video files. Defaults to `OverwriteMode.PROMPT`.")
+    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.")
     args = parser.parse_args()
     overwrite = OverwriteMode(args.overwrite.lower())
     for path in args.paths:
