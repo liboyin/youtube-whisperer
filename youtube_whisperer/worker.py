@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import time
 
+from pathlib_extensions import OverwriteMode
+
 from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
 from youtube_whisperer.utils import redis_connection, is_url
@@ -22,12 +24,12 @@ def process_queue():
                 language = task['language']
                 # assume playlists and glob patterns have been resolved at insertion time
                 if is_url(source):
-                    video_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language)
+                    video_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
                 else:
                     video_file_path = Path(source)
                     transcript_flag = False
                 if not transcript_flag:
-                    transcribe_to_srt_files([video_file_path], language)
+                    transcribe_to_srt_files([video_file_path], language, overwrite=OverwriteMode.NEVER)
                 client.lpop('tasks')
             else:
                 print("Queue is empty. Sleeping for 60 seconds...")
