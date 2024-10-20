@@ -1,12 +1,14 @@
+import argparse
 from pathlib import Path
+import time
 
 import ffmpeg
-from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
+from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_dir, prepare_input_file, prepare_output_file
 
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 
-def encode_video_from_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
+def encode_to_mp4(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
     """
     Encodes a video file to MP4 with H.264 video codec and AAC audio codec. Equivalent to the following command:
 
@@ -37,7 +39,7 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
     assert isinstance(output_file_path, Path)  # narrow down type from `Path | None` to `Path`
     stream = (
         ffmpeg
-        .input(str(input_file_path), threads=0)
+        .input(str(input_file_path), threads=0)  # ffmpeg automatically detects the optimal number of threads
         # TODO: output target must be seekable. Is it possible to use a buffer instead of a file?
         .output(str(output_file_path), vcodec='libx264', acodec='aac', audio_bitrate='160k', ac=2, format='mp4')
     )
@@ -50,7 +52,31 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
     return output_file_path
 
 
-if __name__ == '__main__':
-    input_file_path = WHISPER_ASSETS_DIR / 'test.mp4'
-    output_file_path = WHISPER_ASSETS_DIR / 'test.out.mp4'
-    encode_video_from_file(input_file_path, output_file_path)
+def monitor_dir_and_encode_to_mp4(dir_path: Path = WHISPER_ASSETS_DIR, sleep_seconds: int = 60) -> None:
+    """
+    Monitors a directory for new MKV files and encodes them to MP4.
+
+    Args:
+        dir_path (Path, optional): The directory to monitor for new MKV files. Defaults to `WHISPER_ASSETS_DIR`.
+        sleep_seconds (int, optional): The number of seconds to sleep between checks. Defaults to 60.
+    """
+    while True:
+        file_found = False
+        for input_file_path in prepare_input_dir(dir_path).glob("*.mkv"):
+            output_file_path = input_file_path.with_suffix('.mp4')
+            if not output_file_path.exists():
+                encode_to_mp4(input_file_path, output_file_path, OverwriteMode.NEVER)
+            file_found = True
+        if not file_found:
+            print(f"No new file detected. Sleeping for {sleep_seconds} seconds...")
+        time.sleep(sleep_seconds)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dir", type=Path, default=WHISPER_ASSETS_DIR, help="The directory to monitor for new MKV files, defaults to `WHISPER_ASSETS_DIR`.")
+    monitor_dir_and_encode_to_mp4(parser.parse_args().dir)
+
+
+if __name__ == "__main__":
+    main()
