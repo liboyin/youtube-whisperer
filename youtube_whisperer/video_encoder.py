@@ -43,7 +43,7 @@ def encode_video_from_file(input_file_path: Path, output_file_path: Path | None 
     )
     print('ffmpeg args:', stream.get_args())
     try:
-        stream.run(input=input_file_path.read_bytes(), capture_stdout=True, capture_stderr=True, overwrite_output=True)
+        stream.run(capture_stdout=True, capture_stderr=True, overwrite_output=True)
     except ffmpeg.Error as e:
         print(e.stderr.decode())
         raise
