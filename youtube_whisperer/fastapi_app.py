@@ -6,10 +6,9 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
-import redis
 
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, is_url
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, get_redis_client, is_url
 
 redis_client = None
 
@@ -18,8 +17,7 @@ redis_client = None
 async def lifespan(app: FastAPI):
     global redis_client
     try:
-        redis_client = redis.StrictRedis(host='redis')
-        redis_client.ping()
+        redis_client = get_redis_client()
         yield
     finally:
         if redis_client:

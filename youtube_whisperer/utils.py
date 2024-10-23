@@ -51,22 +51,32 @@ def verify_language_code(language: str | None) -> None:
         raise ValueError("Unsupported language:", language)
 
 
-@contextmanager
-def redis_connection():
+def get_redis_client() -> redis.StrictRedis:
     """
-    Context manager for establishing a Redis connection.
+    Returns a new, verified Redis connection.
 
-    Yields:
+    Returns:
         redis.StrictRedis: A Redis client instance.
 
     Raises:
         redis.ConnectionError: If there is an issue connecting to the Redis server.
     """
     client = redis.StrictRedis(host='redis')
+    client.ping()  # raise a ConnectionError if the server is unreachable
+    return client
+
+
+@contextmanager
+def redis_connection():
+    """
+    Context manager for a Redis connection.
+
+    Yields:
+        redis.StrictRedis: A Redis client instance.
+    """
+    client = get_redis_client()
     try:
-        client.ping()
         yield client
-    except redis.ConnectionError:
-        raise
     finally:
-        client.close()
+        if client:
+            client.close()
