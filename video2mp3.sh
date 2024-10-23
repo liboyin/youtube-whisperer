@@ -20,6 +20,6 @@ while true; do
     done < <(find "$MONITOR_DIR_PATH" \( -name "*.mkv" -o -name "*.mp4" \) -print0)
     if [ "$file_found" = false ]; then
         echo "No new file detected. Sleeping for 60 seconds..."
+        sleep 60
     fi
-    sleep 60
 done
