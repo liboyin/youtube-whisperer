@@ -1,3 +1,9 @@
+from pathlib import Path
+from textwrap import dedent
+
+from pathlib_extensions import OverwriteMode
+import pytest
+
 from youtube_whisperer.formatters.srt_deduplicator import (
     SrtBlock,
     convert_srt_blocks_to_str,
@@ -6,10 +12,6 @@ from youtube_whisperer.formatters.srt_deduplicator import (
     yield_lines_from_srt_blocks,
     yield_srt_blocks_from_lines,
 )
-from pathlib import Path
-from textwrap import dedent
-
-import pytest
 
 
 @pytest.fixture(scope="module")
@@ -101,7 +103,7 @@ def test_convert_srt_blocks_to_str():
 
 
 def test_deduplicate_srt_file(temp_srt_file: Path):
-    assert deduplicate_srt_file(temp_srt_file) is temp_srt_file
+    assert deduplicate_srt_file(temp_srt_file, overwrite=OverwriteMode.ALWAYS) is temp_srt_file
     expected = dedent("""\
         1
         00:00:01,000 --> 00:00:02,000
