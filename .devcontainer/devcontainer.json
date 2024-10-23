@@ -21,7 +21,7 @@
                 "ms-python.vscode-pylance",
                 "ms-vscode.live-server",
                 "ryu1kn.partial-diff",
-                "saoudrizwan.claude-dev",
+                // "saoudrizwan.claude-dev", // disable for Cursor
                 "streetsidesoftware.code-spell-checker",
                 "tamasfe.even-better-toml",
                 "visualstudioexptteam.intellicode-api-usage-examples",
