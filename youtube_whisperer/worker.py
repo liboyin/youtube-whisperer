@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import time
@@ -6,7 +7,23 @@ from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
-from youtube_whisperer.utils import redis_connection, is_url
+from youtube_whisperer.utils import get_redis_client, is_url
+
+
+@contextmanager
+def redis_connection():
+    """
+    Context manager for a Redis connection.
+
+    Yields:
+        redis.StrictRedis: A Redis client instance.
+    """
+    client = get_redis_client()
+    try:
+        yield client
+    finally:
+        if client:
+            client.close()
 
 
 def process_queue():
