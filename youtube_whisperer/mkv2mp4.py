@@ -69,7 +69,7 @@ def monitor_dir_and_encode_to_mp4(dir_path: Path = WHISPER_ASSETS_DIR, sleep_sec
             file_found = True
         if not file_found:
             print(f"No new file detected. Sleeping for {sleep_seconds} seconds...")
-        time.sleep(sleep_seconds)
+            time.sleep(sleep_seconds)
 
 
 def main() -> None:
