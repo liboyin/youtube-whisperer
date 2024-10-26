@@ -13,5 +13,7 @@ EOF
 fi
 
 # Pin dependency versions by installing from the lock file before installing this project
-pip --disable-pip-version-check --no-cache-dir install -r requirements.txt
-pip --disable-pip-version-check --no-cache-dir install --editable .
+if [ -f "requirements.txt" ]; then
+    pip --disable-pip-version-check --no-cache-dir install -r requirements.txt
+fi
+pip --disable-pip-version-check --no-cache-dir install -e .
