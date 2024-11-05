@@ -60,7 +60,7 @@ def main() -> None:
     file_paths, video_urls = tuple(map(list, more_itertools.partition(is_url, args.sources)))
     language = args.language
     verify_language_code(language)
-    overwrite = OverwriteMode(args.overwrite.lower())
+    overwrite = OverwriteMode(args.overwrite)
     file_paths = itertools.chain(try_download_videos_and_transcripts(video_urls, language, overwrite), (Path(x) for x in file_paths))
     transcribe_to_srt_files(file_paths, language, overwrite)
 

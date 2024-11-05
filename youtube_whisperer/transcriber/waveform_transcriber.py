@@ -80,7 +80,7 @@ def main() -> None:
     args = parser.parse_args()
     language = args.language
     verify_language_code(language)
-    overwrite = OverwriteMode(args.overwrite.lower())
+    overwrite = OverwriteMode(args.overwrite)
     for path in args.paths:
         transcribe_file_with_default_model(path, language=language, overwrite=overwrite)
 

@@ -45,7 +45,7 @@ def main() -> None:
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Video file paths to encode to MP3.")
     parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing MP3 files. Defaults to `OverwriteMode.PROMPT`.")
     args = parser.parse_args()
-    overwrite = OverwriteMode(args.overwrite.lower())
+    overwrite = OverwriteMode(args.overwrite)
     for path in args.paths:
         encode_to_mp3(path, overwrite=overwrite)
 
