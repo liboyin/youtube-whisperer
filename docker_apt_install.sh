@@ -8,6 +8,6 @@ if [ -n "$APT_PROXY" ]; then
 fi
 
 apt-get update
-apt-get install -y --no-install-recommends ffmpeg
+apt-get install -y --no-install-recommends ffmpeg handbrake-cli
 apt-get clean
 rm -rf /var/lib/apt/lists/*
