@@ -11,17 +11,16 @@
     "customizations": {
         "vscode": {
             "extensions": [
-                // Some extensions are not needed on Cursor
                 "charliermarsh.ruff",
-                // "github.copilot",
-                // "github.copilot-chat",
+                "github.copilot",
+                "github.copilot-chat",
                 "mhutchie.git-graph",
                 "ms-python.debugpy",
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ms-vscode.live-server",
                 "ryu1kn.partial-diff",
-                // "saoudrizwan.claude-dev",
+                "saoudrizwan.claude-dev",
                 "streetsidesoftware.code-spell-checker",
                 "tamasfe.even-better-toml",
                 "visualstudioexptteam.intellicode-api-usage-examples",
