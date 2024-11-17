@@ -46,23 +46,29 @@ async def get_tasks() -> list[Task]:
 
 
 @app.post("/tasks", status_code=status.HTTP_201_CREATED)
-async def add_tasks(tasks: list[Task]) -> list[dict[str, str]]:
+async def add_tasks(patterns: list[Task]) -> list[Task]:
     """
-    Add new tasks to the Redis queue.
+    Add new tasks from patterns to the Redis queue.
+
+    Args:
+        patterns (list[Task]): List of task patterns.
+
+    Returns:
+        list[Task]: List of tasks added to the queue.
     """
     global redis_client
     try:
-        task_dicts: list[dict[str, str]] = []
-        for task in tasks:
+        tasks: list[Task] = []
+        for task in patterns:
             if is_url(task.source):
                 for url in yield_flattened_video_urls([task.source]):
-                    task_dicts.append({"source": url, "language": task.language})
+                    tasks.append(Task(source=url, language=task.language))
             else:
                 for path in glob.glob(os.path.expanduser(task.source)):
-                    task_dicts.append({"source": str(path), "language": task.language})
-        if task_dicts:
-            redis_client.rpush('tasks', *(json.dumps(task) for task in task_dicts))
-        return task_dicts
+                    tasks.append(Task(source=str(path), language=task.language))
+        if tasks:
+            redis_client.rpush('tasks', *(task.model_dump_json() for task in tasks))
+        return tasks
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -81,12 +87,12 @@ async def clear_tasks() -> None:
 
 
 @app.get("/assets")
-async def list_assets(dir_path: str = str(WHISPER_ASSETS_DIR)) -> list[str]:
+async def list_assets(dir_path: Path = WHISPER_ASSETS_DIR) -> list[str]:
     """
     List all contents of the specified directory.
     """
     try:
-        return sorted(map(str, Path(dir_path).iterdir()))
+        return sorted(map(str, dir_path.iterdir()))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
