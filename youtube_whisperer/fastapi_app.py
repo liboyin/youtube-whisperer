@@ -1,3 +1,4 @@
+from collections import defaultdict
 from contextlib import asynccontextmanager
 import glob
 import json
@@ -86,5 +87,35 @@ async def list_assets(dir_path: str = str(WHISPER_ASSETS_DIR)) -> list[str]:
     """
     try:
         return sorted(map(str, Path(dir_path).iterdir()))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/assets")
+async def clean_assets(dir_path: Path = WHISPER_ASSETS_DIR) -> list[str]:
+    """
+    Clean up redundant files in the specified directory.
+
+    If the same filename exists as MP4 and SRT, remove corresponding MKV and SEG files.
+
+    Args:
+        dir_path (Path): The directory path to clean up.
+
+    Returns:
+        list[str]: List of removed file paths.
+    """
+    try:
+        stem2suffixes: dict[str, set[str]] = defaultdict(set)
+        for file_path in dir_path.iterdir():
+            if file_path.is_file():
+                stem2suffixes[file_path.stem].add(file_path.suffix.lower())
+        removed_files: list[str] = []
+        for stem, suffixes in stem2suffixes.items():
+            if suffixes >= {'.mp4', '.srt'}:
+                for suffix in ['.mkv', '.seg']:
+                    if suffix in suffixes and (file_path := dir_path / f"{stem}{suffix}").is_file():
+                        file_path.unlink()
+                        removed_files.append(str(file_path))
+        return sorted(removed_files)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
