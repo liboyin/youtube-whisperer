@@ -28,7 +28,7 @@ app = FastAPI(lifespan=lifespan, title="YouTube Whisperer")
 
 
 class Task(BaseModel):
-    source: str = 'assets/*.mp4'
+    source: str = 'assets/2024*.mkv'
     language: str = 'en'
 
 
