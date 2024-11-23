@@ -17,3 +17,4 @@ if [ -f "requirements.txt" ]; then
     pip --disable-pip-version-check --no-cache-dir install -r requirements.txt
 fi
 pip --disable-pip-version-check --no-cache-dir install -e .
+rm -rf /tmp/pip-tmp
