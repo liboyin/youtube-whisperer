@@ -1,5 +1,5 @@
 # https://github.com/devcontainers/images/blob/main/src/python/.devcontainer/Dockerfile
-FROM mcr.microsoft.com/devcontainers/python:1-3.12-bullseye
+FROM mcr.microsoft.com/devcontainers/python:1-3.12-bookworm
 
 ARG APT_PROXY=http://192.168.0.4:3142
 ARG PYPI_PROXY=http://192.168.0.4:3141/root/pypi/+simple/
