@@ -28,7 +28,7 @@ def get_default_whisper_model_parameters() -> dict[str, Any]:
     The parameters are determined based on the environment variables and the available hardware.
     """
     result: dict[str, Any] = {
-        "model_size_or_path": os.getenv("WHISPER_MODEL", "large-v3"),
+        "model_size_or_path": os.getenv("WHISPER_MODEL", "large-v3-turbo"),
         "download_root": str(WHISPER_MODELS_DIR),
     }
     use_cuda = get_default_cuda_flag()

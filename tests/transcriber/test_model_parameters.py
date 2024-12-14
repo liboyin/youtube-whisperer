@@ -53,7 +53,7 @@ def test_get_default_whisper_model_parameters_without_env_var_cpu(monkeypatch, m
     mocker.patch('youtube_whisperer.transcriber.model_parameters.get_default_cuda_flag', return_value=False)
     mocker.patch('multiprocessing.cpu_count', return_value=8)
     assert get_default_whisper_model_parameters() == {
-        "model_size_or_path": "large-v3",
+        "model_size_or_path": "large-v3-turbo",
         "download_root": str(WHISPER_MODELS_DIR),
         "device": "cpu",
         "compute_type": "int8",
