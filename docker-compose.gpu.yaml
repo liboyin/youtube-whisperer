@@ -5,6 +5,7 @@ services:
       service: app
     environment:
       WHISPER_USE_CUDA: '1'
+      WHISPER_MODEL: large-v3
     runtime: nvidia
 
   worker:
@@ -13,6 +14,7 @@ services:
       service: worker
     environment:
       WHISPER_USE_CUDA: '1'
+      WHISPER_MODEL: large-v3
     runtime: nvidia
 
   redis:
