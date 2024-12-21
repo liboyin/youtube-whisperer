@@ -1,7 +1,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Self
+from typing import Iterable, Iterator
 
 from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
 
@@ -23,7 +23,7 @@ class SrtBlock:
     content: list[str]
 
     @classmethod
-    def from_lines(cls, lines: list[str]) -> Self:
+    def from_lines(cls, lines: list[str]) -> 'SrtBlock':
         """
         Creates an SrtBlock instance from a list of strings.
         """
