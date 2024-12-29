@@ -1,14 +1,15 @@
+x-volumes: &volumes
+  - .:/workspaces/youtube-whisperer
+  - ~/.whisper:/home/ubuntu/.whisper
+  - /media/libo/Videos/Transcode:/workspaces/youtube-whisperer/assets
+  - ~/snap/firefox/common/.mozilla/firefox:/home/ubuntu/snap/firefox/common/.mozilla/firefox
+
 services:
   app:
     build:
       context: .
     container_name: youtube-whisperer-app
-    volumes:
-      - .:/workspaces/youtube-whisperer
-      - ~/.whisper:/home/ubuntu/.whisper
-      # FIXME: this does not work on MacOS
-      - /media/libo/Videos/Transcode:/workspaces/youtube-whisperer/assets
-      - ~/snap/firefox/common/.mozilla/firefox:/home/ubuntu/snap/firefox/common/.mozilla/firefox
+    volumes: *volumes
     environment:
       WHISPER_USE_CUDA: '0'
     depends_on:
@@ -21,10 +22,7 @@ services:
     build:
       context: .
     container_name: youtube-whisperer-worker
-    volumes:
-      - ~/.whisper:/home/ubuntu/.whisper
-      - /media/libo/Videos/Transcode:/workspaces/youtube-whisperer/assets
-      - ~/snap/firefox/common/.mozilla/firefox:/home/ubuntu/snap/firefox/common/.mozilla/firefox
+    volumes:  *volumes
     environment:
       WHISPER_USE_CUDA: '0'
     depends_on:
