@@ -118,7 +118,7 @@ async def clean_assets(dir_path: Path = WHISPER_ASSETS_DIR) -> list[str]:
         removed_files: list[str] = []
         for stem, suffixes in stem2suffixes.items():
             if suffixes >= {'.mp4', '.srt'}:
-                for suffix in ['.mkv', '.seg']:
+                for suffix in ['.mkv', '.seg', '.mp3']:
                     if suffix in suffixes and (file_path := dir_path / f"{stem}{suffix}").is_file():
                         file_path.unlink()
                         removed_files.append(str(file_path))
