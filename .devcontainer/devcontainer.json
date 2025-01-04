@@ -1,5 +1,5 @@
 {
-    "dockerComposeFile": "../docker-compose.cpu.yaml",
+    "dockerComposeFile": "../docker-compose.yaml",
     "service": "app",
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2":{
