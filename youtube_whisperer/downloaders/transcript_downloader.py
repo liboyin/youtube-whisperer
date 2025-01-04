@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Collection, TypedDict
 from urllib.parse import urlparse, parse_qs
 
-from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars
+from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars, truncate_filename
 from youtube_transcript_api import TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
@@ -150,7 +150,7 @@ def download_transcript_as_srt_file_with_default_title(url: str, lang_codes: str
         Path | None: The path to the downloaded SRT file if successful, or None otherwise.
     """
     title = replace_os_reserved_chars(get_video_title(url))
-    output_file_path = target_dir / f'{title}.srt'
+    output_file_path = truncate_filename(target_dir / f'{title}.srt', max_length=220)
     if download_transcript_as_srt_file(url, lang_codes, output_file_path, overwrite=overwrite):
         return output_file_path
     return None

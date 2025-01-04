@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars
+from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars, truncate_filename
 import yt_dlp
 
 from youtube_whisperer.downloaders.utils import get_video_title, is_firefox_cookies_available
@@ -44,7 +44,7 @@ def download_video_with_default_title(url: str, target_dir: Path = WHISPER_ASSET
         Path: The path to the downloaded video file.
     """
     title = replace_os_reserved_chars(get_video_title(url))
-    target_path = target_dir / f'{title}.mp4'
+    target_path = truncate_filename(target_dir / f'{title}.mp4', max_length=220)
     download_video(url, target_path, overwrite=overwrite)
     return target_path
 

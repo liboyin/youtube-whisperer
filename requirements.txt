@@ -35,7 +35,7 @@ mpmath==1.3.0
 numpy==2.2.1
 onnxruntime==1.20.1
 packaging==24.2
-pathlib-extensions @ git+https://github.com/liboyin/pathlib-extensions.git@96e66b6adb0d40cadd89df6d17a4ea7dfb9a901a
+pathlib-extensions @ git+https://github.com/liboyin/pathlib-extensions.git@b83207f4e7bd7115b1d7621d511fcd07c719bbbb
 protobuf==5.29.2
 pydantic==2.10.4
 pydantic_core==2.27.2
