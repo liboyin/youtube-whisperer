@@ -2,6 +2,7 @@ FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NVIDIA_DRIVER_CAPABILITIES=all
+ENV PYTHONFAULTHANDLER=1
 
 COPY . /workspaces/youtube-whisperer
 WORKDIR /workspaces/youtube-whisperer
