@@ -1,45 +1,26 @@
-x-build-args: &build-args
-  APT_PROXY: http://192.168.0.4:3142
-  PYPI_PROXY: http://192.168.0.4:3141/root/pypi/+simple/
-
-x-volumes: &volumes
-  - .:/workspaces/youtube-whisperer
-  - ~/.whisper:/home/ubuntu/.whisper
-  - /media/libo/Videos/Transcode:/workspaces/youtube-whisperer/assets
-  - ~/snap/firefox/common/.mozilla/firefox:/home/ubuntu/snap/firefox/common/.mozilla/firefox
-
 services:
   app:
-    build:
-      context: .
-      args: *build-args
-    container_name: youtube-whisperer-app
-    volumes: *volumes
+    extends:
+      file: docker-compose.cpu.yaml
+      service: app
     environment:
-      WHISPER_USE_CUDA: '0'
-    depends_on:
-      - redis
-    ports:
-      - "8000:8000"
-    entrypoint: ["uvicorn", "youtube_whisperer.fastapi_app:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
+      WHISPER_USE_CUDA: '1'
+      WHISPER_MODEL: large-v3
+    runtime: nvidia
 
   worker:
-    build:
-      context: .
-      args: *build-args
-    container_name: youtube-whisperer-worker
-    volumes:  *volumes
+    extends:
+      file: docker-compose.cpu.yaml
+      service: worker
     environment:
-      WHISPER_USE_CUDA: '0'
-    depends_on:
-      - redis
-    entrypoint: ["python", "-m", "youtube_whisperer.worker"]
+      WHISPER_USE_CUDA: '1'
+      WHISPER_MODEL: large-v3
+    runtime: nvidia
 
   redis:
-    image: redis:latest
-    container_name: youtube-whisperer-redis
-    volumes:
-      - redis_vol:/data
+    extends:
+      file: docker-compose.cpu.yaml
+      service: redis
 
 volumes:
   redis_vol:
