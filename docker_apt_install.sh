@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Configure APT proxy
 if [ -n "$APT_PROXY" ]; then
     APT_CONF_PATH=/etc/apt/apt.conf.d/01proxy

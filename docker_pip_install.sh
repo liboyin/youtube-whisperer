@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 PIP_CONF_PATH=$HOME/.pip/pip.conf
 mkdir -p "$(dirname "$PIP_CONF_PATH")"
 cat <<EOF > "$PIP_CONF_PATH"
