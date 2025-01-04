@@ -13,6 +13,7 @@ services:
     build:
       context: .
       args: *build-args
+    init: true
     container_name: youtube-whisperer-app
     volumes: *volumes
     environment:
@@ -27,8 +28,9 @@ services:
     build:
       context: .
       args: *build-args
+    init: true
     container_name: youtube-whisperer-worker
-    volumes:  *volumes
+    volumes: *volumes
     environment:
       WHISPER_USE_CUDA: '0'
     depends_on:
