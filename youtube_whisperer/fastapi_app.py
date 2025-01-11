@@ -1,5 +1,6 @@
 from collections import defaultdict
 from contextlib import asynccontextmanager
+import datetime
 import glob
 import json
 import os
@@ -28,7 +29,7 @@ app = FastAPI(lifespan=lifespan, title="YouTube Whisperer")
 
 
 class Task(BaseModel):
-    source: str = 'assets/2024*.mkv'
+    source: str = f'assets/{datetime.date.today().year}*.mkv'
     language: str = 'en'
 
 
