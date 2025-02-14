@@ -10,7 +10,7 @@ if [ -v APT_PROXY ]; then
 fi
 
 apt-get update
-apt-get install -y --no-install-recommends curl ffmpeg git python3
+apt-get install -y --no-install-recommends ffmpeg git python3 python3-pip
 ln -s "$(which python3)" "$(dirname "$(which python3)")/python"
 apt-get autoremove -y
 apt-get clean
