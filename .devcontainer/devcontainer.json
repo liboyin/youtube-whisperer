@@ -10,7 +10,8 @@
     "remoteUser": "ubuntu",
     "workspaceFolder": "/workspaces/youtube-whisperer",
     "mounts": [
-        "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind"
+        "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind",
+        "source=${localWorkspaceFolder},target=/workspaces/youtube-whisperer,type=bind"
     ],
     "postCreateCommand": "chmod +x .devcontainer/postCreateCommand.sh && ./.devcontainer/postCreateCommand.sh",
     "customizations": {

@@ -3,7 +3,6 @@ x-build-args: &build-args
   PYPI_PROXY: http://192.168.0.4:3141/root/pypi/+simple/
 
 x-volumes: &volumes
-  - .:/workspaces/youtube-whisperer
   - ~/.whisper:/home/ubuntu/.whisper
   - /media/libo-largefiles/Videos/Transcode:/workspaces/youtube-whisperer/assets
   - ~/snap/firefox/common/.mozilla/firefox:/home/ubuntu/snap/firefox/common/.mozilla/firefox
