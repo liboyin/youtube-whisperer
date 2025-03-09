@@ -4,7 +4,7 @@ x-build-args: &build-args
 
 x-volumes: &volumes
   - ~/.whisper:/home/ubuntu/.whisper
-  - /media/libo-largefiles/Videos/Transcode:/workspaces/youtube-whisperer/assets
+  - /media/libo-smallfiles/Transcode:/workspaces/youtube-whisperer/assets
   - ~/snap/firefox/common/.mozilla/firefox:/home/ubuntu/snap/firefox/common/.mozilla/firefox
 
 services:
