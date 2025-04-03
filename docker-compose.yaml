@@ -16,6 +16,11 @@ services:
       WHISPER_USE_CUDA: '1'
       WHISPER_MODEL: large-v3
     runtime: nvidia
+    healthcheck:
+      test: ["CMD", "nvidia-smi"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
 
   redis:
     extends:
