@@ -31,7 +31,7 @@ services:
       args: *build-args
     container_name: youtube-whisperer-worker
     init: true
-    restart: unless-stopped
+    restart: on-failure:3
     volumes: *volumes
     environment:
       WHISPER_USE_CUDA: '0'

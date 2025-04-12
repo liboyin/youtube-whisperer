@@ -9,6 +9,7 @@ from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
+from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
 from youtube_whisperer.utils import get_redis_client, is_url
 
 
@@ -51,7 +52,7 @@ def process_queue():
         while True:
             task = client.lindex('tasks', 0)
             if task:
-                if not is_gpu_healthy():
+                if use_cuda() and not is_gpu_healthy():
                     print("GPU health check failed. Restarting...")
                     sys.exit(2)  # ENOENT
                 print(f"Picked up task: {task}")
