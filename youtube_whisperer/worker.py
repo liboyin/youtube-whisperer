@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 import json
 from pathlib import Path
+import subprocess
+import sys
 import time
 
 from pathlib_extensions import OverwriteMode
@@ -26,6 +28,20 @@ def redis_connection():
             client.close()
 
 
+def is_gpu_healthy() -> bool:
+    """
+    Checks if the GPU is healthy and available by running nvidia-smi.
+    
+    Returns:
+        bool: True if nvidia-smi finished with exit code 0, False otherwise.
+    """
+    try:
+        result = subprocess.run(["nvidia-smi"], check=False)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def process_queue():
     """
     Continuously monitors and processes download and transcription tasks from a Redis queue.
@@ -35,6 +51,9 @@ def process_queue():
         while True:
             task = client.lindex('tasks', 0)
             if task:
+                if not is_gpu_healthy():
+                    print("GPU health check failed. Restarting...")
+                    sys.exit(2)  # ENOENT
                 print(f"Picked up task: {task}")
                 task = json.loads(task)
                 source = task['source']

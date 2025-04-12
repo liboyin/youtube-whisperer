@@ -37,7 +37,7 @@ services:
       WHISPER_USE_CUDA: '0'
     depends_on:
       - redis
-    entrypoint: ["/workspaces/youtube-whisperer/worker_entrypoint.sh"]
+    entrypoint: ["python", "-m", "youtube_whisperer.worker"]
 
   redis:
     image: redis:latest
