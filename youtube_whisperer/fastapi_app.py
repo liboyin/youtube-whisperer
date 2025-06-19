@@ -74,15 +74,19 @@ async def add_tasks(patterns: list[Task]) -> list[Task]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/tasks", status_code=status.HTTP_204_NO_CONTENT)
-async def clear_tasks() -> None:
+@app.delete("/tasks")
+async def clear_tasks() -> list[Task]:
     """
     Clear all tasks from the Redis queue.
+
+    Returns:
+        list[Task]: List of tasks that were deleted from the queue.
     """
     global redis_client
     try:
+        deleted = [Task.model_validate_json(task) for task in redis_client.lrange('tasks', 0, -1)]
         redis_client.delete('tasks')
-        return None
+        return deleted
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
