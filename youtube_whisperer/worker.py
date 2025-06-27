@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 import subprocess
 import sys
-import time
 
 from pathlib_extensions import OverwriteMode
 
@@ -50,27 +49,23 @@ def process_queue():
     with redis_connection() as client:
         print("Worker started")
         while True:
-            task = client.lindex('tasks', 0)
-            if task:
-                if use_cuda() and not is_gpu_healthy():
-                    print("GPU health check failed. Restarting...")
-                    sys.exit(2)  # ENOENT
-                print(f"Picked up task: {task}")
-                task = json.loads(task)
-                source = task['source']
-                language = task['language']
-                # assume playlists and glob patterns have been resolved at insertion time
-                if is_url(source):
-                    video_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
-                else:
-                    video_file_path = Path(source)
-                    transcript_flag = False
-                if not transcript_flag:
-                    transcribe_to_srt_files([video_file_path], language, overwrite=OverwriteMode.NEVER)
-                client.lpop('tasks')
+            task = client.blpop('tasks', 0)[1]  # block indefinitely until a task is available
+            # client.blpop returns a tuple (queue_name, task), e.g. (b'tasks', b'{"source": "...", "language": "..."}')
+            if use_cuda() and not is_gpu_healthy():
+                print("GPU health check failed. Restarting...")
+                sys.exit(2)  # ENOENT
+            print(f"Picked up task: {task}")
+            task = json.loads(task)
+            source = task['source']
+            language = task['language']
+            # assume playlists and glob patterns have been resolved at insertion time
+            if is_url(source):
+                video_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
             else:
-                print("Queue is empty. Sleeping for 60 seconds...")
-                time.sleep(60)
+                video_file_path = Path(source)
+                transcript_flag = False
+            if not transcript_flag:
+                transcribe_to_srt_files([video_file_path], language, overwrite=OverwriteMode.NEVER)
 
 
 if __name__ == "__main__":
