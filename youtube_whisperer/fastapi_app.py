@@ -36,7 +36,7 @@ class AddTasksResponse(BaseModel):
 
 
 @app.get("/tasks")
-async def get_tasks(redis_client: StrictRedis = Depends(get_redis, scope="app")) -> list[Task]:
+async def get_tasks(redis_client: StrictRedis = Depends(get_redis)) -> list[Task]:
     """
     Retrieve all tasks from the Redis queue.
     """
@@ -62,7 +62,7 @@ def resolve_tasks(pattern: Task) -> list[Task]:
 
 
 @app.post("/tasks", status_code=status.HTTP_201_CREATED)
-async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(get_redis, scope="app")) -> AddTasksResponse:
+async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(get_redis)) -> AddTasksResponse:
     """
     Add new tasks from patterns to the Redis queue.
 
@@ -90,7 +90,7 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
 
 
 @app.delete("/tasks")
-async def clear_tasks(redis_client: StrictRedis = Depends(get_redis, scope="app")) -> list[Task]:
+async def clear_tasks(redis_client: StrictRedis = Depends(get_redis)) -> list[Task]:
     """
     Clear all tasks from the Redis queue.
 
