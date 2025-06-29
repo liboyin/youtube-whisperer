@@ -1,31 +1,29 @@
 from collections import defaultdict
-from contextlib import asynccontextmanager
 import datetime
 import glob
 import json
 import os
 from pathlib import Path
+from typing import Generator
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel
+from redis import StrictRedis
 
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR, get_redis_client, is_url
 
-redis_client = None
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global redis_client
+def get_redis() -> Generator[StrictRedis, None, None]:
+    client = get_redis_client()
     try:
-        redis_client = get_redis_client()
-        yield
+        yield client
     finally:
-        if redis_client:
-            redis_client.close()
+        if client:
+            client.close()
 
-app = FastAPI(lifespan=lifespan, title="YouTube Whisperer")
+
+app = FastAPI(title="YouTube Whisperer")
 
 
 class Task(BaseModel):
@@ -39,11 +37,10 @@ class AddTasksResponse(BaseModel):
 
 
 @app.get("/tasks")
-async def get_tasks() -> list[Task]:
+async def get_tasks(redis_client: StrictRedis = Depends(get_redis, scope="app")) -> list[Task]:
     """
     Retrieve all tasks from the Redis queue.
     """
-    global redis_client
     try:
         tasks = redis_client.lrange('tasks', 0, -1)
         return [json.loads(task) for task in tasks]
@@ -66,7 +63,7 @@ def resolve_tasks(pattern: Task) -> list[Task]:
 
 
 @app.post("/tasks", status_code=status.HTTP_201_CREATED)
-async def add_tasks(patterns: list[Task]) -> AddTasksResponse:
+async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(get_redis, scope="app")) -> AddTasksResponse:
     """
     Add new tasks from patterns to the Redis queue.
 
@@ -78,7 +75,6 @@ async def add_tasks(patterns: list[Task]) -> AddTasksResponse:
             - A list of tasks that have been successfully added to the work queue
             - A list of tasks or patterns that failed to resolve
     """
-    global redis_client
     try:
         successful_tasks: list[Task] = []
         failed_tasks: list[Task] = []
@@ -95,14 +91,13 @@ async def add_tasks(patterns: list[Task]) -> AddTasksResponse:
 
 
 @app.delete("/tasks")
-async def clear_tasks() -> list[Task]:
+async def clear_tasks(redis_client: StrictRedis = Depends(get_redis, scope="app")) -> list[Task]:
     """
     Clear all tasks from the Redis queue.
 
     Returns:
         list[Task]: List of tasks that were deleted from the queue.
     """
-    global redis_client
     try:
         deleted = [Task.model_validate_json(task) for task in redis_client.lrange('tasks', 0, -1)]
         redis_client.delete('tasks')
