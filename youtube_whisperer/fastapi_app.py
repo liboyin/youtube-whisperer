@@ -1,7 +1,6 @@
 from collections import defaultdict
 import datetime
 import glob
-import json
 import os
 from pathlib import Path
 from typing import Generator
@@ -43,7 +42,7 @@ async def get_tasks(redis_client: StrictRedis = Depends(get_redis, scope="app"))
     """
     try:
         tasks = redis_client.lrange('tasks', 0, -1)
-        return [json.loads(task) for task in tasks]
+        return [Task.model_validate_json(task) for task in tasks]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
