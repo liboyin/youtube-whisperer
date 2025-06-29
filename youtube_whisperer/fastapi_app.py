@@ -33,6 +33,11 @@ class Task(BaseModel):
     language: str = 'en'
 
 
+class AddTasksResponse(BaseModel):
+    successful: list[Task]
+    failed: list[Task]
+
+
 @app.get("/tasks")
 async def get_tasks() -> list[Task]:
     """
@@ -46,8 +51,22 @@ async def get_tasks() -> list[Task]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def resolve_tasks(pattern: Task) -> list[Task]:
+    """
+    Resolve a Task pattern into a list of concrete Tasks.
+    """
+    result: list[Task] = []
+    if is_url(pattern.source):
+        for url in yield_flattened_video_urls([pattern.source]):
+            result.append(Task(source=url, language=pattern.language))
+    else:
+        for path in glob.glob(os.path.expanduser(pattern.source)):
+            result.append(Task(source=str(path), language=pattern.language))
+    return result
+
+
 @app.post("/tasks", status_code=status.HTTP_201_CREATED)
-async def add_tasks(patterns: list[Task]) -> list[Task]:
+async def add_tasks(patterns: list[Task]) -> AddTasksResponse:
     """
     Add new tasks from patterns to the Redis queue.
 
@@ -55,21 +74,22 @@ async def add_tasks(patterns: list[Task]) -> list[Task]:
         patterns (list[Task]): List of task patterns.
 
     Returns:
-        list[Task]: List of tasks added to the queue.
+        AddTasksResponse:
+            - A list of tasks that have been successfully added to the work queue
+            - A list of tasks or patterns that failed to resolve
     """
     global redis_client
     try:
-        tasks: list[Task] = []
-        for task in patterns:
-            if is_url(task.source):
-                for url in yield_flattened_video_urls([task.source]):
-                    tasks.append(Task(source=url, language=task.language))
+        successful_tasks: list[Task] = []
+        failed_tasks: list[Task] = []
+        for pattern in patterns:
+            if resolved_tasks := resolve_tasks(pattern):
+                successful_tasks.extend(resolved_tasks)
             else:
-                for path in glob.glob(os.path.expanduser(task.source)):
-                    tasks.append(Task(source=str(path), language=task.language))
-        if tasks:
-            redis_client.rpush('tasks', *(task.model_dump_json() for task in tasks))
-        return tasks
+                failed_tasks.append(pattern)
+        if successful_tasks:
+            redis_client.rpush('tasks', *(task.model_dump_json() for task in successful_tasks))
+        return AddTasksResponse(successful=successful_tasks, failed=failed_tasks)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
