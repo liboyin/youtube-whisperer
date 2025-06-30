@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import Generator
 
 from fastapi import Depends, FastAPI, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from redis import StrictRedis
 
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, get_redis_client, is_url
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_LANG_CODES, get_redis_client, is_url
 
 
 def get_redis() -> Generator[StrictRedis, None, None]:
@@ -26,8 +26,28 @@ app = FastAPI(title="YouTube Whisperer")
 
 
 class Task(BaseModel):
+    """
+    source: str
+        At input time, source can be a URL of a YouTube video or a playlist, or a glob pattern for local files.
+        After resolution, it will be a concrete URL of a YouTube video or a local file path.
+
+    language: str
+        The language code for the transcription. Must be one of Whisper-supported language codes.
+    """
     source: str = f'assets/{datetime.date.today().year}*.mkv'
     language: str = 'en'
+
+    @field_validator('source')
+    def validate_source(cls, x: str) -> str:
+        if not x.strip():
+            raise ValueError('Source cannot be empty')
+        return x.strip()
+
+    @field_validator('language')
+    def validate_language(cls, x: str) -> str:
+        if not x or x not in WHISPER_LANG_CODES:
+            raise ValueError(f'Unsupported language: {x}')
+        return x
 
 
 class AddTasksResponse(BaseModel):
