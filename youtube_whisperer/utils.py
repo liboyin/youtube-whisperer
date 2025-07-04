@@ -60,6 +60,10 @@ def get_redis_client() -> redis.StrictRedis:
     Raises:
         redis.ConnectionError: If there is an issue connecting to the Redis server.
     """
-    client = redis.StrictRedis(host='redis')
+    client = redis.StrictRedis(
+        host='redis',
+        socket_connect_timeout=5,  # 5 second timeout for the initial connection
+        health_check_interval=60  # check connection health every 60 seconds
+    )
     client.ping()  # raise a ConnectionError if the server is unreachable
     return client
