@@ -61,6 +61,6 @@ def test_get_redis_client(mocker):
     mock_client = mock_redis.return_value
     mock_client.ping.return_value = True
     client = get_redis_client()
-    mock_redis.assert_called_once_with(host='redis')
+    mock_redis.assert_called_once_with(host='redis', socket_connect_timeout=5, health_check_interval=60)
     mock_client.ping.assert_called_once()
     assert client == mock_client
