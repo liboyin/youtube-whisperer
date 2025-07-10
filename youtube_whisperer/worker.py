@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-import json
 from pathlib import Path
 import subprocess
 import sys
@@ -8,6 +7,7 @@ from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
+from youtube_whisperer.fastapi_app import Task
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
 from youtube_whisperer.utils import get_redis_client, is_url
 
@@ -55,9 +55,9 @@ def process_queue():
                 print("GPU health check failed. Restarting...")
                 sys.exit(2)  # ENOENT
             print(f"Picked up task: {task}")
-            task = json.loads(task)
-            source = task['source']
-            language = task['language']
+            task = Task.model_validate_json(task)
+            source = task.source
+            language = task.language
             # assume playlists and glob patterns have been resolved at insertion time
             if is_url(source):
                 video_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
