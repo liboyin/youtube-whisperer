@@ -12,13 +12,14 @@ from youtube_whisperer.transcriber.waveform_transcriber import transcribe_file_w
 from youtube_whisperer.utils import is_url, verify_language_code
 
 
-def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: str | None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> list[Path]:
+# Note that lang_codes cannot default to DEFAULT_LANG_CODES because the value is shared with transcribe_to_srt_files(), and Whisper only accepts up to one language code.
+def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: str | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> list[Path]:
     """
     Attempts to download videos and their transcripts from a list of URLs.
 
     Args:
         urls (Iterable[str]): An iterable of YouTube video or playlist URLs to download.
-        lang_codes (str | None): Language codes to filter available transcripts with. If `None`, use `DEFAULT_LANG_CODES`.
+        lang_codes (str | None, optional): Language codes to filter available transcripts with. If `None`, use `DEFAULT_LANG_CODES`. Defaults to `None`.
         overwrite (OverwriteMode, optional): Whether to overwrite existing video & SRT files. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
@@ -32,13 +33,13 @@ def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: str | N
     return video_files_without_transcripts
 
 
-def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
+def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
     """
     Transcribes a list of waveform files using the default model and converts the transcriptions to SRT format.
 
     Args:
         input_file_paths (Iterable[Path]): An iterable of waveform file paths to be transcribed.
-        language (str | None): The language code for the transcription. If None, the language will be automatically detected.
+        language (str | None, optional): The language code for the transcription. If `None`, the language will be automatically detected. Defaults to `None`.
         overwrite (OverwriteMode, optional): Whether to overwrite existing Segment & SRT files. Defaults to `OverwriteMode.PROMPT`.
     """
     for input_file_path in input_file_paths:
@@ -55,7 +56,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("sources", nargs='+', metavar='source', help="Waveform file paths to transcribe, or video/playlist URLs to download and transcribe.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language code for transcript download or waveform transcription.")
-    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing files. Defaults to `OverwriteMode.PROMPT`.")
+    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing files. Defaults to `prompt`.")
     args = parser.parse_args()
     file_paths, video_urls = tuple(map(list, more_itertools.partition(is_url, args.sources)))
     language = args.language
