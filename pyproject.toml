@@ -44,4 +44,4 @@ strict_optional = true
 addopts = "--cov=youtube_whisperer --cov-report html --cov-report=term"
 
 [tool.setuptools.packages]
-find = {where = ["youtube_whisperer"]}
+find = {where = ["."]}
