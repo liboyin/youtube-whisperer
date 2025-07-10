@@ -1,6 +1,6 @@
 #! /bin/bash
 pip freeze | grep -v "youtube-whisperer\|youtube_whisperer" > requirements.txt
-# deployment dependencies are installed as root, but current user is vscode
+# deployment dependencies are installed as root, but current user is ubuntu
 sudo pip install -e .[dev]
 # install nodeJS for AI code assistants
 sudo apt-get update
