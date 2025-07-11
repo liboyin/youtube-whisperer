@@ -10,7 +10,7 @@ from pydantic import BaseModel, field_validator
 from redis import StrictRedis
 
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_LANG_CODES, get_redis_client, is_url
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_LANG_CODES, WhisperMode, get_redis_client, is_url
 
 
 def get_redis() -> Generator[StrictRedis, None, None]:
@@ -33,9 +33,13 @@ class Task(BaseModel):
 
     language: str
         The language code for the transcription. Must be one of Whisper-supported language codes.
+
+    mode: WhisperMode
+        Whether to run Whisper in transcribe mode or translate mode.
     """
     source: str = f'assets/{datetime.date.today().year}*.mkv'
     language: str = 'en'
+    mode: WhisperMode = WhisperMode.TRANSCRIBE
 
     @field_validator('source')
     def validate_source(cls, x: str) -> str:
@@ -48,6 +52,14 @@ class Task(BaseModel):
         if not x or x not in WHISPER_LANG_CODES:
             raise ValueError(f'Unsupported language: {x}')
         return x
+
+    @field_validator('mode')
+    def validate_mode(cls, x: str | WhisperMode) -> WhisperMode:
+        if isinstance(x, WhisperMode):
+            return x
+        if isinstance(x, str):
+            return WhisperMode(x)
+        raise TypeError(f'Unexpected WhisperMode {x} of type {type(x)}')
 
 
 class AddTasksResponse(BaseModel):
@@ -74,10 +86,10 @@ def resolve_tasks(pattern: Task) -> list[Task]:
     result: list[Task] = []
     if is_url(pattern.source):
         for url in yield_flattened_video_urls([pattern.source]):
-            result.append(Task(source=url, language=pattern.language))
+            result.append(Task(source=url, language=pattern.language, mode=pattern.mode))
     else:
         for path in glob.glob(os.path.expanduser(pattern.source)):
-            result.append(Task(source=str(path), language=pattern.language))
+            result.append(Task(source=str(path), language=pattern.language, mode=pattern.mode))
     return result
 
 

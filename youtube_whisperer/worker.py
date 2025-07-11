@@ -65,7 +65,7 @@ def process_queue():
                 video_file_path = Path(source)
                 transcript_flag = False
             if not transcript_flag:
-                transcribe_to_srt_files([video_file_path], language, overwrite=OverwriteMode.NEVER)
+                transcribe_to_srt_files([video_file_path], language, mode=task.mode, overwrite=OverwriteMode.NEVER)
 
 
 if __name__ == "__main__":
