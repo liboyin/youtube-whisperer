@@ -86,14 +86,14 @@ def main() -> None:
     def add_encode_subparser(command_name, help_message, encode_func):
         parser_cmd = subparsers.add_parser(command_name, help=help_message)
         parser_cmd.add_argument('paths', type=Path, nargs='+', metavar='path', help=f'Video file paths to encode to {command_name.upper()}.')
-        parser_cmd.add_argument('-o', '--overwrite', choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help='Whether to overwrite existing files.')
+        parser_cmd.add_argument('-o', '--overwrite', type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help='Whether to overwrite existing files. Defaults to `prompt`.')
         parser_cmd.set_defaults(encode_func=encode_func)
 
     add_encode_subparser('mp3', 'Encode media files to MP3.', encode_to_mp3)
     add_encode_subparser('mp4', 'Encode video files to MP4.', encode_to_mp4)
     args = parser.parse_args()
     if hasattr(args, 'encode_func'):
-        overwrite = OverwriteMode(args.overwrite)
+        overwrite = args.overwrite
         for path in args.paths:
             args.encode_func(path, overwrite=overwrite)
     else:

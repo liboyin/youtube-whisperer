@@ -64,9 +64,9 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Segment file paths to convert to SRT.")
-    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.")
+    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
     args = parser.parse_args()
-    overwrite = OverwriteMode(args.overwrite)
+    overwrite = args.overwrite
     for path in args.paths:
         convert_segments_file_to_srt(path, overwrite=overwrite)
 

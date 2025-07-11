@@ -71,9 +71,9 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs='+', metavar='url', help="URLs of playlists to download.")
-    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help='Whether to overwrite existing video files. Defaults to `OverwriteMode.PROMPT`.')
+    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help='Whether to overwrite existing video files. Defaults to `prompt`.')
     args = parser.parse_args()
-    overwrite = OverwriteMode(args.overwrite)
+    overwrite = args.overwrite
     for url in args.urls:
         download_playlist_with_default_titles(url, overwrite=overwrite)
 

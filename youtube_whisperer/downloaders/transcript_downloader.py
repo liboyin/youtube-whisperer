@@ -163,9 +163,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs='+', metavar='url', help="URLs of videos to download transcripts for.")
     parser.add_argument("-l", "--languages", type=str, default=DEFAULT_LANG_CODES, help="Candidate languages to download transcripts in. Defaults to `DEFAULT_LANG_CODES`.")
-    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.")
+    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
     args = parser.parse_args()
-    overwrite = OverwriteMode(args.overwrite)
+    overwrite = args.overwrite
     for url in args.urls:
         # do not verify language codes here because YouTube's language codes are not the same as Whisper's
         download_transcript_as_srt_file_with_default_title(url, args.languages, overwrite=overwrite)

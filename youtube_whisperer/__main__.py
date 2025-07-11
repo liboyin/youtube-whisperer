@@ -60,13 +60,13 @@ def main() -> None:
     parser.add_argument("sources", nargs='+', metavar='source', help="Waveform file paths to transcribe, or video/playlist URLs to download and transcribe.")
     # Language cannot default to empty string because Whisper uses None for auto-detect language, whereas empty string is not a valid language code.
     parser.add_argument("-l", "--language", type=str, default=None, help="Language code for transcript download or waveform transcription.")
-    parser.add_argument("-m", "--mode", choices=WhisperMode.values(), default=WhisperMode.TRANSCRIBE.value, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
-    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing Segment files. Defaults to `prompt`.")
+    parser.add_argument("-m", "--mode", type=WhisperMode, choices=WhisperMode.values(), default=WhisperMode.TRANSCRIBE, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
+    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing Segment files. Defaults to `prompt`.")
     args = parser.parse_args()
     file_paths, video_urls = tuple(map(list, more_itertools.partition(is_url, args.sources)))
     language = args.language
     verify_language_code(language)
-    overwrite = OverwriteMode(args.overwrite)
+    overwrite = args.overwrite
     file_paths = itertools.chain(try_download_videos_and_transcripts(video_urls, language, overwrite), (Path(x) for x in file_paths))
     transcribe_to_srt_files(file_paths, language, WhisperMode(args.mode), overwrite)
 

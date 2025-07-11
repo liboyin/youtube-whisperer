@@ -79,13 +79,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Waveform file paths to transcribe.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language to transcribe waveform files. Defaults to auto detection.")
-    parser.add_argument("-m", "--mode", choices=WhisperMode.values(), default=WhisperMode.TRANSCRIBE.value, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
-    parser.add_argument("-o", "--overwrite", choices=OverwriteMode.values(), default=OverwriteMode.PROMPT.value, help="Whether to overwrite existing Segment files. Defaults to `prompt`.")
+    parser.add_argument("-m", "--mode", type=WhisperMode, choices=WhisperMode.values(), default=WhisperMode.TRANSCRIBE, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
+    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing Segment files. Defaults to `prompt`.")
     args = parser.parse_args()
     language = args.language
     verify_language_code(language)
-    whisper_mode = WhisperMode(args.mode)
-    overwrite = OverwriteMode(args.overwrite)
+    whisper_mode = args.mode
+    overwrite = args.overwrite
     for path in args.paths:
         transcribe_file_with_default_model(path, language=language, overwrite=overwrite, mode=whisper_mode)
 
