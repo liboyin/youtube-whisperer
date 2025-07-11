@@ -62,6 +62,10 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
     Returns:
         Path: The path to the output file containing the transcribed Segments.
     """
+    # Whisper only supports translation to English
+    if kwargs.get('language') == 'en' and mode == WhisperMode.TRANSLATE:
+        print('Resetting Whisper mode to TRANSCRIBE because the language spoken in the waveform is English.')
+        mode = WhisperMode.TRANSCRIBE
     output_file_path = output_file_path or input_file_path.with_suffix('.seg')
     print('About to write Segments to file:', output_file_path)
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):

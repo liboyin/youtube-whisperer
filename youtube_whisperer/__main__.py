@@ -43,8 +43,6 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | No
         mode (WhisperMode, optional): Whether to run Whisper in transcribe mode or translate mode. Defaults to `WhisperMode.TRANSCRIBE`.
         overwrite (OverwriteMode, optional): Whether to overwrite existing Segment & SRT files. Defaults to `OverwriteMode.PROMPT`.
     """
-    if language is None and mode == WhisperMode.TRANSLATE:
-        raise ValueError("Language must be specified in Whisper translate mode.")
     for input_file_path in input_file_paths:
         segment_file_path = transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite)
         print('Saved Segments file:', segment_file_path)
