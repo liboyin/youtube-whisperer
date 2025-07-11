@@ -1,6 +1,10 @@
 import pytest
 
-from youtube_whisperer.utils import get_redis_client, is_url, strtobool
+from youtube_whisperer.utils import WhisperMode, get_redis_client, is_url, strtobool
+
+
+def test_whisper_mode_values():
+    assert WhisperMode.values() == ('transcribe', 'translate')
 
 
 @pytest.mark.parametrize("input_text, expected", [
