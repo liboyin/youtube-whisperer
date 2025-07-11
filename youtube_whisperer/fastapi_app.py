@@ -43,9 +43,10 @@ class Task(BaseModel):
 
     @field_validator('source')
     def validate_source(cls, x: str) -> str:
-        if not x.strip():
+        x = x.strip()
+        if not x:
             raise ValueError('Source cannot be empty')
-        return x.strip()
+        return x
 
     @field_validator('language')
     def validate_language(cls, x: str) -> str:
@@ -55,11 +56,10 @@ class Task(BaseModel):
 
     @field_validator('mode')
     def validate_mode(cls, x: str | WhisperMode) -> WhisperMode:
-        if isinstance(x, WhisperMode):
-            return x
-        if isinstance(x, str):
+        try:
             return WhisperMode(x)
-        raise TypeError(f'Unexpected WhisperMode {x} of type {type(x)}')
+        except ValueError:
+            raise TypeError(f'Unexpected mode {x} of type {type(x)}')
 
 
 class AddTasksResponse(BaseModel):
