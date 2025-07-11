@@ -1,3 +1,4 @@
+from enum import Enum
 import os
 from pathlib import Path
 import re
@@ -8,6 +9,15 @@ from faster_whisper.tokenizer import _LANGUAGE_CODES as WHISPER_LANG_CODES
 
 WHISPER_ASSETS_DIR = Path(os.getenv("WHISPER_ASSETS_DIR", Path(__file__).parents[1] / "assets"))
 WHISPER_MODELS_DIR = Path(os.getenv("WHISPER_MODELS_DIR", Path.home() / ".whisper"))
+
+
+class WhisperMode(str, Enum):
+    TRANSCRIBE = 'transcribe'
+    TRANSLATE = 'translate'
+
+    @classmethod
+    def values(cls) -> tuple[str, ...]:
+        return tuple(mode.value for mode in cls)
 
 
 def strtobool(val: str) -> bool:
