@@ -136,19 +136,20 @@ def download_transcript_as_srt_file(url: str, lang_codes: str, output_file_path:
     return True
 
 
-def download_transcript_as_srt_file_with_default_title(url: str, lang_codes: str = DEFAULT_LANG_CODES, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
+def download_transcript_as_srt_file_with_default_title(url: str, lang_codes: str | None = None, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
     """
     Downloads the transcript of a YouTube video as an SRT file named after the video title.
 
     Args:
         url (str): The URL of the YouTube video.
-        lang_codes (str, optional): Language codes to filter available transcripts with. Defaults to `DEFAULT_LANG_CODES`.
+        lang_codes (str | None, optional): Language codes to filter available transcripts with. if `None`, `DEFAULT_LANG_CODES` will be used. Defaults to `None`.
         target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to `WHISPER_ASSET_DIR`.
         overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.
 
     Returns:
         Path | None: The path to the downloaded SRT file if successful, or None otherwise.
     """
+    lang_codes = lang_codes or DEFAULT_LANG_CODES
     title = replace_os_reserved_chars(get_video_title(url))
     output_file_path = truncate_filename(target_dir / f'{title}.srt', max_length=220)
     if download_transcript_as_srt_file(url, lang_codes, output_file_path, overwrite=overwrite):

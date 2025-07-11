@@ -9,13 +9,13 @@ from youtube_whisperer.downloaders.video_downloader import download_video_with_d
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 
-def download_video_and_transcript_with_default_title(url: str, lang_codes: str = DEFAULT_LANG_CODES, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> tuple[Path, bool]:
+def download_video_and_transcript_with_default_title(url: str, lang_codes: str | None = None, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> tuple[Path, bool]:
     """
     Downloads a YouTube video and its transcript from the given URL and saves it with a default title in the target directory.
 
     Args:
         url (str): The URL of the video to download.
-        lang_codes (str, optional): Language codes to filter available transcripts with. Defaults to `DEFAULT_LANG_CODES`.
+        lang_codes (str | None, optional): Language codes to filter available transcripts with. if `None`, `DEFAULT_LANG_CODES` will be used. Defaults to `None`.
         target_dir (Path, optional): The target directory where the videos and transcripts will be saved. Defaults to `WHISPER_ASSET_DIR`.
         overwrite (OverwriteMode, optional): Whether to overwrite existing video and SRT files. Defaults to `OverwriteMode.PROMPT`.
 
@@ -27,13 +27,13 @@ def download_video_and_transcript_with_default_title(url: str, lang_codes: str =
     return video_file_path, transcript_flag
 
 
-def download_videos_and_transcripts_with_default_titles(urls: Iterable[str], lang_codes: str = DEFAULT_LANG_CODES, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Iterable[tuple[Path, bool]]:
+def download_videos_and_transcripts_with_default_titles(urls: Iterable[str], lang_codes: str | None = None, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Iterable[tuple[Path, bool]]:
     """
     Downloads YouTube videos and their transcripts from the given URLs and saves them with their default titles in the target directory.
 
     Args:
         urls (Iterable[str]): An iterable of video URLs to download.
-        lang_codes (str, optional): Language codes to filter available transcripts with. Defaults `DEFAULT_LANG_CODES`.
+        lang_codes (str | None, optional): Language codes to filter available transcripts with. if `None`, `DEFAULT_LANG_CODES` will be used. Defaults to `None`.
         target_dir (Path, optional): The directory where the videos and transcripts will be saved. Defaults to `WHISPER_ASSET_DIR`.
         overwrite (OverwriteMode, optional): Whether to overwrite existing video and SRT files. Defaults to `OverwriteMode.PROMPT`.
 

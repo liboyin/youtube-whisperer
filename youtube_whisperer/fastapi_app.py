@@ -32,7 +32,7 @@ class Task(BaseModel):
         After resolution, it will be a concrete URL of a YouTube video or a local file path.
 
     language: str
-        The language code for the transcription. Must be one of Whisper-supported language codes.
+        The language code for the transcription. Must be one of Whisper-supported language codes or an empty string.
 
     mode: WhisperMode
         Whether to run Whisper in transcribe mode or translate mode.
@@ -50,7 +50,7 @@ class Task(BaseModel):
 
     @field_validator('language')
     def validate_language(cls, x: str) -> str:
-        if not x or x not in WHISPER_LANG_CODES:
+        if x and x not in WHISPER_LANG_CODES:
             raise ValueError(f'Unsupported language: {x}')
         return x
 

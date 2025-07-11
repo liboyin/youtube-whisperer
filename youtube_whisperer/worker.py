@@ -58,6 +58,8 @@ def process_queue():
             task = Task.model_validate_json(task)
             source = task.source
             language = task.language
+            if language == '':
+                language = None  # use default lang codes for transcript downloader and auto-detect language for Whisper
             # assume playlists and glob patterns have been resolved at insertion time
             if is_url(source):
                 video_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)

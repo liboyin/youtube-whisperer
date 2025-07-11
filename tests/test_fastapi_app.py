@@ -13,10 +13,10 @@ def test_task_source_validator():
 
 
 def test_task_language_validator():
+    task = testee.Task(language="")
+    assert task.language == ""
     task = testee.Task(language="en")
     assert task.language == "en"
-    with pytest.raises(ValidationError):
-        testee.Task(language="")
     with pytest.raises(ValidationError):
         testee.Task(language="unsupported")
 
