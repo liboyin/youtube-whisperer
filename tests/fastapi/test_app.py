@@ -1,40 +1,13 @@
 import pytest
-from pydantic import ValidationError
 
-import youtube_whisperer.fastapi_app as testee
-from youtube_whisperer.utils import WhisperMode
-
-
-def test_task_source_validator():
-    task = testee.Task(source="  http://example.com/video  ")
-    assert task.source == "http://example.com/video"
-    with pytest.raises(ValidationError):
-        testee.Task(source="  ")
-
-
-def test_task_language_validator():
-    task = testee.Task(language="")
-    assert task.language == ""
-    task = testee.Task(language="en")
-    assert task.language == "en"
-    with pytest.raises(ValidationError):
-        testee.Task(language="unsupported")
-
-
-def test_task_mode_validator():
-    task = testee.Task(mode="transcribe")
-    assert task.mode == WhisperMode.TRANSCRIBE
-    task = testee.Task(mode=WhisperMode.TRANSLATE)
-    assert task.mode == WhisperMode.TRANSLATE
-    with pytest.raises(ValidationError):
-        testee.Task(mode="invalid_mode")
+import youtube_whisperer.fastapi.app as testee
 
 
 @pytest.fixture
 def mock_dependencies(mocker):
-    mock_is_url = mocker.patch('youtube_whisperer.fastapi_app.is_url')
-    mock_yield_urls = mocker.patch('youtube_whisperer.fastapi_app.yield_flattened_video_urls')
-    mock_glob = mocker.patch('youtube_whisperer.fastapi_app.glob.glob')
+    mock_is_url = mocker.patch('youtube_whisperer.fastapi.app.is_url')
+    mock_yield_urls = mocker.patch('youtube_whisperer.fastapi.app.yield_flattened_video_urls')
+    mock_glob = mocker.patch('youtube_whisperer.fastapi.app.glob.glob')
     return mock_is_url, mock_yield_urls, mock_glob
 
 

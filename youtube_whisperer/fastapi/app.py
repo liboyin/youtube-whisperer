@@ -1,5 +1,4 @@
 from collections import defaultdict
-import datetime
 import glob
 import os
 from pathlib import Path
@@ -7,11 +6,11 @@ from typing import Generator
 
 from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File
 from pathlib_extensions import prepare_output_file
-from pydantic import BaseModel, field_validator
 from redis import StrictRedis
 
+from youtube_whisperer.fastapi.models import Task, AddTasksResponse, AddAssetsResponse
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_LANG_CODES, WhisperMode, get_redis_client, is_url
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, get_redis_client, is_url
 
 app = FastAPI(title="YouTube Whisperer")
 
@@ -27,53 +26,6 @@ def get_redis() -> Generator[StrictRedis, None, None]:
 
 def get_assets_dir() -> Path:
     return WHISPER_ASSETS_DIR
-
-
-class Task(BaseModel):
-    """
-    source: str
-        At input time, source can be a URL of a YouTube video or a playlist, or a glob pattern for local files.
-        After resolution, it will be a concrete URL of a YouTube video or a local file path.
-
-    language: str
-        The language code for the transcription. Must be one of Whisper-supported language codes or an empty string.
-
-    mode: WhisperMode
-        Whether to run Whisper in transcribe mode or translate mode.
-    """
-    source: str = f'assets/{datetime.date.today().year}*.mkv'
-    language: str = 'en'
-    mode: WhisperMode = WhisperMode.TRANSCRIBE
-
-    @field_validator('source')
-    def validate_source(cls, x: str) -> str:
-        x = x.strip()
-        if not x:
-            raise ValueError('Source cannot be empty')
-        return x
-
-    @field_validator('language')
-    def validate_language(cls, x: str) -> str:
-        if x and x not in WHISPER_LANG_CODES:
-            raise ValueError(f'Unsupported language: {x}')
-        return x
-
-    @field_validator('mode')
-    def validate_mode(cls, x: str | WhisperMode) -> WhisperMode:
-        try:
-            return WhisperMode(x)
-        except ValueError:
-            raise TypeError(f'Unexpected mode {x} of type {type(x)}')
-
-
-class AddTasksResponse(BaseModel):
-    successful: list[Task]
-    failed: list[Task]
-
-
-class AddAssetsResponse(BaseModel):
-    successful: list[str]
-    failed: list[str]
 
 
 @app.get("/tasks")
