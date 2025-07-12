@@ -13,6 +13,8 @@ from redis import StrictRedis
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR, WHISPER_LANG_CODES, WhisperMode, get_redis_client, is_url
 
+app = FastAPI(title="YouTube Whisperer")
+
 
 def get_redis() -> Generator[StrictRedis, None, None]:
     client = get_redis_client()
@@ -23,7 +25,8 @@ def get_redis() -> Generator[StrictRedis, None, None]:
             client.close()
 
 
-app = FastAPI(title="YouTube Whisperer")
+def get_assets_dir() -> Path:
+    return WHISPER_ASSETS_DIR
 
 
 class Task(BaseModel):
@@ -145,7 +148,7 @@ async def clear_tasks(redis_client: StrictRedis = Depends(get_redis)) -> list[Ta
 
 
 @app.get("/assets")
-async def list_assets(dir_path: Path = WHISPER_ASSETS_DIR) -> list[str]:
+async def list_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
     List all contents of the specified directory.
     """
@@ -156,13 +159,12 @@ async def list_assets(dir_path: Path = WHISPER_ASSETS_DIR) -> list[str]:
 
 
 @app.post("/assets", status_code=status.HTTP_201_CREATED)
-async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = WHISPER_ASSETS_DIR) -> AddAssetsResponse:
+async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depends(get_assets_dir)) -> AddAssetsResponse:
     """
     Upload files to the asset directory.
 
     Args:
         files (list[UploadFile]): Files to upload.
-        dir_path (Path): Target directory.
 
     Returns:
         AddAssetsResponse: {
@@ -188,14 +190,11 @@ async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = WHISP
 
 
 @app.delete("/assets")
-async def clean_assets(dir_path: Path = WHISPER_ASSETS_DIR) -> list[str]:
+async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
     Clean up redundant files in the specified directory.
 
     If the same filename exists as MP4 and SRT, remove corresponding MKV and SEG files.
-
-    Args:
-        dir_path (Path): The directory path to clean up.
 
     Returns:
         list[str]: List of removed file paths.
