@@ -108,13 +108,14 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
         patterns (list[Task]): List of task patterns.
 
     Returns:
-        AddTasksResponse:
-            - A list of tasks that have been successfully added to the work queue
-            - A list of tasks or patterns that failed to resolve
+        AddTasksResponse: {
+            successful: Tasks that have been successfully added to the work queue
+            failed: Tasks / patterns that failed to resolve
+        }
     """
+    successful_tasks: list[Task] = []
+    failed_tasks: list[Task] = []
     try:
-        successful_tasks: list[Task] = []
-        failed_tasks: list[Task] = []
         for pattern in patterns:
             if resolved_tasks := resolve_tasks(pattern):
                 successful_tasks.extend(resolved_tasks)
