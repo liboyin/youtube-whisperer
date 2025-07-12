@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 from typing import Generator
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File
+from pathlib_extensions import prepare_output_file
 from pydantic import BaseModel, field_validator
 from redis import StrictRedis
 
@@ -65,6 +66,11 @@ class Task(BaseModel):
 class AddTasksResponse(BaseModel):
     successful: list[Task]
     failed: list[Task]
+
+
+class AddAssetsResponse(BaseModel):
+    successful: list[str]
+    failed: list[str]
 
 
 @app.get("/tasks")
@@ -144,6 +150,38 @@ async def list_assets(dir_path: Path = WHISPER_ASSETS_DIR) -> list[str]:
     """
     try:
         return sorted(map(str, dir_path.iterdir()))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/assets", status_code=status.HTTP_201_CREATED)
+async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = WHISPER_ASSETS_DIR) -> AddAssetsResponse:
+    """
+    Upload files to the asset directory.
+
+    Args:
+        files (list[UploadFile]): Files to upload.
+        dir_path (Path): Target directory.
+
+    Returns:
+        AddAssetsResponse: {
+            successful: Saved file paths on the server
+            failed: Client-side file paths that failed to upload
+        }
+    """
+    saved_files: list[str] = []
+    failed_files: list[str] = []
+    try:
+        for upload in files:
+            target_path = prepare_output_file(dir_path / upload.filename)
+            try:
+                with target_path.open("wb") as f:
+                    content = await upload.read()
+                    f.write(content)
+                saved_files.append(str(target_path))
+            except Exception:
+                failed_files.append(upload.filename)
+        return AddAssetsResponse(successful=saved_files, failed=failed_files)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
