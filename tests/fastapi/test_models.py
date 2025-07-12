@@ -28,3 +28,13 @@ def test_task_mode_validator():
     assert task.mode == WhisperMode.TRANSLATE
     with pytest.raises(ValidationError):
         testee.Task(mode="invalid_mode")
+
+
+def test_task_validate_mode():
+    assert testee.Task.model_validate({"mode": "transcribe"}).mode == WhisperMode.TRANSCRIBE
+    assert testee.Task.model_validate({"mode": "translate"}).mode == WhisperMode.TRANSLATE
+    assert testee.Task.model_validate({"mode": WhisperMode.TRANSCRIBE}).mode == WhisperMode.TRANSCRIBE
+    assert testee.Task.model_validate({"mode": WhisperMode.TRANSLATE}).mode == WhisperMode.TRANSLATE
+    import pydantic
+    with pytest.raises(pydantic.ValidationError):
+        testee.Task.model_validate({"mode": "foo"})
