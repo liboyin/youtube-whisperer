@@ -13,7 +13,9 @@ def test_get_video_id():
 
 def test_get_first_matching_lang_code():
     assert get_first_matching_lang_code([], '') is None
-    assert get_first_matching_lang_code(['en'], '') is None
+    assert get_first_matching_lang_code([], None) is None
+    assert get_first_matching_lang_code(['en'], '') == 'en'
+    assert get_first_matching_lang_code(['en'], None) == 'en'
     assert get_first_matching_lang_code([], 'en') is None
     assert get_first_matching_lang_code(['en-US', 'en'], 'zh') is None
     assert get_first_matching_lang_code(['en-US', 'en'], 'en') == 'en-US'

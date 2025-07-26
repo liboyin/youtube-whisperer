@@ -49,17 +49,18 @@ def get_video_id(url: str) -> str:
     raise ValueError(url)
 
 
-def get_first_matching_lang_code(candidate_lang_codes: Collection[str], requested_lang_codes: str) -> str | None:
+def get_first_matching_lang_code(candidate_lang_codes: Collection[str], requested_lang_codes: str | None) -> str | None:
     """
     Finds the first matching language code from the candidate language codes based on the requested language codes.
 
     Args:
         candidate_lang_codes (Collection[str]): Candidate language codes for a video.
-        requested_lang_codes (str): Requested language codes separated by semicolons.
+        requested_lang_codes (str | None): Requested language codes separated by semicolons. If None, defaults to `DEFAULT_LANG_CODES`.
 
     Returns:
         str | None: The first matching language code from the candidate language codes, or None if no match is found.
     """
+    requested_lang_codes = requested_lang_codes or DEFAULT_LANG_CODES
     print(f"Candidate language codes: {candidate_lang_codes}; requested language codes: {requested_lang_codes}")
     for request in requested_lang_codes.split(';'):
         if request:  # ignore empty language codes
@@ -71,13 +72,13 @@ def get_first_matching_lang_code(candidate_lang_codes: Collection[str], requeste
     return None
 
 
-def download_transcript(url: str, lang_codes: str) -> list[TranscriptBlock] | None:
+def download_transcript(url: str, lang_codes: str | None) -> list[TranscriptBlock] | None:
     """
     Downloads the transcript of a YouTube video.
 
     Args:
         url (str): The URL of the YouTube video.
-        lang_codes (str): Language codes to filter available transcripts with.
+        lang_codes (str | None): Language codes to filter available transcripts with. If None, defaults to `DEFAULT_LANG_CODES`.
 
     Returns:
         list[TranscriptBlock] | None: Downloaded transcript as a list of TranscriptBlock dicts.
@@ -96,13 +97,13 @@ def download_transcript(url: str, lang_codes: str) -> list[TranscriptBlock] | No
     return result
 
 
-def download_transcript_as_srt_text(url: str, lang_codes: str) -> str | None:
+def download_transcript_as_srt_text(url: str, lang_codes: str | None) -> str | None:
     """
     Downloads the transcript for a YouTube video and returns it as an SRT formatted text.
 
     Args:
         url (str): The URL of the YouTube video.
-        lang_codes (str): Language codes to filter available transcripts with.
+        lang_codes (str | None): Language codes to filter available transcripts with. If None, defaults to `DEFAULT_LANG_CODES`.
 
     Returns:
         str | None: The transcript as an SRT formatted text, or None if no transcript in the requested language is available.
@@ -113,13 +114,13 @@ def download_transcript_as_srt_text(url: str, lang_codes: str) -> str | None:
     return SRTFormatter().format_transcript(transcript)
 
 
-def download_transcript_as_srt_file(url: str, lang_codes: str, output_file_path: Path, overwrite: OverwriteMode) -> bool:
+def download_transcript_as_srt_file(url: str, lang_codes: str | None, output_file_path: Path, overwrite: OverwriteMode) -> bool:
     """
     Downloads the transcript of a YouTube video as an SRT file.
 
     Args:
         url (str): The URL of the YouTube video.
-        lang_codes (str): Language codes to filter available transcripts with.
+        lang_codes (str | None): Language codes to filter available transcripts with. If None, defaults to `DEFAULT_LANG_CODES`.
         output_file_path (Path): The path where the SRT file will be saved.
         overwrite (OverwriteMode): Whether to overwrite existing SRT files.
 
@@ -149,7 +150,6 @@ def download_transcript_as_srt_file_with_default_title(url: str, lang_codes: str
     Returns:
         Path | None: The path to the downloaded SRT file if successful, or None otherwise.
     """
-    lang_codes = lang_codes or DEFAULT_LANG_CODES
     title = replace_os_reserved_chars(get_video_title(url))
     output_file_path = truncate_filename(target_dir / f'{title}.srt', max_length=220)
     if download_transcript_as_srt_file(url, lang_codes, output_file_path, overwrite=overwrite):
