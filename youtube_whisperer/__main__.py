@@ -61,6 +61,7 @@ def main() -> None:
     parser.add_argument("-m", "--mode", type=WhisperMode, choices=WhisperMode.values(), default=WhisperMode.TRANSCRIBE, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
     parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing Segment files. Defaults to `prompt`.")
     args = parser.parse_args()
+    file_paths: Iterable[Path]
     file_paths, video_urls = tuple(map(list, more_itertools.partition(is_url, args.sources)))
     language = args.language
     verify_language_code(language)

@@ -57,7 +57,7 @@ def process_queue():
             print(f"Picked up task: {task}")
             task = Task.model_validate_json(task)
             source = task.source
-            language = task.language
+            language: str | None = task.language
             if language == '':
                 language = None  # use default lang codes for transcript downloader and auto-detect language for Whisper
             # assume playlists and glob patterns have been resolved at insertion time

@@ -128,6 +128,7 @@ async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depen
     failed_files: list[str] = []
     try:
         for upload in files:
+            assert upload.filename
             target_path = prepare_output_file(dir_path / upload.filename)
             try:
                 with target_path.open("wb") as f:
