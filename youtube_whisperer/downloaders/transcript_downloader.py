@@ -85,7 +85,7 @@ def download_transcript(url: str, lang_codes: str | None) -> list[TranscriptBloc
             If no transcript in the requested language is available, return None.
     """
     try:
-        transcripts = YouTubeTranscriptApi.list_transcripts(get_video_id(url))
+        transcripts = YouTubeTranscriptApi().list(get_video_id(url))
     except TranscriptsDisabled:
         print(f"Transcripts are disabled for {url}")
         return None

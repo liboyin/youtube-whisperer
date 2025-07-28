@@ -36,80 +36,83 @@ def test_get_first_matching_lang_code():
 
 def test_download_transcript_success(mocker):
     """Test successful transcript download."""
-    # Mock the API components
-    mock_transcript_obj = MagicMock()
-    mock_transcript_obj.language_code = 'en-US'
-    
-    # Mock the transcript_list object
+    mock_video_id = 'test_video_id'
+    mock_url = f'https://www.youtube.com/watch?v={mock_video_id}'
+    mock_lang_codes = 'en'
+    expected_transcript = [{'text': 'hello', 'start': 0.0, 'duration': 1.0}]
+    mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
+    mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
+    mock_yt_api_instance = mock_yt_api_class.return_value
     mock_transcript_list = MagicMock()
-    mock_transcript_list.__iter__ = lambda self: iter([mock_transcript_obj])  # Make it iterable
-    
-    mock_transcript_fetch = MagicMock()
-    mock_transcript_fetch.fetch.return_value = [
-        {'text': 'Hello world', 'start': 0.0, 'end': 2.0},
-        {'text': 'This is a test', 'start': 2.0, 'end': 4.0}
-    ]
-    mock_transcript_list.find_transcript.return_value = mock_transcript_fetch
-    
-    mock_transcript_api = mocker.patch.object(testee, 'YouTubeTranscriptApi')
-    mock_transcript_api.list_transcripts.return_value = mock_transcript_list
-    
-    # Mock get_video_id
-    mocker.patch.object(testee, 'get_video_id', return_value='test_id')
-    
-    result = download_transcript('https://youtube.com/watch?v=test', 'en')
-    
-    assert result is not None
-    assert len(result) == 2
-    assert result[0]['text'] == 'Hello world'
-    assert result[0]['start'] == 0.0
-    assert result[0]['end'] == 2.0
-    
-    mock_transcript_api.list_transcripts.assert_called_once_with('test_id')
-    mock_transcript_list.find_transcript.assert_called_once_with(['en-US'])
+    mock_yt_api_instance.list.return_value = mock_transcript_list
+    mock_transcript_metadata_en = MagicMock()
+    mock_transcript_metadata_en.language_code = 'en'
+    mock_transcript_metadata_fr = MagicMock()
+    mock_transcript_metadata_fr.language_code = 'fr'
+    mock_transcript_list.__iter__.return_value = [mock_transcript_metadata_en, mock_transcript_metadata_fr]
+    mock_transcript_list.find_transcript.return_value.fetch.return_value = expected_transcript
+    result = download_transcript(mock_url, mock_lang_codes)
+    assert result == expected_transcript
+    testee.get_video_id.assert_called_once_with(mock_url)
+    mock_yt_api_class.assert_called_once_with()
+    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
+    mock_transcript_list.find_transcript.assert_called_once_with(['en'])
 
 
 def test_download_transcript_disabled(mocker):
     """Test when transcripts are disabled."""
-    from youtube_transcript_api import TranscriptsDisabled
-    
-    mock_transcript_api = mocker.patch.object(testee, 'YouTubeTranscriptApi')
-    mock_transcript_api.list_transcripts.side_effect = TranscriptsDisabled('test_id')
-    mocker.patch.object(testee, 'get_video_id', return_value='test_id')
-    result = download_transcript('https://youtube.com/watch?v=test', 'en')
+    mock_video_id = 'test_video_id'
+    mock_url = f'https://www.youtube.com/watch?v={mock_video_id}'
+    mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
+    mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
+    mock_yt_api_instance = mock_yt_api_class.return_value
+    mock_yt_api_instance.list.side_effect = testee.TranscriptsDisabled(mock_video_id)
+    result = download_transcript(mock_url, 'en')
     assert result is None
+    testee.get_video_id.assert_called_once_with(mock_url)
+    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
 
 
 def test_download_transcript_no_matching_language(mocker):
     """Test when no matching language is found."""
-    mock_transcript_obj = MagicMock()
-    mock_transcript_obj.language_code = 'fr'
+    mock_video_id = 'test_video_id'
+    mock_url = f'https://www.youtube.com/watch?v={mock_video_id}'
+    mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
+    mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
+    mock_yt_api_instance = mock_yt_api_class.return_value
     mock_transcript_list = MagicMock()
-    mock_transcript_list.__iter__ = lambda self: iter([mock_transcript_obj])
-    mock_transcript_api = mocker.patch.object(testee, 'YouTubeTranscriptApi')
-    mock_transcript_api.list_transcripts.return_value = mock_transcript_list
-    mocker.patch.object(testee, 'get_video_id', return_value='test_id')
-    result = download_transcript('https://youtube.com/watch?v=test', 'en;zh')
+    mock_yt_api_instance.list.return_value = mock_transcript_list
+    mock_transcript_metadata_fr = MagicMock()
+    mock_transcript_metadata_fr.language_code = 'fr'
+    mock_transcript_list.__iter__.return_value = [mock_transcript_metadata_fr]
+    result = download_transcript(mock_url, 'en')
     assert result is None
+    testee.get_video_id.assert_called_once_with(mock_url)
+    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
+    mock_transcript_list.find_transcript.assert_not_called()
 
 
 def test_download_transcript_default_lang_codes(mocker):
     """Test using default language codes when None is passed."""
-    mock_transcript_obj = MagicMock()
-    mock_transcript_obj.language_code = 'en-US'
+    mock_video_id = 'test_video_id'
+    mock_url = f'https://www.youtube.com/watch?v={mock_video_id}'
+    expected_transcript = [{'text': 'hello', 'start': 0.0, 'duration': 1.0}]
+    mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
+    mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
+    mock_yt_api_instance = mock_yt_api_class.return_value
     mock_transcript_list = MagicMock()
-    mock_transcript_list.__iter__ = lambda self: iter([mock_transcript_obj])
-    mock_transcript_fetch = MagicMock()
-    mock_transcript_body = {'text': 'test', 'start': 0.0, 'end': 1.0}
-    mock_transcript_fetch.fetch.return_value = [mock_transcript_body]
-    mock_transcript_list.find_transcript.return_value = mock_transcript_fetch
-    mock_transcript_api = mocker.patch.object(testee, 'YouTubeTranscriptApi')
-    mock_transcript_api.list_transcripts.return_value = mock_transcript_list
-    mocker.patch.object(testee, 'get_video_id', return_value='test_id')
-    result = download_transcript('https://youtube.com/watch?v=test', None)
-    assert result is not None
-    assert len(result) == 1
-    assert result[0] == mock_transcript_body
+    mock_yt_api_instance.list.return_value = mock_transcript_list
+    mock_transcript_metadata_en = MagicMock()
+    mock_transcript_metadata_en.language_code = 'en'
+    mock_transcript_metadata_zh = MagicMock()
+    mock_transcript_metadata_zh.language_code = 'zh'
+    mock_transcript_list.__iter__.return_value = [mock_transcript_metadata_en, mock_transcript_metadata_zh]
+    mock_transcript_list.find_transcript.return_value.fetch.return_value = expected_transcript
+    result = download_transcript(mock_url, None)
+    assert result == expected_transcript
+    testee.get_video_id.assert_called_once_with(mock_url)
+    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
+    mock_transcript_list.find_transcript.assert_called_once_with(['en'])
 
 
 def test_download_transcript_as_srt_text_success(mocker):
