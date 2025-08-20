@@ -47,7 +47,7 @@ def transcribe_waveform_with_default_model(waveform: np.ndarray, mode: WhisperMo
     return transcribe_waveform(model, waveform, mode, **kwargs)
 
 
-def transcribe_file_with_default_model(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, mode: WhisperMode = WhisperMode.TRANSCRIBE, **kwargs) -> Path:
+def transcribe_file_with_default_model(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, mode: WhisperMode = WhisperMode.TRANSCRIBE, **kwargs) -> Path | None:
     """
     Transcribe a waveform file using default model parameters and save the transcribed Segments to a file.
 
@@ -60,7 +60,7 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
         kwargs: Additional arguments to pass to `model.transcribe()`.
 
     Returns:
-        Path: The path to the output file containing the transcribed Segments.
+        Path | None: The path to the output file containing the transcribed Segments, or `None` if transcription failed.
     """
     # Whisper only supports translation to English
     if kwargs.get('language') == 'en' and mode == WhisperMode.TRANSLATE:
@@ -70,10 +70,18 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
     print('About to write Segments to file:', output_file_path)
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return output_file_path
-    segments_generator = transcribe_waveform_with_default_model(load_waveform_from_file(input_file_path), mode=mode, **kwargs)
-    for segment in duplicate_segments_to_file(segments_generator, output_file_path):
-        print(segment)
-    return output_file_path
+    waveform = load_waveform_from_file(input_file_path)
+    if len(waveform) == 0:
+        print(f'Skipping {input_file_path} because empty waveform is loaded')
+        return None
+    try:
+        segments_generator = transcribe_waveform_with_default_model(waveform, mode=mode, **kwargs)
+        for segment in duplicate_segments_to_file(segments_generator, output_file_path):
+            print(segment)
+        return output_file_path
+    except Exception as e:
+        print(f"An error occurred while transcribing {input_file_path}: {e}")
+        return None
 
 
 def main() -> None:

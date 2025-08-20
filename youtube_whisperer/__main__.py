@@ -44,10 +44,12 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | No
         overwrite (OverwriteMode, optional): Whether to overwrite existing Segment & SRT files. Defaults to `OverwriteMode.PROMPT`.
     """
     for input_file_path in input_file_paths:
-        segment_file_path = transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite)
-        print('Saved Segments file:', segment_file_path)
-        srt_file_path = convert_segments_file_to_srt(segment_file_path, overwrite=overwrite)
-        print('Saved SRT file:', srt_file_path)
+        if segment_file_path := transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite):
+            print('Saved Segments file:', segment_file_path)
+            srt_file_path = convert_segments_file_to_srt(segment_file_path, overwrite=overwrite)
+            print('Saved SRT file:', srt_file_path)
+        else:
+            print('Failed to transcribe file:', input_file_path)
 
 
 def main() -> None:
