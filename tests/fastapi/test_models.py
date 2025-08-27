@@ -21,15 +21,6 @@ def test_task_transcriber_validator():
         testee.Task(transcriber="unknown")
 
 
-def test_task_validate_transcriber():
-    assert testee.Task.model_validate({"transcriber": "local"}).transcriber == TranscriberType.LOCAL
-    assert testee.Task.model_validate({"transcriber": "azure"}).transcriber == TranscriberType.AZURE
-    assert testee.Task.model_validate({"transcriber": TranscriberType.LOCAL}).transcriber == TranscriberType.LOCAL
-    assert testee.Task.model_validate({"transcriber": TranscriberType.AZURE}).transcriber == TranscriberType.AZURE
-    with pytest.raises(ValidationError):
-        testee.Task.model_validate({"transcriber": "unknown"})
-
-
 def test_task_language_validator():
     task = testee.Task(language="")
     assert task.language == ""
@@ -45,14 +36,4 @@ def test_task_mode_validator():
     task = testee.Task(mode=TranscriberMode.TRANSLATE)
     assert task.mode == TranscriberMode.TRANSLATE
     with pytest.raises(ValidationError):
-        testee.Task(mode="invalid_mode")
-
-
-def test_task_validate_mode():
-    assert testee.Task.model_validate({"mode": "transcribe"}).mode == TranscriberMode.TRANSCRIBE
-    assert testee.Task.model_validate({"mode": "translate"}).mode == TranscriberMode.TRANSLATE
-    assert testee.Task.model_validate({"mode": TranscriberMode.TRANSCRIBE}).mode == TranscriberMode.TRANSCRIBE
-    assert testee.Task.model_validate({"mode": TranscriberMode.TRANSLATE}).mode == TranscriberMode.TRANSLATE
-    import pydantic
-    with pytest.raises(pydantic.ValidationError):
-        testee.Task.model_validate({"mode": "foo"})
+        testee.Task(mode="unknown")
