@@ -11,6 +11,7 @@ authors = [
   {name = "Libo Yin", email = "liboyin830@gmail.com"}
 ]
 dependencies = [
+  "azure-cognitiveservices-speech",
   "ctranslate2",
   "fastapi[standard]",
   "faster-whisper",
