@@ -40,7 +40,7 @@ def convert_segments_file_to_srt(input_file_path: Path, output_file_path: Path |
         input_file_path (Path): The path to the input segments file.
         output_file_path (Path | None, optional): The path to the output SRT file. If not provided, a file with the same name as the input file and the .srt extension will be created. Defaults to None.
         deduplicate (bool, optional): Whether to deduplicate the segments. Defaults to True.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
 
     Returns:
         Path: The path to the output SRT file.

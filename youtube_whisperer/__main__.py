@@ -20,7 +20,7 @@ def try_download_videos_and_transcripts(urls: Iterable[str], lang_codes: str | N
     Args:
         urls (Iterable[str]): An iterable of YouTube video or playlist URLs to download.
         lang_codes (str | None, optional): Language codes to filter available transcripts with. If `None`, use `DEFAULT_LANG_CODES`. Defaults to `None`.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing video & SRT files. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing video & SRT files. Defaults to `prompt`.
 
     Returns:
         list[Path]: A list of Paths to video files that were downloaded but did not have transcripts.
@@ -40,8 +40,8 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | No
     Args:
         input_file_paths (Iterable[Path]): An iterable of waveform file paths to be transcribed.
         language (str | None, optional): The language code for the transcription. If `None`, the language will be automatically detected. Defaults to `None`.
-        mode (TranscriberMode, optional): Whether to run Whisper in transcribe mode or translate mode. Defaults to `TranscriberMode.TRANSCRIBE`.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing Segment & SRT files. Defaults to `OverwriteMode.PROMPT`.
+        mode (TranscriberMode, optional): Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing Segment & SRT files. Defaults to `prompt`.
     """
     for input_file_path in input_file_paths:
         if segment_file_path := transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite):

@@ -145,7 +145,7 @@ def download_transcript_as_srt_file_with_default_title(url: str, lang_codes: str
         url (str): The URL of the YouTube video.
         lang_codes (str | None, optional): Language codes to filter available transcripts with. if `None`, `DEFAULT_LANG_CODES` will be used. Defaults to `None`.
         target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to `WHISPER_ASSET_DIR`.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
 
     Returns:
         Path | None: The path to the downloaded SRT file if successful, or None otherwise.

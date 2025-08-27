@@ -125,7 +125,7 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
     Args:
         input_file_path (Path): The path to the input SRT file.
         output_file_path (Path | None, optional): The path to the output file. If not provided, the input file will be overwritten. Defaults to None.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `OverwriteMode.PROMPT`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
 
     Returns:
         Path: The path to the output file.
