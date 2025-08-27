@@ -2,7 +2,7 @@ import datetime
 
 from pydantic import BaseModel, field_validator
 
-from youtube_whisperer.utils import WHISPER_LANG_CODES, WhisperMode
+from youtube_whisperer.utils import WHISPER_LANG_CODES, TranscriberMode
 
 
 class Task(BaseModel):
@@ -14,12 +14,12 @@ class Task(BaseModel):
     language: str
         The language code for the transcription. Must be one of Whisper-supported language codes or an empty string.
 
-    mode: WhisperMode
+    mode: TranscriberMode
         Whether to run Whisper in transcribe mode or translate mode.
     """
     source: str = f'assets/{datetime.date.today().year}*.mkv'
     language: str = 'en'
-    mode: WhisperMode = WhisperMode.TRANSCRIBE
+    mode: TranscriberMode = TranscriberMode.TRANSCRIBE
 
     @field_validator('source')
     def validate_source(cls, x: str) -> str:
@@ -35,9 +35,9 @@ class Task(BaseModel):
         return x
 
     @field_validator('mode')
-    def validate_mode(cls, x: str | WhisperMode) -> WhisperMode:
+    def validate_mode(cls, x: str | TranscriberMode) -> TranscriberMode:
         try:
-            return WhisperMode(x)
+            return TranscriberMode(x)
         except ValueError:
             raise TypeError(f'Unexpected mode {x} of type {type(x)}')
 

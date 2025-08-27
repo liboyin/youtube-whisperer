@@ -11,7 +11,7 @@ WHISPER_ASSETS_DIR = Path(os.getenv("WHISPER_ASSETS_DIR", Path(__file__).parents
 WHISPER_MODELS_DIR = Path(os.getenv("WHISPER_MODELS_DIR", Path.home() / ".whisper"))
 
 
-class WhisperMode(str, Enum):
+class TranscriberMode(str, Enum):
     TRANSCRIBE = 'transcribe'
     TRANSLATE = 'translate'
 

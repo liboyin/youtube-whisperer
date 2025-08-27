@@ -5,7 +5,7 @@ import pytest
 from pathlib_extensions import OverwriteMode
 
 import youtube_whisperer.worker as testee
-from youtube_whisperer.utils import WhisperMode
+from youtube_whisperer.utils import TranscriberMode
 
 
 def test_redis_connection(mocker):
@@ -44,7 +44,7 @@ def test_process_queue_url_with_no_transcript(mocker, mock_redis):
     mock_redis.blpop.assert_any_call('tasks', 0)
     mock_is_url.assert_called_once_with(task['source'])
     mock_download.assert_called_once_with(task['source'], task['language'], overwrite=OverwriteMode.NEVER)
-    mock_transcribe.assert_called_once_with([Path('/path/to/video.mp4')], task['language'], mode=WhisperMode.TRANSCRIBE, overwrite=OverwriteMode.NEVER)
+    mock_transcribe.assert_called_once_with([Path('/path/to/video.mp4')], task['language'], mode=TranscriberMode.TRANSCRIBE, overwrite=OverwriteMode.NEVER)
 
 
 def test_process_queue_url_with_transcript(mocker, mock_redis):
@@ -87,4 +87,4 @@ def test_process_queue_local_file(mocker, mock_redis):
     mock_redis.blpop.assert_any_call('tasks', 0)
     mock_is_url.assert_called_once_with(task['source'])
     mock_download.assert_not_called()
-    mock_transcribe.assert_called_once_with([Path(task['source'])], task['language'], mode=WhisperMode.TRANSCRIBE, overwrite=OverwriteMode.NEVER)
+    mock_transcribe.assert_called_once_with([Path(task['source'])], task['language'], mode=TranscriberMode.TRANSCRIBE, overwrite=OverwriteMode.NEVER)

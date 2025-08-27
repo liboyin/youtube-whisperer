@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 import youtube_whisperer.fastapi.models as testee
-from youtube_whisperer.utils import WhisperMode
+from youtube_whisperer.utils import TranscriberMode
 
 
 def test_task_source_validator():
@@ -23,18 +23,18 @@ def test_task_language_validator():
 
 def test_task_mode_validator():
     task = testee.Task(mode="transcribe")
-    assert task.mode == WhisperMode.TRANSCRIBE
-    task = testee.Task(mode=WhisperMode.TRANSLATE)
-    assert task.mode == WhisperMode.TRANSLATE
+    assert task.mode == TranscriberMode.TRANSCRIBE
+    task = testee.Task(mode=TranscriberMode.TRANSLATE)
+    assert task.mode == TranscriberMode.TRANSLATE
     with pytest.raises(ValidationError):
         testee.Task(mode="invalid_mode")
 
 
 def test_task_validate_mode():
-    assert testee.Task.model_validate({"mode": "transcribe"}).mode == WhisperMode.TRANSCRIBE
-    assert testee.Task.model_validate({"mode": "translate"}).mode == WhisperMode.TRANSLATE
-    assert testee.Task.model_validate({"mode": WhisperMode.TRANSCRIBE}).mode == WhisperMode.TRANSCRIBE
-    assert testee.Task.model_validate({"mode": WhisperMode.TRANSLATE}).mode == WhisperMode.TRANSLATE
+    assert testee.Task.model_validate({"mode": "transcribe"}).mode == TranscriberMode.TRANSCRIBE
+    assert testee.Task.model_validate({"mode": "translate"}).mode == TranscriberMode.TRANSLATE
+    assert testee.Task.model_validate({"mode": TranscriberMode.TRANSCRIBE}).mode == TranscriberMode.TRANSCRIBE
+    assert testee.Task.model_validate({"mode": TranscriberMode.TRANSLATE}).mode == TranscriberMode.TRANSLATE
     import pydantic
     with pytest.raises(pydantic.ValidationError):
         testee.Task.model_validate({"mode": "foo"})

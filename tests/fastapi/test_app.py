@@ -4,7 +4,7 @@ from redis import StrictRedis
 from unittest.mock import MagicMock, patch
 
 from youtube_whisperer.fastapi.app import app, get_redis, get_assets_dir, resolve_tasks
-from youtube_whisperer.fastapi.models import Task, WhisperMode
+from youtube_whisperer.fastapi.models import Task, TranscriberMode
 
 
 @pytest.fixture
@@ -89,8 +89,8 @@ def test_get_tasks_empty(client, mock_redis_client):
 
 def test_get_tasks_with_data(client, mock_redis_client):
     tasks_data = [
-        Task(source="http://example.com/video1", language="en", mode=WhisperMode.TRANSCRIBE),
-        Task(source="http://example.com/video2", language="fr", mode=WhisperMode.TRANSLATE),
+        Task(source="http://example.com/video1", language="en", mode=TranscriberMode.TRANSCRIBE),
+        Task(source="http://example.com/video2", language="fr", mode=TranscriberMode.TRANSLATE),
     ]
     mock_redis_client.lrange.return_value = [task.model_dump_json() for task in tasks_data]
     response = client.get("/tasks")
@@ -107,7 +107,7 @@ def test_add_tasks(client, mock_redis_client):
         {"source": "http://example.com/video1", "language": "en", "mode": "transcribe"}
     ]
     with patch('youtube_whisperer.fastapi.app.resolve_tasks') as mock_resolve_tasks:
-        resolved_task = Task(source="http://example.com/video1", language="en", mode=WhisperMode.TRANSCRIBE)
+        resolved_task = Task(source="http://example.com/video1", language="en", mode=TranscriberMode.TRANSCRIBE)
         mock_resolve_tasks.return_value = [resolved_task]
         response = client.post("/tasks", json=tasks_to_add)
     assert response.status_code == 201
@@ -135,7 +135,7 @@ def test_add_tasks_failed_resolution(client, mock_redis_client):
 
 def test_clear_tasks(client, mock_redis_client):
     tasks_data = [
-        Task(source="http://example.com/video1", language="en", mode=WhisperMode.TRANSCRIBE),
+        Task(source="http://example.com/video1", language="en", mode=TranscriberMode.TRANSCRIBE),
     ]
     mock_redis_client.lrange.return_value = [task.model_dump_json() for task in tasks_data]
     response = client.delete("/tasks")
