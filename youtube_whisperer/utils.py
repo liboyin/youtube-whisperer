@@ -11,6 +11,15 @@ WHISPER_ASSETS_DIR = Path(os.getenv("WHISPER_ASSETS_DIR", Path(__file__).parents
 WHISPER_MODELS_DIR = Path(os.getenv("WHISPER_MODELS_DIR", Path.home() / ".whisper"))
 
 
+class TranscriberType(str, Enum):
+    LOCAL = 'local'
+    AZURE = 'azure'
+
+    @classmethod
+    def values(cls) -> tuple[str, ...]:
+        return tuple(transcriber.value for transcriber in cls)
+
+
 class TranscriberMode(str, Enum):
     TRANSCRIBE = 'transcribe'
     TRANSLATE = 'translate'

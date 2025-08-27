@@ -1,6 +1,10 @@
 import pytest
 
-from youtube_whisperer.utils import TranscriberMode, get_redis_client, is_url, strtobool
+from youtube_whisperer.utils import TranscriberMode, TranscriberType, get_redis_client, is_url, strtobool
+
+
+def test_transcriber_type_values():
+    assert TranscriberType.values() == ('local', 'azure')
 
 
 def test_transcriber_mode_values():
