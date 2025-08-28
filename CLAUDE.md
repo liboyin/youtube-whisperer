@@ -55,7 +55,7 @@ The application has two main execution environments:
 
 **Transcriber** (`youtube_whisperer.transcriber/`):
 
-* `waveform_transcriber.py` – Core transcription pipeline.
+* `whisper_transcriber.py` – Core transcription pipeline.
 * `model_parameters.py` – Handles Whisper model selection (CPU/GPU).
 * `waveform_loader.py` – Prepares audio data for transcription.
 

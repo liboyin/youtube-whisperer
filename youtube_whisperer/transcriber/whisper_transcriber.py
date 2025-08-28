@@ -86,7 +86,7 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
 
 def main() -> None:
     """
-    CLI entry point to transcribe waveform files and save each result to a Segments file.
+    CLI entry point to transcribe waveform files with Whisper and save each result to a Segments file.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Waveform file paths to transcribe.")
