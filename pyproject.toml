@@ -19,6 +19,7 @@ dependencies = [
   "more-itertools",
   "pathlib-extensions@git+https://github.com/liboyin/pathlib-extensions.git",
   "redis",
+  "soundfile",
   "youtube-transcript-api",
   "yt-dlp",
 ]
