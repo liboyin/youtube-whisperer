@@ -1,6 +1,8 @@
+from pathlib import Path
 import pytest
 
-from youtube_whisperer.utils import TranscriberMode, TranscriberType, get_redis_client, is_url, strtobool
+import youtube_whisperer.utils as testee
+from youtube_whisperer.utils import TranscriberMode, TranscriberType, get_redis_client, is_url, load_and_get_env_vars, strtobool
 
 
 def test_transcriber_type_values():
@@ -72,3 +74,39 @@ def test_get_redis_client(mocker):
     mock_redis.assert_called_once_with(host='redis', socket_connect_timeout=5, health_check_interval=60)
     mock_client.ping.assert_called_once()
     assert client == mock_client
+
+
+def test_load_and_get_env_vars_no_keys():
+    with pytest.raises(AssertionError):
+        load_and_get_env_vars()
+
+
+def test_load_and_get_env_vars_missing_env_file(mocker):
+    mocker.patch('dotenv.find_dotenv', return_value='')
+    with pytest.raises(FileNotFoundError):
+        load_and_get_env_vars('TEST_VAR')
+
+
+def test_load_and_get_env_vars_missing_env_var(mocker):
+    mocker.patch.object(testee, 'prepare_input_file', return_value=Path('/fake/.env'))
+    mocker.patch('dotenv.load_dotenv', return_value=True)
+    mocker.patch.dict('os.environ', {})
+    with pytest.raises(KeyError):
+        load_and_get_env_vars('NONEXISTENT_VAR')
+
+
+def test_load_and_get_env_vars_single_var(mocker):
+    mocker.patch.object(testee, 'prepare_input_file', return_value=Path('/fake/.env'))
+    mocker.patch('dotenv.load_dotenv', return_value=True)
+    mocker.patch.dict('os.environ', {'TEST_VAR': 'test_value'})
+    result = load_and_get_env_vars('TEST_VAR')
+    assert result == 'test_value'
+
+
+def test_load_and_get_env_vars_multiple_vars(mocker):
+    mocker.patch.object(testee, 'prepare_input_file', return_value=Path('/fake/.env'))
+    mocker.patch('dotenv.load_dotenv', return_value=True)
+    env_vars = {'VAR1': 'value1', 'VAR2': 'value2', 'VAR3': 'value3'}
+    mocker.patch.dict('os.environ', env_vars)
+    result = load_and_get_env_vars('VAR1', 'VAR2', 'VAR3')
+    assert result == ['value1', 'value2', 'value3']
