@@ -47,6 +47,16 @@ def transcribe_waveform_with_default_model(waveform: np.ndarray, mode: Transcrib
     return transcribe_waveform(model, waveform, mode, **kwargs)
 
 
+def early_stopper(segments_generator: Iterable[Segment]) -> Iterable[Segment]:
+    """
+    Stop transcription upon a known error case.
+    """
+    for x in segments_generator:
+        if x.text == '请不吝点赞 订阅 转发 打赏支持明镜与点点栏目':
+            return
+        yield x
+
+
 def transcribe_file_with_default_model(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, mode: TranscriberMode = TranscriberMode.TRANSCRIBE, **kwargs) -> Path | None:
     """
     Transcribe a waveform file using default model parameters and save the transcribed Segments to a file.
@@ -75,7 +85,7 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
         print(f'Skipping {input_file_path} because empty waveform is loaded')
         return None
     try:
-        segments_generator = transcribe_waveform_with_default_model(waveform, mode=mode, **kwargs)
+        segments_generator = early_stopper(transcribe_waveform_with_default_model(waveform, mode=mode, **kwargs))
         for segment in duplicate_segments_to_file(segments_generator, output_file_path):
             print(segment)
         return output_file_path

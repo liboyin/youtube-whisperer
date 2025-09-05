@@ -50,7 +50,6 @@ def duplicate_segments_to_file(segments: Iterable[Segment], output_file_path: Pa
     assert isinstance(flush_every, int) and flush_every > 0, flush_every
     with prepare_output_file(output_file_path).open('w') as file_handler:
         for i, x in enumerate(segments):
-            assert x.text != '请不吝点赞 订阅 转发 打赏支持明镜与点点栏目'
             # write a newline between Segments, but not after the last one
             if i:
                 file_handler.write(f'\n{x}')
