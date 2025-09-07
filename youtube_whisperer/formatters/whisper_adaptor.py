@@ -82,15 +82,11 @@ class WhisperSegmentAdaptor:
             return
         prepare_output_file(file_path).write_text('\n'.join(map(str, self.segment_iter)))
 
-    def yield_srt_blocks(self) -> Iterator[SrtBlock]:
+    def yield_as_srt_blocks(self) -> Iterator[SrtBlock]:
         """
         Yields SrtBlock objects from the segments.
         """
-        for segment in self.segment_iter:
-            print(segment)
-            result = self.segment_to_srt_block(segment)
-            print(result)
-            yield result
+        return map(self.segment_to_srt_block, self.segment_iter)
 
     def save_as_srt_file(self, file_path: Path, deduplicate: bool = True, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
         """
@@ -104,7 +100,7 @@ class WhisperSegmentAdaptor:
         if file_path.is_file() and not overwrite_existing_path(file_path, overwrite):
             return
         file_path = prepare_output_file(file_path)
-        srt_blocks_generator = self.yield_srt_blocks()
+        srt_blocks_generator = self.yield_as_srt_blocks()
         if deduplicate:
             srt_blocks_generator = yield_deduplicated_srt_blocks(srt_blocks_generator)
         file_path.write_text(convert_srt_blocks_to_str(srt_blocks_generator))

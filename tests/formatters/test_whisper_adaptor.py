@@ -66,7 +66,7 @@ def test_segment_to_srt_block():
 
 def test_yield_srt_blocks():
     handler = WhisperSegmentAdaptor(SEGMENTS)
-    srt_blocks = list(handler.yield_srt_blocks())
+    srt_blocks = list(handler.yield_as_srt_blocks())
     assert len(srt_blocks) == 3
     assert all(isinstance(x, SrtBlock) for x in srt_blocks)
     assert srt_blocks[0].content == ['Segment']
