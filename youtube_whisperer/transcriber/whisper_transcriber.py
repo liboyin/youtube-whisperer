@@ -9,7 +9,7 @@ from pathlib_extensions import OverwriteMode, overwrite_existing_path
 
 from youtube_whisperer.formatters.whisper_adaptor import WhisperSegmentAdaptor
 from youtube_whisperer.transcriber.model_parameters import get_default_whisper_model_parameters
-from youtube_whisperer.transcriber.waveform_loader import load_waveform_from_file
+from youtube_whisperer.transcriber.waveform_loader import load_whisper_waveform_from_file
 from youtube_whisperer.utils import TranscriberMode, verify_language_code
 
 
@@ -80,7 +80,7 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
     print('About to write Segments to file:', output_file_path)
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return output_file_path
-    waveform = load_waveform_from_file(input_file_path)
+    waveform = load_whisper_waveform_from_file(input_file_path)
     if len(waveform) == 0:
         print(f'Skipping {input_file_path} because empty waveform is loaded')
         return None

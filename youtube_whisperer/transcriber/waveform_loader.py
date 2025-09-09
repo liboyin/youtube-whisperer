@@ -4,14 +4,12 @@ import ffmpeg
 import numpy as np
 from pathlib_extensions import prepare_input_file
 
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR
-
 DEFAULT_SAMPLE_RATE = 16000
 
 
-def load_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
+def load_whisper_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
     """
-    Load audio from a bytes object and return it as a 1D float32 np.ndarray with a range of [-1, 1].
+    Load Whisper-style waveform from a bytes object and return it as a NumPy array.
 
     Simplified from https://github.com/openai/whisper/blob/main/whisper/audio.py
 
@@ -41,12 +39,8 @@ def load_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAMPLE_RATE
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768
 
 
-def load_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
+def load_whisper_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
     """
-    Load audio from a binary file and return it as a 1D float32 np.ndarray with a range of [-1, 1].
+    Load Whisper-style waveform from a file and return it as a NumPy array.
     """
-    return load_waveform_from_bytes(prepare_input_file(path).read_bytes(), sample_rate)
-
-
-if __name__ == '__main__':
-    print(len(load_waveform_from_file(WHISPER_ASSETS_DIR / 'test.mp4')))
+    return load_whisper_waveform_from_bytes(prepare_input_file(path).read_bytes(), sample_rate)
