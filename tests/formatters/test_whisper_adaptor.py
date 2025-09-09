@@ -1,9 +1,8 @@
 from faster_whisper.transcribe import Segment
 from pathlib_extensions import OverwriteMode
-import pytest
 
 from youtube_whisperer.formatters.srt_deduplicator import SrtBlock
-from youtube_whisperer.formatters.whisper_adaptor import WhisperSegmentAdaptor, convert_segments_file_to_srt
+from youtube_whisperer.formatters.whisper_adaptor import WhisperSegmentAdaptor
 
 SEGMENTS = [
     Segment(id=1, seek=2704, start=0.0, end=1.24, text='Segment', tokens=[50365, 4511], temperature=0.0, avg_logprob=-0.309651929245898, compression_ratio=1.2782608695652173, no_speech_prob=0.72765052318573, words=None),
@@ -59,15 +58,5 @@ def test_save_as_srt_file(tmp_path):
     output_file_path = tmp_path / "output.srt"
     handler.save_as_srt_file(output_file_path, deduplicate=False, overwrite=OverwriteMode.ALWAYS)
     assert output_file_path.is_file()
-    expected = "1\n00:00:00,000 --> 00:00:01,240\nSegment\n\n2\n00:00:01,240 --> 00:00:04,240\nto\n\n3\n00:00:04,240 --> 00:00:06,240\nSRT\n"
-    assert output_file_path.read_text() == expected
-
-
-def test_convert_segments_file_to_srt(tmp_path):
-    input_file_path = tmp_path / 'segments.seg'
-    input_file_path.write_text('\n'.join(map(str, SEGMENTS)))
-    output_file_path = convert_segments_file_to_srt(input_file_path, deduplicate=False, overwrite=OverwriteMode.ALWAYS)
-    assert output_file_path.is_file()
-    assert output_file_path.suffix == '.srt'
     expected = "1\n00:00:00,000 --> 00:00:01,240\nSegment\n\n2\n00:00:01,240 --> 00:00:04,240\nto\n\n3\n00:00:04,240 --> 00:00:06,240\nSRT\n"
     assert output_file_path.read_text() == expected

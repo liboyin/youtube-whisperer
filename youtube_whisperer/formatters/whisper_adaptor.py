@@ -1,10 +1,9 @@
-import argparse
 from pathlib import Path
 from typing import Iterable, Iterator, Self
 
 from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
-from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
+from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file
 
 from youtube_whisperer.formatters.srt_deduplicator import SrtBlock, convert_srt_blocks_to_str, yield_deduplicated_srt_blocks
 
@@ -67,41 +66,3 @@ class WhisperSegmentAdaptor:
         if deduplicate:
             srt_blocks_generator = yield_deduplicated_srt_blocks(srt_blocks_generator)
         file_path.write_text(convert_srt_blocks_to_str(srt_blocks_generator))
-
-
-def convert_segments_file_to_srt(input_file_path: Path, output_file_path: Path | None = None, deduplicate: bool = True, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
-    """
-    Converts a segments file to an SRT file.
-
-    Args:
-        input_file_path (Path): The path to the input segments file.
-        output_file_path (Path | None, optional): The path to the output SRT file. If not provided, a file with the same name as the input file and the .srt extension will be created. Defaults to None.
-        deduplicate (bool, optional): Whether to deduplicate the segments. Defaults to True.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
-
-    Returns:
-        Path: The path to the output SRT file.
-    """
-    prepare_input_file(input_file_path)
-    output_file_path = output_file_path or input_file_path.with_suffix('.srt')
-    if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
-        return output_file_path
-    WhisperSegmentAdaptor.from_file(input_file_path).save_as_srt_file(output_file_path, deduplicate=deduplicate, overwrite=overwrite)
-    return output_file_path
-
-
-def main() -> None:
-    """
-    CLI entry point to convert Segment files to SRT.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Segment file paths to convert to SRT.")
-    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
-    args = parser.parse_args()
-    overwrite = args.overwrite
-    for path in args.paths:
-        convert_segments_file_to_srt(path, overwrite=overwrite)
-
-
-if __name__ == '__main__':
-    main()
