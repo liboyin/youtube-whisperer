@@ -52,6 +52,7 @@ def early_stopper(segments_generator: Iterable[Segment]) -> Iterable[Segment]:
     Stop transcription upon a known error case.
     """
     for x in segments_generator:
+        print(x)
         if x.text == '请不吝点赞 订阅 转发 打赏支持明镜与点点栏目':
             return
         yield x
@@ -59,25 +60,23 @@ def early_stopper(segments_generator: Iterable[Segment]) -> Iterable[Segment]:
 
 def transcribe_file_with_default_model(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, mode: TranscriberMode = TranscriberMode.TRANSCRIBE, **kwargs) -> Path | None:
     """
-    Transcribe a waveform file using default model parameters and save the transcribed Segments to a file.
+    Transcribe a waveform file using default model parameters and save the output to an SRT file.
 
     Args:
         input_file_path (Path): The path to the input file containing the waveform.
-        output_file_path (Path | None, optional): The path to the output file where the transcribed Segments will be saved.
-            If not provided, a file with the same name as the input file and a '.seg' extension will be created.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing Segment files. Defaults to `prompt`.
+        output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
         mode (TranscriberMode, optional): Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.
         kwargs: Additional arguments to pass to `model.transcribe()`.
 
     Returns:
-        Path | None: The path to the output file containing the transcribed Segments, or `None` if transcription failed.
+        Path | None: The path to the output SRT file, or `None` if transcription failed.
     """
     # Whisper only supports translation to English
     if kwargs.get('language') == 'en' and mode == TranscriberMode.TRANSLATE:
         print('Resetting Whisper mode to TRANSCRIBE because the language spoken in the waveform is English.')
         mode = TranscriberMode.TRANSCRIBE
-    output_file_path = output_file_path or input_file_path.with_suffix('.seg')
-    print('About to write Segments to file:', output_file_path)
+    output_file_path = output_file_path or input_file_path.with_suffix('.srt')
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return output_file_path
     waveform = load_whisper_waveform_from_file(input_file_path)
@@ -86,8 +85,7 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
         return None
     try:
         segments_generator = early_stopper(transcribe_waveform_with_default_model(waveform, mode=mode, **kwargs))
-        for segment in WhisperSegmentAdaptor(segments_generator).tee_to_file(output_file_path):
-            print(segment)
+        WhisperSegmentAdaptor(segments_generator).save_as_srt_file(output_file_path, overwrite=overwrite)
         return output_file_path
     except Exception as e:
         print(f"An error occurred while transcribing {input_file_path}: {e}")
@@ -96,13 +94,13 @@ def transcribe_file_with_default_model(input_file_path: Path, output_file_path: 
 
 def main() -> None:
     """
-    CLI entry point to transcribe waveform files with Whisper and save each result to a Segments file.
+    CLI entry point to transcribe waveform files with Whisper and save each result to an SRT file.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Waveform file paths to transcribe.")
     parser.add_argument("-l", "--language", type=str, default=None, help="Language to transcribe waveform files. Defaults to auto detection.")
     parser.add_argument("-m", "--mode", type=TranscriberMode, choices=TranscriberMode.values(), default=TranscriberMode.TRANSCRIBE, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
-    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing Segment files. Defaults to `prompt`.")
+    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
     args = parser.parse_args()
     language = args.language
     verify_language_code(language)

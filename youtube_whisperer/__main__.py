@@ -7,7 +7,6 @@ import more_itertools
 from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.downloaders import DEFAULT_LANG_CODES, download_videos_and_transcripts_with_default_titles
-from youtube_whisperer.formatters.whisper_adaptor import convert_segments_file_to_srt
 from youtube_whisperer.transcriber.whisper_transcriber import transcribe_file_with_default_model
 from youtube_whisperer.utils import TranscriberMode, is_url, verify_language_code
 
@@ -44,9 +43,7 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: str | No
         overwrite (OverwriteMode, optional): Whether to overwrite existing Segment & SRT files. Defaults to `prompt`.
     """
     for input_file_path in input_file_paths:
-        if segment_file_path := transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite):
-            print('Saved Segments file:', segment_file_path)
-            srt_file_path = convert_segments_file_to_srt(segment_file_path, overwrite=overwrite)
+        if srt_file_path := transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite):
             print('Saved SRT file:', srt_file_path)
         else:
             print('Failed to transcribe file:', input_file_path)

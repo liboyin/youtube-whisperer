@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import Generator, Iterable, Iterator, Self
+from typing import Iterable, Iterator, Self
 
 from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
@@ -44,43 +44,6 @@ class WhisperSegmentAdaptor:
         """
         with file_path.open() as file_handler:
             return cls(list(cls.yield_segments_from_lines(file_handler)))  # eager evaluation
-
-    def tee_to_file(self, file_path: Path, flush_interval_lines: int = 100, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Generator[Segment, None, None]:
-        """
-        Writes Segments to a file, and yield them.
-
-        Args:
-            file_path (Path): The path to the file to write to.
-            flush_interval_lines (int): Flush the file every X lines. Defaults to 100.
-            overwrite (OverwriteMode): Whether to overwrite existing Segment files. Defaults to `prompt`.
-
-        Yields:
-            Segments from input as-is.
-        """
-        if file_path.is_file() and not overwrite_existing_path(file_path, overwrite):
-            return
-        with prepare_output_file(file_path).open('w') as file_handler:
-            for i, x in enumerate(self.segment_iter):
-                # write a newline between Segments, but not after the last one
-                if i:
-                    file_handler.write(f'\n{x}')
-                else:
-                    file_handler.write(str(x))
-                if (i + 1) % flush_interval_lines == 0:
-                    file_handler.flush()
-                yield x
-
-    def save_to_file(self, file_path: Path, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
-        """
-        Writes Segments to a file.
-
-        Args:
-            file_path (Path): The path to the file to write to.
-            overwrite (OverwriteMode): Whether to overwrite existing Segment files. Defaults to `prompt`.
-        """
-        if file_path.is_file() and not overwrite_existing_path(file_path, overwrite):
-            return
-        prepare_output_file(file_path).write_text('\n'.join(map(str, self.segment_iter)))
 
     def yield_as_srt_blocks(self) -> Iterator[SrtBlock]:
         """

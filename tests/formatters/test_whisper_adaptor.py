@@ -34,28 +34,6 @@ def test_from_file(tmp_path):
     assert segments[2].text == 'SRT'
 
 
-def test_save_to_file(tmp_path):
-    output_file_path = tmp_path / "output.seg"
-    handler = WhisperSegmentAdaptor(SEGMENTS)
-    handler.save_to_file(output_file_path, overwrite=OverwriteMode.ALWAYS)
-    assert output_file_path.is_file()
-    assert output_file_path.read_text() == '\n'.join(map(str, SEGMENTS))
-
-
-def test_tee_to_file(tmp_path):
-    output_file_path = tmp_path / "output.seg"
-    handler = WhisperSegmentAdaptor(SEGMENTS)
-    segments_generator = handler.tee_to_file(output_file_path, overwrite=OverwriteMode.ALWAYS)
-    assert not output_file_path.exists()
-    for i, x in enumerate(SEGMENTS):
-        assert next(segments_generator) is x
-        if not i:
-            assert output_file_path.is_file()
-    with pytest.raises(StopIteration):
-        next(segments_generator)
-    assert output_file_path.read_text() == '\n'.join(map(str, SEGMENTS))
-
-
 def test_segment_to_srt_block():
     srt_block = WhisperSegmentAdaptor.segment_to_srt_block(SEGMENTS[0])
     assert isinstance(srt_block, SrtBlock)
@@ -64,7 +42,7 @@ def test_segment_to_srt_block():
     assert srt_block.content == ['Segment']
 
 
-def test_yield_srt_blocks():
+def test_yield_as_srt_blocks():
     handler = WhisperSegmentAdaptor(SEGMENTS)
     srt_blocks = list(handler.yield_as_srt_blocks())
     assert len(srt_blocks) == 3
