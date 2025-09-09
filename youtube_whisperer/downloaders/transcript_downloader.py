@@ -4,7 +4,7 @@ from typing import Collection, TypedDict
 from urllib.parse import urlparse, parse_qs
 
 from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars, truncate_filename
-from youtube_transcript_api import TranscriptsDisabled, YouTubeTranscriptApi
+from youtube_transcript_api import FetchedTranscript, NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
 from youtube_whisperer.downloaders.utils import get_video_title
@@ -72,7 +72,7 @@ def get_first_matching_lang_code(candidate_lang_codes: Collection[str], requeste
     return None
 
 
-def download_transcript(url: str, lang_codes: str | None) -> list[TranscriptBlock] | None:
+def download_transcript(url: str, lang_codes: str | None) -> FetchedTranscript | None:
     """
     Downloads the transcript of a YouTube video.
 
@@ -81,8 +81,7 @@ def download_transcript(url: str, lang_codes: str | None) -> list[TranscriptBloc
         lang_codes (str | None): Language codes to filter available transcripts with. If None, defaults to `DEFAULT_LANG_CODES`.
 
     Returns:
-        list[TranscriptBlock] | None: Downloaded transcript as a list of TranscriptBlock dicts.
-            If no transcript in the requested language is available, return None.
+        FetchedTranscript | None: Downloaded transcript, or `None` if no transcript in the requested language is available.
     """
     try:
         transcripts = YouTubeTranscriptApi().list(get_video_id(url))
@@ -92,9 +91,12 @@ def download_transcript(url: str, lang_codes: str | None) -> list[TranscriptBloc
     lang_code = get_first_matching_lang_code([x.language_code for x in transcripts], lang_codes)
     if lang_code is None:
         return None
-    result = transcripts.find_transcript([lang_code]).fetch()
-    print(f"Successfully downloaded transcript with {len(result)} blocks for {url}")
-    return result
+    try:
+        result = transcripts.find_transcript([lang_code]).fetch()
+        print(f"Successfully downloaded transcript with {len(result)} blocks for {url}")
+        return result
+    except NoTranscriptFound:
+        return None
 
 
 def download_transcript_as_srt_text(url: str, lang_codes: str | None) -> str | None:
