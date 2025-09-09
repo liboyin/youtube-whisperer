@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import dotenv
 from enum import Enum
 import os
@@ -88,6 +89,22 @@ def get_redis_client() -> redis.StrictRedis:
     )
     client.ping()  # raise a ConnectionError if the server is unreachable
     return client
+
+
+@contextmanager
+def redis_connection():
+    """
+    Context manager for a Redis connection.
+
+    Yields:
+        redis.StrictRedis: A Redis client instance.
+    """
+    client = get_redis_client()
+    try:
+        yield client
+    finally:
+        if client:
+            client.close()
 
 
 def load_and_get_env_vars(*keys: str) -> str | list[str]:

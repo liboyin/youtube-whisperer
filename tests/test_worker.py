@@ -8,14 +8,6 @@ import youtube_whisperer.worker as testee
 from youtube_whisperer.utils import TranscriberMode
 
 
-def test_redis_connection(mocker):
-    mock_client = mocker.MagicMock()
-    mocker.patch('youtube_whisperer.worker.get_redis_client', return_value=mock_client)
-    with testee.redis_connection() as client:
-        assert client == mock_client
-    mock_client.close.assert_called_once()
-
-
 @pytest.fixture
 def mock_redis(mocker):
     mock_redis_client = mocker.MagicMock()

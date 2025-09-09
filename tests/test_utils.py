@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest
 
 import youtube_whisperer.utils as testee
-from youtube_whisperer.utils import TranscriberMode, TranscriberType, get_redis_client, is_url, load_and_get_env_vars, strtobool
+from youtube_whisperer.utils import TranscriberMode, TranscriberType, get_redis_client, is_url, load_and_get_env_vars, redis_connection, strtobool
 
 
 def test_transcriber_type_values():
@@ -74,6 +74,14 @@ def test_get_redis_client(mocker):
     mock_redis.assert_called_once_with(host='redis', socket_connect_timeout=5, health_check_interval=60)
     mock_client.ping.assert_called_once()
     assert client == mock_client
+
+
+def test_redis_connection(mocker):
+    mock_client = mocker.MagicMock()
+    mocker.patch('youtube_whisperer.utils.get_redis_client', return_value=mock_client)
+    with redis_connection() as client:
+        assert client is mock_client
+    mock_client.close.assert_called_once()
 
 
 def test_load_and_get_env_vars_no_keys():

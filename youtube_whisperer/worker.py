@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from pathlib import Path
 import subprocess
 import sys
@@ -9,23 +8,7 @@ from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
 from youtube_whisperer.fastapi.models import Task
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
-from youtube_whisperer.utils import TranscriberType, get_redis_client, is_url
-
-
-@contextmanager
-def redis_connection():
-    """
-    Context manager for a Redis connection.
-
-    Yields:
-        redis.StrictRedis: A Redis client instance.
-    """
-    client = get_redis_client()
-    try:
-        yield client
-    finally:
-        if client:
-            client.close()
+from youtube_whisperer.utils import TranscriberType, redis_connection, is_url
 
 
 def is_gpu_healthy() -> bool:
