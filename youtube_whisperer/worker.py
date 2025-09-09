@@ -9,7 +9,7 @@ from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
 from youtube_whisperer.fastapi.models import Task
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
-from youtube_whisperer.utils import get_redis_client, is_url
+from youtube_whisperer.utils import TranscriberType, get_redis_client, is_url
 
 
 @contextmanager
@@ -62,12 +62,18 @@ def process_queue():
                 language = None  # use default lang codes for transcript downloader and auto-detect language for Whisper
             # assume playlists and glob patterns have been resolved at insertion time
             if is_url(source):
-                video_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
+                waveform_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
             else:
-                video_file_path = Path(source)
+                waveform_file_path = Path(source)
                 transcript_flag = False
             if not transcript_flag:
-                transcribe_to_srt_files([video_file_path], language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+                match task.transcriber:
+                    case TranscriberType.AZURE:
+                        # TODO: if the file is a video file, convert it to a wav file first
+                        # TODO: Azure should be the default transcriber
+                        raise NotImplementedError
+                    case TranscriberType.LOCAL:
+                        transcribe_to_srt_files([waveform_file_path], language, mode=task.mode, overwrite=OverwriteMode.NEVER)
 
 
 if __name__ == "__main__":
