@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Iterator, Self
+from typing import Iterable, Iterator
 
 from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
@@ -10,13 +10,7 @@ from youtube_whisperer.formatters.srt_deduplicator import SrtBlock, convert_srt_
 
 class WhisperSegmentAdaptor:
     def __init__(self, segments: Iterable[Segment]) -> None:
-        self.segment_iter = iter(segments)  # default to lazy evaluation
-
-    @staticmethod
-    def yield_segments_from_lines(lines: Iterable[str]) -> Iterator[Segment]:
-        for line in lines:
-            if line := line.strip():
-                yield eval(line, globals(), locals())
+        self.segment_iter = iter(segments)  # lazy evaluation
 
     @staticmethod
     def segment_to_srt_block(segment: Segment) -> SrtBlock:
@@ -28,21 +22,6 @@ class WhisperSegmentAdaptor:
             format_timestamp(segment.end, always_include_hours=True, decimal_marker=','),
             segment.text.strip().split('\n'),
         )
-
-    @classmethod
-    def from_lines(cls, lines: Iterable[str]) -> Self:
-        """
-        Loads Segments from an iterable of lines.
-        """
-        return cls(list(cls.yield_segments_from_lines(lines)))  # eager evaluation
-    
-    @classmethod
-    def from_file(cls, file_path: Path) -> Self:
-        """
-        Loads Segments from a file.
-        """
-        with file_path.open() as file_handler:
-            return cls(list(cls.yield_segments_from_lines(file_handler)))  # eager evaluation
 
     def yield_as_srt_blocks(self) -> Iterator[SrtBlock]:
         """

@@ -11,28 +11,6 @@ SEGMENTS = [
 ]
 
 
-def test_from_lines():
-    handler = WhisperSegmentAdaptor.from_lines(map(str, SEGMENTS))
-    segments = list(handler.segment_iter)
-    assert len(segments) == 3
-    assert all(isinstance(x, Segment) for x in segments)
-    assert segments[0].text == 'Segment'
-    assert segments[1].text == 'to'
-    assert segments[2].text == 'SRT'
-
-
-def test_from_file(tmp_path):
-    file_path = tmp_path / 'segments.seg'
-    file_path.write_text('\n'.join(map(str, SEGMENTS)))
-    handler = WhisperSegmentAdaptor.from_file(file_path)
-    segments = list(handler.segment_iter)
-    assert len(segments) == 3
-    assert all(isinstance(x, Segment) for x in segments)
-    assert segments[0].text == 'Segment'
-    assert segments[1].text == 'to'
-    assert segments[2].text == 'SRT'
-
-
 def test_segment_to_srt_block():
     srt_block = WhisperSegmentAdaptor.segment_to_srt_block(SEGMENTS[0])
     assert isinstance(srt_block, SrtBlock)
@@ -52,9 +30,7 @@ def test_yield_as_srt_blocks():
 
 
 def test_save_as_srt_file(tmp_path):
-    input_file_path = tmp_path / 'segments.seg'
-    input_file_path.write_text('\n'.join(map(str, SEGMENTS)))
-    handler = WhisperSegmentAdaptor.from_file(input_file_path)
+    handler = WhisperSegmentAdaptor(SEGMENTS)
     output_file_path = tmp_path / "output.srt"
     handler.save_as_srt_file(output_file_path, deduplicate=False, overwrite=OverwriteMode.ALWAYS)
     assert output_file_path.is_file()
