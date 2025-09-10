@@ -1,8 +1,8 @@
 from faster_whisper.transcribe import Segment
 from pathlib_extensions import OverwriteMode
 
-from youtube_whisperer.formatters.srt_deduplicator import SrtBlock
-from youtube_whisperer.formatters.whisper_adaptor import WhisperSegmentAdaptor
+from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock
+from youtube_whisperer.adaptors.whisper_adaptor import WhisperSegmentAdaptor
 
 SEGMENTS = [
     Segment(id=1, seek=2704, start=0.0, end=1.24, text='Segment', tokens=[50365, 4511], temperature=0.0, avg_logprob=-0.309651929245898, compression_ratio=1.2782608695652173, no_speech_prob=0.72765052318573, words=None),

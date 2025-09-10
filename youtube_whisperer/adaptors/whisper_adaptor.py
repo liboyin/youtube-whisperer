@@ -5,7 +5,7 @@ from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
 from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file
 
-from youtube_whisperer.formatters.srt_deduplicator import SrtBlock, convert_srt_blocks_to_str, yield_deduplicated_srt_blocks
+from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, convert_srt_blocks_to_str, yield_deduplicated_srt_blocks
 
 
 class WhisperSegmentAdaptor:

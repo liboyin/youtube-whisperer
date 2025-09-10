@@ -7,7 +7,7 @@ from faster_whisper.transcribe import Segment
 import numpy as np
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
 
-from youtube_whisperer.formatters.whisper_adaptor import WhisperSegmentAdaptor
+from youtube_whisperer.adaptors.whisper_adaptor import WhisperSegmentAdaptor
 from youtube_whisperer.transcriber.model_parameters import get_default_whisper_model_parameters
 from youtube_whisperer.transcriber.waveform_loader import load_whisper_waveform_from_file
 from youtube_whisperer.utils import TranscriberMode, verify_language_code

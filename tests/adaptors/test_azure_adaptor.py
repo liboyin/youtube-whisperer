@@ -1,7 +1,7 @@
 from pathlib_extensions import OverwriteMode
 
-from youtube_whisperer.formatters.azure_adaptor import AzureRecognitionResultAdaptor
-from youtube_whisperer.formatters.srt_deduplicator import SrtBlock
+from youtube_whisperer.adaptors.azure_adaptor import AzureRecognitionResultAdaptor
+from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock
 
 
 class MockSpeechRecognitionResult:
