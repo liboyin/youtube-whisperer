@@ -7,13 +7,7 @@ from azure.cognitiveservices.speech import SpeechRecognitionResult
 from youtube_whisperer.formatters.srt_deduplicator import SrtBlock, convert_srt_blocks_to_str, yield_deduplicated_srt_blocks
 
 
-class AzureRecognitionResultAdaptor:
-    def __init__(self):
-        self.segments: list[SpeechRecognitionResult] = []
-
-    def append(self, segment: SpeechRecognitionResult) -> None:
-        self.segments.append(segment)
-
+class AzureRecognitionResultAdaptor(list[SpeechRecognitionResult]):
     @staticmethod
     def recognition_result_to_srt_block(segment: SpeechRecognitionResult) -> SrtBlock:
         """
@@ -31,7 +25,7 @@ class AzureRecognitionResultAdaptor:
         """
         Yields SrtBlock objects from recorded recognition results.
         """
-        return map(self.recognition_result_to_srt_block, self.segments)
+        return map(self.recognition_result_to_srt_block, self)
 
     def save_as_srt_file(self, file_path: Path, deduplicate: bool = True, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
         """
