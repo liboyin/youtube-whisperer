@@ -1,30 +1,21 @@
 import pytest
 
-from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode, MissingTargetLanguageCode, UnregisteredLanguageCode, UnableToConvertLanguageCode
+from youtube_whisperer.adaptors.lang_code_adaptor import (
+    LanguageCode,
+    MissingTargetLanguageCode,
+    UnableToConvertLanguageCode,
+    UnregisteredLanguageCode,
+)
 
 
-def test_init_valid_codes():
-    # ISO source
-    lang_code = LanguageCode(source='en')
-    assert lang_code.source == 'en'
-    assert lang_code.source_is_BCP is False
-    assert lang_code.target is None
-    assert lang_code.target_is_BCP is None
-    # BCP source
-    lang_code = LanguageCode(source='en-us')
-    assert lang_code.source == 'en-us'
-    assert lang_code.source_is_BCP is True
-    # ISO target
-    lang_code = LanguageCode(source='en', target='zh')
-    assert lang_code.target == 'zh'
-    assert lang_code.target_is_BCP is False
-    # BCP target
-    lang_code = LanguageCode(source='en', target='zh-cn')
-    assert lang_code.target == 'zh-cn'
-    assert lang_code.target_is_BCP is True
+def test_init():
+    assert LanguageCode(source='en') == LanguageCode(source='en', target=None)
+    assert LanguageCode(source='en-us') == LanguageCode(source='en-us', target=None)
+    assert LanguageCode(source='en', target='zh') is not None
+    assert LanguageCode(source='en', target='zh-cn') is not None
 
 
-def test_init_invalid_codes():
+def test_init_invalid():
     with pytest.raises(UnregisteredLanguageCode):
         LanguageCode(source='')
     with pytest.raises(UnregisteredLanguageCode):
@@ -35,56 +26,48 @@ def test_init_invalid_codes():
         LanguageCode(source='en', target='invalid')
 
 
+def test_is_source_bcp():
+    assert LanguageCode('en-us').is_source_BCP() is True
+    assert LanguageCode('en').is_source_BCP() is False
+
+
+def test_is_target_bcp():
+    assert LanguageCode('en', 'zh-cn').is_target_BCP() is True
+    assert LanguageCode('en', 'zh').is_target_BCP() is False
+    assert LanguageCode('en').is_target_BCP() is None
+
+
 def test_get_source_as_bcp():
-    # BCP source
-    lang_code = LanguageCode(source='en-us')
-    assert lang_code.get_source_as_BCP() == 'en-us'
-    # ISO source
-    lang_code = LanguageCode(source='en')
+    assert LanguageCode('en-us').get_source_as_BCP() == 'en-us'
     with pytest.raises(UnableToConvertLanguageCode):
-        lang_code.get_source_as_BCP()
+        LanguageCode('en').get_source_as_BCP()
 
 
 def test_get_source_as_iso():
-    # BCP source
-    lang_code = LanguageCode(source='en-us')
-    assert lang_code.get_source_as_ISO() == 'en'
-    # ISO source
-    lang_code = LanguageCode(source='zh')
-    assert lang_code.get_source_as_ISO() == 'zh'
+    assert LanguageCode('en-us').get_source_as_ISO() == 'en'
+    assert LanguageCode('zh').get_source_as_ISO() == 'zh'
 
 
 def test_get_source_as_bcp_and_iso():
-    # BCP source
-    lang_code = LanguageCode(source='en-us')
-    assert lang_code.get_source_as_BCP_and_ISO() == ['en-us', 'en']
-    # ISO source
-    lang_code = LanguageCode(source='en')
-    assert lang_code.get_source_as_BCP_and_ISO() == ['en']
+    assert LanguageCode('en-us').get_source_as_BCP_and_ISO() == ['en-us', 'en']
+    assert LanguageCode('en').get_source_as_BCP_and_ISO() == ['en']
 
 
 def test_get_target_as_bcp():
-    # BCP target
-    lang_code = LanguageCode(source='en', target='zh-cn')
-    assert lang_code.get_target_as_BCP() == 'zh-cn'
-    # ISO target
-    lang_code = LanguageCode(source='en', target='zh')
-    with pytest.raises(UnableToConvertLanguageCode):
-        lang_code.get_target_as_BCP()
     # No target
-    lang_code = LanguageCode(source='en')
     with pytest.raises(MissingTargetLanguageCode):
-        lang_code.get_target_as_BCP()
-
+        LanguageCode('en').get_target_as_BCP()
+    # BCP target
+    assert LanguageCode('en', 'zh-cn').get_target_as_BCP() == 'zh-cn'
+    # ISO target
+    with pytest.raises(UnableToConvertLanguageCode):
+        LanguageCode('en', 'zh').get_target_as_BCP()
 
 def test_get_target_as_iso():
     # No target
-    lang_code = LanguageCode(source='en')
     with pytest.raises(MissingTargetLanguageCode):
-        lang_code.get_target_as_ISO()
-    # ISO target
-    lang_code_iso = LanguageCode(source='en', target='zh')
-    assert lang_code_iso.get_target_as_ISO() == 'zh'
+        LanguageCode('en').get_target_as_ISO()
     # BCP target
-    lang_code_bcp = LanguageCode(source='en', target='zh-cn')
-    assert lang_code_bcp.get_target_as_ISO() == 'zh'
+    assert LanguageCode('en', 'zh-cn').get_target_as_ISO() == 'zh'
+    # ISO target
+    assert LanguageCode('en', 'zh').get_target_as_ISO() == 'zh'
