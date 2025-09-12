@@ -32,7 +32,7 @@ def test_resolve_tasks_with_local_path(mock_dependencies):
     mock_is_url, _, mock_glob = mock_dependencies
     mock_is_url.return_value = False
     mock_glob.return_value = ['/path/to/file1.mkv', '/path/to/file2.mkv']
-    pattern = Task(source='/path/to/*.mkv', language='fr')
+    pattern = Task(source='/path/to/*.mkv', language='en')
     result = resolve_tasks(pattern)
     assert len(result) == 2
     assert result[0].source == '/path/to/file1.mkv'
@@ -46,7 +46,7 @@ def test_resolve_tasks_no_match(mock_dependencies):
     mock_is_url.return_value = False
     mock_yield_urls.return_value = []
     mock_glob.return_value = []
-    pattern = Task(source='nonexistent_pattern', language='es')
+    pattern = Task(source='nonexistent_pattern', language='en')
     result = resolve_tasks(pattern)
     assert len(result) == 0
     mock_is_url.assert_called_once_with('nonexistent_pattern')
@@ -89,10 +89,10 @@ def test_get_tasks_empty(client, mock_redis_client):
 
 def test_get_tasks_with_data(client, mock_redis_client):
     tasks_data = [
-        Task(source="http://example.com/video1", language="en", mode=TranscriberMode.TRANSCRIBE),
-        Task(source="http://example.com/video2", language="fr", mode=TranscriberMode.TRANSLATE),
+        Task(source="http://example.com/video1", language="zh", mode=TranscriberMode.TRANSCRIBE),
+        Task(source="http://example.com/video2", language="en", mode=TranscriberMode.TRANSLATE),
     ]
-    mock_redis_client.lrange.return_value = [task.model_dump_json() for task in tasks_data]
+    mock_redis_client.lrange.return_value = [task.model_dump_json().encode('utf-8') for task in tasks_data]
     response = client.get("/tasks")
     assert response.status_code == 200
     response_json = response.json()
@@ -137,7 +137,7 @@ def test_clear_tasks(client, mock_redis_client):
     tasks_data = [
         Task(source="http://example.com/video1", language="en", mode=TranscriberMode.TRANSCRIBE),
     ]
-    mock_redis_client.lrange.return_value = [task.model_dump_json() for task in tasks_data]
+    mock_redis_client.lrange.return_value = [task.model_dump_json().encode('utf-8') for task in tasks_data]
     response = client.delete("/tasks")
     assert response.status_code == 200
     response_json = response.json()

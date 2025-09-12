@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 import youtube_whisperer.fastapi.models as testee
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 
@@ -22,12 +23,15 @@ def test_task_transcriber_validator():
 
 
 def test_task_language_validator():
-    task = testee.Task(language="")
-    assert task.language == ""
+    english = LanguageCode("en")
     task = testee.Task(language="en")
-    assert task.language == "en"
+    assert task.language == english
+    task = testee.Task(language=english)
+    assert task.language == english
     with pytest.raises(ValidationError):
-        testee.Task(language="unsupported")
+        testee.Task(language="")
+    with pytest.raises(ValidationError):
+        testee.Task(language="invalid")
 
 
 def test_task_mode_validator():

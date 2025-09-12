@@ -8,8 +8,6 @@ import re
 from pathlib_extensions import prepare_input_file
 import redis
 
-from faster_whisper.tokenizer import _LANGUAGE_CODES as WHISPER_LANG_CODES
-
 WHISPER_ASSETS_DIR = Path(os.getenv("WHISPER_ASSETS_DIR", Path(__file__).parents[1] / "assets"))
 WHISPER_MODELS_DIR = Path(os.getenv("WHISPER_MODELS_DIR", Path.home() / ".whisper"))
 
@@ -62,14 +60,6 @@ def is_url(text: str) -> bool:
         bool: True if the input text is a valid URL, False otherwise.
     """
     return bool(re.match(r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)", text))
-
-
-def verify_language_code(language: str | None) -> None:
-    """
-    Verifies if the given language code is supported by Whisper. Ignore empty string or `None`.
-    """
-    if language and language not in WHISPER_LANG_CODES:
-        raise ValueError("Unsupported language:", language)
 
 
 def get_redis_client() -> redis.StrictRedis:
