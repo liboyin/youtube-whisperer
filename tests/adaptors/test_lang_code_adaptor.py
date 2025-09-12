@@ -26,6 +26,51 @@ def test_init_invalid():
         LanguageCode(source='en', target='invalid')
 
 
+def test_str():
+    lang_code_source_only = LanguageCode(source='en')
+    assert str(lang_code_source_only) == 'en'
+    lang_code_with_target = LanguageCode(source='en', target='zh')
+    assert str(lang_code_with_target) == 'en->zh'
+
+
+def test_from_str():
+    lang_code = LanguageCode.from_str('en')
+    assert lang_code == LanguageCode('en')
+    lang_code = LanguageCode.from_str('en->zh')
+    assert lang_code == LanguageCode('en', 'zh')
+    lang_code = LanguageCode.from_str('  en-us  ->  zh-cn  ')
+    assert lang_code == LanguageCode('en-us', 'zh-cn')
+    # Test invalid format
+    with pytest.raises(ValueError):
+        LanguageCode.from_str('en<-zh')
+    # Test invalid language code
+    with pytest.raises(UnregisteredLanguageCode):
+        LanguageCode.from_str('en->xx')
+
+def test_from_repr():
+    """Tests the from_repr classmethod."""
+    # Test with target
+    repr_str = "LanguageCode(source='en', target='zh')"
+    lang_code = LanguageCode.from_repr(repr_str)
+    assert lang_code == LanguageCode('en', 'zh')
+    # Test without target
+    repr_str = "LanguageCode(source='en-us', target=None)"
+    lang_code = LanguageCode.from_repr(repr_str)
+    assert lang_code == LanguageCode('en-us')
+    # Test with BCP codes
+    repr_str = "LanguageCode(source='en-us', target='zh-cn')"
+    lang_code = LanguageCode.from_repr(repr_str)
+    assert lang_code == LanguageCode('en-us', 'zh-cn')
+    # Test invalid format
+    with pytest.raises(ValueError):
+        LanguageCode.from_repr("Invalid(source='en')")
+    with pytest.raises(ValueError):
+        LanguageCode.from_repr("LanguageCode(source='en', target='zh', extra='oops')")
+    # Test invalid language code
+    with pytest.raises(UnregisteredLanguageCode):
+        LanguageCode.from_repr("LanguageCode(source='xx', target='yy')")
+
+
 def test_is_source_bcp():
     assert LanguageCode('en-us').is_source_BCP() is True
     assert LanguageCode('en').is_source_BCP() is False
