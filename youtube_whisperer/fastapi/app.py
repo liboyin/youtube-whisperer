@@ -47,10 +47,10 @@ def resolve_tasks(pattern: Task) -> list[Task]:
     result: list[Task] = []
     if is_url(pattern.source):
         for url in yield_flattened_video_urls([pattern.source]):
-            result.append(Task(source=url, language=pattern.language, mode=pattern.mode))
+            result.append(Task(source=url, transcriber=pattern.transcriber, language=pattern.language, mode=pattern.mode))
     else:
         for path in glob.glob(os.path.expanduser(pattern.source)):
-            result.append(Task(source=str(path), language=pattern.language, mode=pattern.mode))
+            result.append(Task(source=str(path), transcriber=pattern.transcriber, language=pattern.language, mode=pattern.mode))
     return result
 
 
