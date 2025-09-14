@@ -21,7 +21,6 @@ Dockerfile*
 __pycache__/
 .coverage
 .eggs/
-.env
 .installed.cfg
 .mypy_cache/
 .pytest_cache/
@@ -54,3 +53,8 @@ wheels/
 .devcontainer/
 assets/
 tests/
+
+# AI agents
+AGENTS.md
+CLAUDE.md
+GEMINI.md
