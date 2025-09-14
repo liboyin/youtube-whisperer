@@ -51,6 +51,8 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: Language
                 srt_file_path = transcribe_audio_file(input_file_path, language, overwrite=overwrite)
             case TranscriberType.LOCAL:
                 srt_file_path = transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite)
+            case _:
+                raise ValueError(f'Unsupported transcriber type: {transcriber}')
         if srt_file_path:
             print('Saved SRT file:', srt_file_path)
         else:

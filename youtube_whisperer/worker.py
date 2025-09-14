@@ -60,6 +60,8 @@ def process_queue():
                         transcribe_audio_file(waveform_file_path, language, overwrite=OverwriteMode.NEVER)
                     case TranscriberType.LOCAL:
                         transcribe_to_srt_files([waveform_file_path], language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+                    case _:
+                        raise ValueError(f'Unsupported transcriber type: {task.transcriber}')
 
 
 if __name__ == "__main__":
