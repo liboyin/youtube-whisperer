@@ -7,7 +7,9 @@ from pathlib_extensions import OverwriteMode
 from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
 from youtube_whisperer.fastapi.models import Task
+from youtube_whisperer.transcriber.azure_transcriber import transcribe_audio_file
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
+from youtube_whisperer.transcriber.waveform_loader import save_as_wav_file
 from youtube_whisperer.utils import TranscriberType, redis_connection, is_url
 
 
@@ -50,9 +52,12 @@ def process_queue():
             if not transcript_flag:
                 match task.transcriber:
                     case TranscriberType.AZURE:
-                        # TODO: if the file is a video file, convert it to a wav file first
-                        # TODO: Azure should be the default transcriber
-                        raise NotImplementedError
+                        if waveform_file_path.suffix.lower() != '.wav':
+                            waveform_file_path = save_as_wav_file(waveform_file_path, overwrite=OverwriteMode.NEVER)
+                            if not waveform_file_path:
+                                print(f"Skipping transcription for {waveform_file_path} as WAV conversion failed")
+                                continue
+                        transcribe_audio_file(waveform_file_path, language, overwrite=OverwriteMode.NEVER)
                     case TranscriberType.LOCAL:
                         transcribe_to_srt_files([waveform_file_path], language, mode=task.mode, overwrite=OverwriteMode.NEVER)
 

@@ -9,8 +9,9 @@ from pathlib_extensions import OverwriteMode
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
+from youtube_whisperer.transcriber.azure_transcriber import transcribe_audio_file
 from youtube_whisperer.transcriber.whisper_transcriber import transcribe_file_with_default_model
-from youtube_whisperer.utils import TranscriberMode, is_url
+from youtube_whisperer.utils import TranscriberMode, TranscriberType, is_url
 
 
 def try_download_videos_and_transcripts(urls: Iterable[str], language: LanguageCode, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> list[Path]:
@@ -33,18 +34,24 @@ def try_download_videos_and_transcripts(urls: Iterable[str], language: LanguageC
     return video_files_without_transcripts
 
 
-def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: LanguageCode, mode: TranscriberMode = TranscriberMode.TRANSCRIBE, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
+def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: LanguageCode, transcriber: TranscriberType = TranscriberType.LOCAL, mode: TranscriberMode = TranscriberMode.TRANSCRIBE, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
     """
     Transcribes a list of waveform files using the default model and converts the transcriptions to SRT format.
 
     Args:
         input_file_paths (Iterable[Path]): An iterable of waveform file paths to be transcribed.
         language (LanguageCode): Whisper's output language.
+        transcriber (TranscriberType, optional): The transcriber to use. Defaults to `local`.
         mode (TranscriberMode, optional): Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.
         overwrite (OverwriteMode, optional): Whether to overwrite existing Segment & SRT files. Defaults to `prompt`.
     """
     for input_file_path in input_file_paths:
-        if srt_file_path := transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite):
+        match transcriber:
+            case TranscriberType.AZURE:
+                srt_file_path = transcribe_audio_file(input_file_path, language, overwrite=overwrite)
+            case TranscriberType.LOCAL:
+                srt_file_path = transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite)
+        if srt_file_path:
             print('Saved SRT file:', srt_file_path)
         else:
             print('Failed to transcribe file:', input_file_path)
@@ -57,6 +64,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("sources", nargs='+', metavar='source', help="Waveform file paths to transcribe/translate, or video/playlist URLs to download and transcribe/translate.")
     parser.add_argument("-l", "--language", type=LanguageCode, help="Language code for transcript download and transcription/translation.")
+    parser.add_argument("-t", "--transcriber", type=TranscriberType, choices=TranscriberType.values(), default=TranscriberType.LOCAL, help="Transcriber to use for transcription. Defaults to `local`.")
     parser.add_argument("-m", "--mode", type=TranscriberMode, choices=TranscriberMode.values(), default=TranscriberMode.TRANSCRIBE, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
     parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
     args = parser.parse_args()

@@ -4,39 +4,44 @@ from pathlib import Path
 from typing import List, Tuple, Optional
 
 import azure.cognitiveservices.speech as speechsdk
+from pathlib_extensions import OverwriteMode, overwrite_existing_path
 import soundfile as sf
 
 from youtube_whisperer.adaptors.azure_adaptor import AzureRecognitionResultAdaptor
+from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.utils import load_and_get_env_vars
 
 AZURE_SPEECH_API_KEY, AZURE_SERVICE_REGION = load_and_get_env_vars("AZURE_SPEECH_API_KEY", "AZURE_SERVICE_REGION")
 
 
-def get_audio_duration(audio_file: Path) -> float:
+def get_audio_duration_seconds(audio_file: Path) -> float:
     """Get the duration of an audio file in seconds."""
     return sf.info(str(audio_file)).duration
 
 
-def transcribe_audio_file(audio_file: Path, source_language: str) -> None:
+def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
     """
-    Transcribes an audio file using Azure AI Speech service.
+    Transcribes an audio file using Azure AI Speech service. Blocks until the transcription is complete/failed/timed out.
 
     Args:
-        audio_file (Path): The path to the audio file to transcribe.
-        source_language (str): The language of the audio file.
+        input_file_path (Path): The path to the audio file to transcribe.
+        language (LanguageCode): The language of the audio file.
+        output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
 
     Returns:
-        str: The transcription of the audio file.
-
-    Raises:
-        Exception: If there is an error during transcription.
+        Path | None: Output SRT file path, or `None` if transcription failed.
     """
+    output_file_path = output_file_path or input_file_path.with_suffix('.srt')
+    if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
+        return output_file_path
     speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_API_KEY, region=AZURE_SERVICE_REGION)
-    speech_config.speech_recognition_language = source_language
-    audio_config = speechsdk.audio.AudioConfig(filename=str(audio_file))
+    speech_config.speech_recognition_language = language.get_source_as_BCP()
+    audio_config = speechsdk.audio.AudioConfig(filename=str(input_file_path))
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     result_adaptor = AzureRecognitionResultAdaptor()
     done = False
+
     def stop_cb(evt):
         nonlocal done
         print(f'CLOSED: {evt}')
@@ -58,18 +63,18 @@ def transcribe_audio_file(audio_file: Path, source_language: str) -> None:
     speech_recognizer.start_continuous_recognition()
 
     start_time = time.time()
-    timeout = get_audio_duration(audio_file)
+    timeout_seconds = get_audio_duration_seconds(input_file_path)  # time out after audio duration
     while not done:
-        if time.time() - start_time > timeout:
+        if time.time() - start_time > timeout_seconds:
             speech_recognizer.stop_continuous_recognition()
-            raise Exception(f"Transcription timed out after {timeout} seconds")
+            raise Exception(f"Transcription timed out after {timeout_seconds} seconds")
         time.sleep(1)
 
     speech_recognizer.stop_continuous_recognition()
-    result_adaptor.save_as_srt_file(audio_file.with_suffix('.srt'), deduplicate=True)
+    result_adaptor.save_as_srt_file(output_file_path, deduplicate=True)
 
 
-async def transcribe_audio_file_async(audio_file: Path, source_language: str) -> None:
+async def transcribe_audio_file_async(input_file_path: Path, source_language: str) -> None:
     """
     Asynchronously transcribes an audio file using Azure AI Speech service.
 
@@ -82,7 +87,7 @@ async def transcribe_audio_file_async(audio_file: Path, source_language: str) ->
     """
     speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_API_KEY, region=AZURE_SERVICE_REGION)
     speech_config.speech_recognition_language = source_language
-    audio_config = speechsdk.audio.AudioConfig(filename=str(audio_file))
+    audio_config = speechsdk.audio.AudioConfig(filename=str(input_file_path))
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     result_adaptor = AzureRecognitionResultAdaptor()
     
@@ -111,7 +116,7 @@ async def transcribe_audio_file_async(audio_file: Path, source_language: str) ->
 
     speech_recognizer.start_continuous_recognition()
     
-    timeout = get_audio_duration(audio_file) + 10 # Add a 10s buffer
+    timeout = get_audio_duration_seconds(input_file_path) + 10 # Add a 10s buffer
     try:
         await asyncio.wait_for(done.wait(), timeout=timeout)
     except asyncio.TimeoutError:
@@ -123,11 +128,11 @@ async def transcribe_audio_file_async(audio_file: Path, source_language: str) ->
     if error:
         raise error
 
-    result_adaptor.save_as_srt_file(audio_file.with_suffix('.srt'), deduplicate=True)
+    result_adaptor.save_as_srt_file(input_file_path.with_suffix('.srt'), deduplicate=True)
 
 
 async def transcribe_audio_files_concurrently(
-    audio_files: List[Path],
+    input_file_path: List[Path],
     source_language: str,
     max_workers: Optional[int] = None
 ) -> List[Tuple[Path, Optional[Exception]]]:
@@ -152,7 +157,7 @@ async def transcribe_audio_files_concurrently(
 
     concurrency_limit = max_workers if max_workers is not None else 10
     semaphore = asyncio.Semaphore(concurrency_limit)
-    tasks = [transcribe_and_catch(f, semaphore) for f in audio_files]
+    tasks = [transcribe_and_catch(f, semaphore) for f in input_file_path]
     results = await asyncio.gather(*tasks)
     return results
 
@@ -191,6 +196,6 @@ if __name__ == "__main__":
     parser.add_argument("source_language", type=str, help="Source language code (e.g., en-US)")
     args = parser.parse_args()
     transcribe_audio_file(
-        audio_file=args.audio_file,
-        source_language=args.source_language
+        input_file_path=args.audio_file,
+        language=args.source_language
     )
