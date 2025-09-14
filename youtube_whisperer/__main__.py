@@ -7,7 +7,8 @@ import more_itertools
 from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.downloaders import download_videos_and_transcripts_with_default_titles
+from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
+from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
 from youtube_whisperer.transcriber.whisper_transcriber import transcribe_file_with_default_model
 from youtube_whisperer.utils import TranscriberMode, is_url
 
@@ -25,7 +26,8 @@ def try_download_videos_and_transcripts(urls: Iterable[str], language: LanguageC
         list[Path]: A list of Paths to video files that were downloaded but did not have transcripts.
     """
     video_files_without_transcripts: list[Path] = []
-    for video_file_path, transcript_flag in download_videos_and_transcripts_with_default_titles(urls, language, overwrite=overwrite):
+    for url in yield_flattened_video_urls(urls):
+        video_file_path, transcript_flag = download_video_and_transcript_with_default_title(url, language, overwrite=overwrite)
         if not transcript_flag:
             video_files_without_transcripts.append(video_file_path)
     return video_files_without_transcripts
