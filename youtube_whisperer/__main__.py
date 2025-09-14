@@ -71,7 +71,7 @@ def main() -> None:
     file_paths: Iterable[Path]
     file_paths, video_urls = tuple(map(list, more_itertools.partition(is_url, args.sources)))
     file_paths = itertools.chain(try_download_videos_and_transcripts(video_urls, args.language, args.overwrite), (Path(x) for x in file_paths))
-    transcribe_to_srt_files(file_paths, args.language, TranscriberMode(args.mode), args.overwrite)
+    transcribe_to_srt_files(file_paths, args.language, args.transcriber, args.mode, args.overwrite)
 
 
 if __name__ == "__main__":
