@@ -60,6 +60,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     speech_recognizer.canceled.connect(canceled_cb)
     speech_recognizer.session_stopped.connect(stop_cb)
 
+    print("Starting transcription on Azure...")
     speech_recognizer.start_continuous_recognition()
 
     start_time = time.time()
@@ -68,10 +69,11 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
         if time.time() - start_time > timeout_seconds:
             speech_recognizer.stop_continuous_recognition()
             raise Exception(f"Transcription timed out after {timeout_seconds} seconds")
-        time.sleep(1)
+        time.sleep(5)
 
     speech_recognizer.stop_continuous_recognition()
     result_adaptor.save_as_srt_file(output_file_path, deduplicate=True)
+    return output_file_path
 
 
 async def transcribe_audio_file_async(input_file_path: Path, source_language: str) -> None:
