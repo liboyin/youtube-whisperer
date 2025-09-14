@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import Iterable
+from typing import Generator, Iterable
 
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
@@ -52,8 +52,7 @@ def transcribe_waveform_with_default_model(waveform: np.ndarray, mode: Transcrib
     return transcribe_waveform(model, waveform, mode, language)
 
 
-# TODO: change return type to Generator
-def early_stopper(segments_generator: Iterable[Segment]) -> Iterable[Segment]:
+def early_stopper(segments_generator: Iterable[Segment]) -> Generator[Segment, None, None]:
     """
     Stop transcription/translation upon a known error case.
     """

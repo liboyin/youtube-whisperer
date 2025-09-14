@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Generator, Iterable
 
 from pathlib_extensions import OverwriteMode
 import yt_dlp
@@ -10,7 +10,7 @@ from youtube_whisperer.downloaders.video_downloader import download_video_with_d
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 
-def yield_video_urls_from_playlist(url: str) -> Iterable[str]:
+def yield_video_urls_from_playlist(url: str) -> Generator[str, None, None]:
     """
     Extracts individual video URLs from a YouTube playlist. Uses Firefox cookies if available.
     
@@ -33,7 +33,7 @@ def yield_video_urls_from_playlist(url: str) -> Iterable[str]:
             yield f"https://www.youtube.com/watch?v={v['id']}"
 
 
-def yield_flattened_video_urls(urls: Iterable[str]) -> Iterable[str]:
+def yield_flattened_video_urls(urls: Iterable[str]) -> Generator[str, None, None]:
     """
     Yields individual YouTube video URLs from an iterable of URLs, flattening any playlist URLs.
 

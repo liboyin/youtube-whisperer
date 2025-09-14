@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable
+from typing import Generator, Iterable
 
 from pathlib_extensions import OverwriteMode
 
@@ -29,7 +29,7 @@ def download_video_and_transcript_with_default_title(url: str, language: Languag
 
 
 # TODO: move into __main__.py as there is no other caller
-def download_videos_and_transcripts_with_default_titles(urls: Iterable[str], language: LanguageCode, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Iterable[tuple[Path, bool]]:
+def download_videos_and_transcripts_with_default_titles(urls: Iterable[str], language: LanguageCode, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Generator[tuple[Path, bool], None, None]:
     """
     Downloads YouTube videos and their transcripts from the given URLs and saves them with their default titles in the target directory.
 
