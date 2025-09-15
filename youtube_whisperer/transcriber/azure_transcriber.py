@@ -49,7 +49,8 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
 
     def recognized_cb(evt):
         print(f'UPDATE: {evt}')
-        result_adaptor.append(evt.result)
+        if evt.result.text:  # sometimes there is an empty update at the end of the recognition
+            result_adaptor.append(evt.result)
 
     def canceled_cb(evt):
         print(f'CANCELED: {evt}')
