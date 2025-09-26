@@ -1,6 +1,7 @@
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 from pathlib_extensions import OverwriteMode
 
@@ -27,29 +28,36 @@ def is_gpu_healthy() -> bool:
         return False
 
 
-def process_queue():
+def process_queue(check_interval_seconds: int = 5) -> None:
     """
     Continuously monitors and processes download and transcription tasks from a Redis queue.
     """
     with redis_connection() as client:
         print("Worker started")
         while True:
-            task = client.blpop('tasks', 0)[1]  # block indefinitely until a task is available
-            # client.blpop returns a tuple (queue_name, task), e.g. (b'tasks', b'{"source": "...", "language": "..."}')
+            # Peek at the head of the queue without removing the task.
+            head = client.lrange('tasks', 0, 0)
+            if not head:
+                time.sleep(check_interval_seconds)
+                continue
+            task_json = head[0]
+            # Perform the health check before processing.
             if use_cuda() and not is_gpu_healthy():
                 print("GPU health check failed. Restarting...")
-                sys.exit(2)  # ENOENT
-            print(f"Picked up task: {task}")
-            task = Task.model_validate_json(task)
-            source = task.source
-            language = task.language
-            # assume playlists and glob patterns have been resolved at insertion time
-            if is_url(source):
-                waveform_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
-            else:
-                waveform_file_path = Path(source)
-                transcript_flag = False
-            if not transcript_flag:
+                sys.exit(2)  # Return ENOENT while the task remains on the queue.
+            try:
+                print(f"Picked up task: {task_json}")
+                task = Task.model_validate_json(task_json)
+                source = task.source
+                language = task.language
+                # assume playlists and glob patterns have been resolved at insertion time
+                if is_url(source):
+                    waveform_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
+                else:
+                    waveform_file_path = Path(source)
+                    transcript_flag = False
+                if transcript_flag:
+                    continue
                 match task.transcriber:
                     case TranscriberType.AZURE:
                         if waveform_file_path.suffix.lower() != '.wav':
@@ -62,6 +70,13 @@ def process_queue():
                         transcribe_to_srt_files([waveform_file_path], language, mode=task.mode, overwrite=OverwriteMode.NEVER)
                     case _:
                         raise ValueError(f'Unsupported transcriber type: {task.transcriber}')
+            except Exception as e:
+                print(f"An error occurred while processing task {task_json}: {e}")
+            finally:
+                # Remove the task from the queue after it has been processed or an error occurred.
+                # Assuming a single worker, we can safely LPOP the head.
+                popped_task = client.lpop('tasks')
+                print(f"Removed task: {popped_task}")
 
 
 if __name__ == "__main__":
