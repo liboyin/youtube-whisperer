@@ -2,8 +2,10 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from typing import Generator
 
 from pathlib_extensions import OverwriteMode
+from redis import StrictRedis
 
 from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
@@ -14,9 +16,25 @@ from youtube_whisperer.transcriber.waveform_loader import save_as_wav_file
 from youtube_whisperer.utils import TranscriberType, redis_connection, is_url
 
 
+def yield_task(client: StrictRedis, poll_interval_seconds: int = 5) -> Generator[Task, None, None]:
+    """
+    Continuously peeks at the head of the Redis 'tasks' queue.
+
+    If a task is available, it yields the task. If the queue is empty, it waits for a specified interval before checking again.
+    """
+    while True:
+        head = client.lrange('tasks', 0, 0)
+        if not head:
+            time.sleep(poll_interval_seconds)
+            continue
+        task = head[0]
+        print(f"Picked up task: {task}")
+        yield Task.model_validate_json(task)
+
+
 def is_gpu_healthy() -> bool:
     """
-    Checks if the GPU is healthy and available by running nvidia-smi.
+    Checks if the GPU is healthy and available by running `nvidia-smi`.
     
     Returns:
         bool: True if nvidia-smi finished with exit code 0, False otherwise.
@@ -28,50 +46,67 @@ def is_gpu_healthy() -> bool:
         return False
 
 
-def process_queue(check_interval_seconds: int = 5) -> None:
+def validate_gpu_health_or_exit() -> None:
     """
-    Continuously monitors and processes download and transcription tasks from a Redis queue.
+    Validates the GPU health. If unhealthy, exit with ENOENT to restart the worker container.
+    """
+    if use_cuda() and not is_gpu_healthy():
+        print("GPU health check failed. Restarting...")
+        sys.exit(2)
+
+
+def resolve_waveform_file_path(task: Task) -> tuple[Path, bool]:
+    """
+    Resolves the task's source into a local media file path and checks for existing transcripts.
+
+    If the task's source is a URL, it downloads the video/audio. If it's a local path, it uses that path directly.
+
+    Returns:
+        tuple[Path, bool]:
+            - Path: The path to the local media file.
+            - bool: True if a transcript was found, False otherwise.
+    """
+    source = task.source
+    # assume playlists and glob patterns have been resolved at insertion time
+    if is_url(source):
+        return download_video_and_transcript_with_default_title(source, task.language, overwrite=OverwriteMode.NEVER)
+    return Path(source), False
+
+
+def dispatch_transcription_task(task: Task, source: Path) -> None:
+    """
+    Dispatches the transcription task to the appropriate transcriber (local Whisper or Azure).
+
+    Handles necessary pre-processing steps like converting audio to WAV format for Azure.
+    """
+    match task.transcriber:
+        case TranscriberType.LOCAL:
+            transcribe_to_srt_files([source], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+        case TranscriberType.AZURE:
+            if source.suffix.lower() != '.wav':
+                source = save_as_wav_file(source, overwrite=OverwriteMode.NEVER)
+                if not source:
+                    print(f"Skipping transcription for {source} as WAV conversion failed")
+                    return
+            transcribe_audio_file(source, task.language, overwrite=OverwriteMode.NEVER)
+        case _:
+            raise ValueError(f'Unsupported transcriber type: {task.transcriber}')
+
+
+def process_queue(poll_interval_seconds: int = 5) -> None:
+    """
+    Continuously monitors the Redis 'tasks' queue and processes incoming transcription tasks.
     """
     with redis_connection() as client:
         print("Worker started")
-        while True:
-            # Peek at the head of the queue without removing the task.
-            head = client.lrange('tasks', 0, 0)
-            if not head:
-                time.sleep(check_interval_seconds)
-                continue
-            task_json = head[0]
-            # Perform the health check before processing.
-            if use_cuda() and not is_gpu_healthy():
-                print("GPU health check failed. Restarting...")
-                sys.exit(2)  # Return ENOENT while the task remains on the queue.
+        for task in yield_task(client, poll_interval_seconds):
+            validate_gpu_health_or_exit()
             try:
-                print(f"Picked up task: {task_json}")
-                task = Task.model_validate_json(task_json)
-                source = task.source
-                language = task.language
-                # assume playlists and glob patterns have been resolved at insertion time
-                if is_url(source):
-                    waveform_file_path, transcript_flag = download_video_and_transcript_with_default_title(source, language, overwrite=OverwriteMode.NEVER)
-                else:
-                    waveform_file_path = Path(source)
-                    transcript_flag = False
-                if transcript_flag:
-                    continue
-                match task.transcriber:
-                    case TranscriberType.AZURE:
-                        if waveform_file_path.suffix.lower() != '.wav':
-                            waveform_file_path = save_as_wav_file(waveform_file_path, overwrite=OverwriteMode.NEVER)
-                            if not waveform_file_path:
-                                print(f"Skipping transcription for {waveform_file_path} as WAV conversion failed")
-                                continue
-                        transcribe_audio_file(waveform_file_path, language, overwrite=OverwriteMode.NEVER)
-                    case TranscriberType.LOCAL:
-                        transcribe_to_srt_files([waveform_file_path], language, mode=task.mode, overwrite=OverwriteMode.NEVER)
-                    case _:
-                        raise ValueError(f'Unsupported transcriber type: {task.transcriber}')
+                waveform_file_path, transcript_found = resolve_waveform_file_path(task)
+                if not transcript_found:
+                    dispatch_transcription_task(task, waveform_file_path)
             except Exception as e:
-                print(f"An error occurred while processing task {task_json}: {e}")
+                print(f"An error occurred while processing task {task}: {e}")
             finally:
                 # Remove the task from the queue after it has been processed or an error occurred.
                 # Assuming a single worker, we can safely LPOP the head.

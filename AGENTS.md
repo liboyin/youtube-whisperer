@@ -84,6 +84,16 @@ The application has two main execution environments:
 6.  The corresponding adaptor (`WhisperSegmentAdaptor` or `AzureRecognitionResultAdaptor`) processes the output.
 7.  The result is formatted, deduplicated, and stored as an `.srt` file.
 
+### Future Architecture: Multi-Queue System
+
+To better support concurrent workers and mixed workloads (e.g., GPU-bound local tasks and I/O-bound Azure tasks), the task queue system is planned to be updated to a more robust three-queue design.
+
+*   **Unprocessed Queue**: A central queue where all new tasks are initially submitted.
+*   **Processing Queue**: When a worker is ready, it atomically moves a task from the unprocessed queue to this queue using the `BRPOPLPUSH` command. This serves as a reliable claim on the task, ensuring that even if the worker crashes, the task is not lost and can be recovered.
+*   **Dead-Letter Queue**: If a task fails processing after a certain number of retries, it is moved to this queue for manual inspection. This prevents "poison pill" tasks from repeatedly blocking the system.
+
+This design will enable multiple, specialized workers (e.g., GPU workers for local transcription, CPU workers for Azure tasks) to operate concurrently, improving both scalability and reliability.
+
 ---
 
 # Building and Running
