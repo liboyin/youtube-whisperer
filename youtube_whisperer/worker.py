@@ -81,6 +81,7 @@ def dispatch_transcription_task(task: Task, source: Path) -> None:
     """
     match task.transcriber:
         case TranscriberType.LOCAL:
+            validate_gpu_health_or_exit()
             transcribe_to_srt_files([source], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
         case TranscriberType.AZURE:
             if source.suffix.lower() != '.wav':
@@ -100,7 +101,6 @@ def process_queue(poll_interval_seconds: int = 5) -> None:
     with redis_connection() as client:
         print("Worker started")
         for task in yield_task(client, poll_interval_seconds):
-            validate_gpu_health_or_exit()
             try:
                 waveform_file_path, transcript_found = resolve_waveform_file_path(task)
                 if not transcript_found:

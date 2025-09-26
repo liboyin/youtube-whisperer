@@ -100,31 +100,37 @@ def test_resolve_waveform_file_path_for_local_file(mocker):
 
 def test_dispatch_transcription_task_for_local_transcriber(mocker):
     """Test dispatching to the local Whisper transcriber."""
+    mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_transcribe = mocker.patch.object(testee, 'transcribe_to_srt_files')
     task = Task(source='/path.mp4', transcriber=TranscriberType.LOCAL, mode=TranscriberMode.TRANSCRIBE)
     source_path = Path('/path.mp4')
     testee.dispatch_transcription_task(task, source_path)
+    mock_validate_gpu.assert_called_once()
     mock_transcribe.assert_called_once_with([source_path], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
 
 
 def test_dispatch_transcription_task_for_azure_transcriber_with_conversion(mocker):
     """Test dispatching to the Azure transcriber when WAV conversion is needed."""
+    mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_save_wav = mocker.patch.object(testee, 'save_as_wav_file', return_value=Path('/path.wav'))
     mock_transcribe_azure = mocker.patch.object(testee, 'transcribe_audio_file')
     task = Task(source='/path.mp4', transcriber=TranscriberType.AZURE)
     source_path = Path('/path.mp4')
     testee.dispatch_transcription_task(task, source_path)
+    mock_validate_gpu.assert_not_called()  # No GPU validation for Azure transcriber
     mock_save_wav.assert_called_once_with(source_path, overwrite=OverwriteMode.NEVER)
     mock_transcribe_azure.assert_called_once_with(Path('/path.wav'), task.language, overwrite=OverwriteMode.NEVER)
 
 
 def test_dispatch_transcription_task_for_azure_transcriber_no_conversion(mocker):
     """Test dispatching to the Azure transcriber when no WAV conversion is needed."""
+    mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_save_wav = mocker.patch.object(testee, 'save_as_wav_file')
     mock_transcribe_azure = mocker.patch.object(testee, 'transcribe_audio_file')
     task = Task(source='/path.wav', transcriber=TranscriberType.AZURE)
     source_path = Path('/path.wav')
     testee.dispatch_transcription_task(task, source_path)
+    mock_validate_gpu.assert_not_called()  # No GPU validation for Azure transcriber
     mock_save_wav.assert_not_called()
     mock_transcribe_azure.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER)
 
@@ -132,7 +138,6 @@ def test_dispatch_transcription_task_for_azure_transcriber_no_conversion(mocker)
 def test_process_queue_full_flow(mocker, mock_redis):
     """Test the integration of functions within process_queue for a successful transcription."""
     mock_yield_task = mocker.patch.object(testee, 'yield_task')
-    mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_resolve_path = mocker.patch.object(testee, 'resolve_waveform_file_path')
     mock_dispatch = mocker.patch.object(testee, 'dispatch_transcription_task')
     task = Task(source='http://example.com', language='en')
@@ -140,7 +145,6 @@ def test_process_queue_full_flow(mocker, mock_redis):
     mock_yield_task.return_value = iter([task])  # Yield one task and stop
     mock_resolve_path.return_value = (waveform_path, False)  # Simulate no existing transcript
     testee.process_queue()
-    mock_validate_gpu.assert_called_once()
     mock_resolve_path.assert_called_once_with(task)
     mock_dispatch.assert_called_once_with(task, waveform_path)
     mock_redis.lpop.assert_called_once_with('tasks')
@@ -149,7 +153,6 @@ def test_process_queue_full_flow(mocker, mock_redis):
 def test_process_queue_skips_transcription_if_transcript_ready(mocker, mock_redis):
     """Test that transcription is skipped if a transcript is already available."""
     mock_yield_task = mocker.patch.object(testee, 'yield_task')
-    mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_resolve_path = mocker.patch.object(testee, 'resolve_waveform_file_path')
     mock_dispatch = mocker.patch.object(testee, 'dispatch_transcription_task')
     task = Task(source='http://example.com', language='en')
@@ -157,7 +160,6 @@ def test_process_queue_skips_transcription_if_transcript_ready(mocker, mock_redi
     mock_yield_task.return_value = iter([task])
     mock_resolve_path.return_value = (waveform_path, True)  # Simulate transcript exists
     testee.process_queue()
-    mock_validate_gpu.assert_called_once()
     mock_resolve_path.assert_called_once_with(task)
     mock_dispatch.assert_not_called()  # The key assertion
     mock_redis.lpop.assert_called_once_with('tasks')
