@@ -96,7 +96,11 @@ class LanguageCode:
 
     @classmethod
     def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler) -> dict[str, Any]:
-        return {'type': 'string', 'examples': ['en', 'en-us', 'en-us->zh-cn']}
+        return {
+            'type': 'string',
+            'default': 'en-us',
+            'examples': ['en', 'en-us', 'en-us->zh-cn'],
+        }
 
     def is_source_BCP(self) -> bool:
         return self.source in BCP_LANG_CODES
