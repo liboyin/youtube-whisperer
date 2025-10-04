@@ -101,17 +101,22 @@ def process_queue(poll_interval_seconds: int = 5) -> None:
     with redis_connection() as client:
         print("Worker started")
         for task in yield_task(client, poll_interval_seconds):
+            delete_task = False
             try:
                 waveform_file_path, transcript_found = resolve_waveform_file_path(task)
                 if not transcript_found:
                     dispatch_transcription_task(task, waveform_file_path)
+                delete_task = True
+            # validate_gpu_health_or_exit() may raise SystemExit, which is a subclass of BaseException instead of Exception
             except Exception as e:
                 print(f"An error occurred while processing task {task}: {e}")
+                delete_task = True  # Remove the task from the queue to prevent infinite retries.
             finally:
-                # Remove the task from the queue after it has been processed or an error occurred.
-                # Assuming a single worker, we can safely LPOP the head.
-                popped_task = client.lpop('tasks')
-                print(f"Removed task: {popped_task}")
+                # delete_task is only False if GPU health check failed
+                if delete_task:
+                    # Assuming a single worker, we can safely LPOP the head.
+                    client.lpop('tasks')
+                    print(f"Removed task: {task}")
 
 
 if __name__ == "__main__":
