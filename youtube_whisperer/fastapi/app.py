@@ -28,7 +28,7 @@ def get_assets_dir() -> Path:
     return WHISPER_ASSETS_DIR
 
 
-@app.get("/tasks")
+@app.get("/tasks", response_model=list[Task])
 async def get_tasks(redis_client: StrictRedis = Depends(get_redis)) -> list[Task]:
     """
     Retrieve all tasks from the Redis queue.
@@ -54,7 +54,7 @@ def resolve_tasks(pattern: Task) -> list[Task]:
     return result
 
 
-@app.post("/tasks", status_code=status.HTTP_201_CREATED)
+@app.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
 async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(get_redis)) -> AddTasksResponse:
     """
     Add new tasks from patterns to the Redis queue.
@@ -83,7 +83,7 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/tasks")
+@app.delete("/tasks", response_model=list[Task])
 async def clear_tasks(redis_client: StrictRedis = Depends(get_redis)) -> list[Task]:
     """
     Clear all tasks from the Redis queue.
@@ -99,7 +99,7 @@ async def clear_tasks(redis_client: StrictRedis = Depends(get_redis)) -> list[Ta
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/assets")
+@app.get("/assets", response_model=list[str])
 async def list_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
     List all contents of the specified directory.
@@ -110,7 +110,7 @@ async def list_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/assets", status_code=status.HTTP_201_CREATED)
+@app.post("/assets", response_model=AddAssetsResponse, status_code=status.HTTP_201_CREATED)
 async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depends(get_assets_dir)) -> AddAssetsResponse:
     """
     Upload files to the asset directory.
@@ -142,7 +142,7 @@ async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depen
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/assets")
+@app.delete("/assets", response_model=list[str])
 async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
     Clean up redundant files in the specified directory.
