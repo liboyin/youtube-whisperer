@@ -102,7 +102,7 @@ This design will enable multiple, specialized workers (e.g., GPU workers for loc
 
 Two Docker Compose setups are provided:
 
-*   **GPU Mode** (requires NVIDIA Docker):
+*   **GPU Mode** (requires an NVIDIA GPU):
     ```bash
     docker-compose up -d
     ```
@@ -155,7 +155,7 @@ python -m youtube_whisperer --help
 
 # Configuration
 
-*   `WHISPER_USE_CUDA`: Enables/disables GPU acceleration for the local transcriber.
+*   `WHISPER_USE_CUDA`: Enables/disables GPU acceleration for the local transcriber (default: whether a CUDA-enabled device exists).
 *   `WHISPER_ASSETS_DIR`: Directory for storing outputs (default: `./assets/`).
 *   `WHISPER_MODELS_DIR`: Local Whisper model cache location (default: `~/.whisper/`).
 *   `AZURE_SPEECH_API_KEY`: API key for Azure AI Speech service.

@@ -99,7 +99,7 @@ class LanguageCode:
         return {
             'type': 'string',
             'default': 'en-us',
-            'examples': ['en', 'en-us', 'en-us->zh-cn'],
+            'examples': ['en', 'en-us', 'en-us->zh-cn'],  # FastAPI uses the first value here to generate examples in the documentation UI
         }
 
     def is_source_BCP(self) -> bool:
