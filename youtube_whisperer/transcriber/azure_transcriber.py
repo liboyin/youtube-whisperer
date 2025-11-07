@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import azure.cognitiveservices.speech as speechsdk
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
@@ -10,6 +11,7 @@ from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.utils import load_and_get_env_vars
 
 AZURE_SPEECH_API_KEY, AZURE_SERVICE_REGION = load_and_get_env_vars("AZURE_SPEECH_API_KEY", "AZURE_SERVICE_REGION")
+THREAD_POOL = ThreadPoolExecutor(max_workers=10)
 
 
 def get_audio_duration_seconds(audio_file: Path) -> float:
@@ -73,6 +75,21 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     speech_recognizer.stop_continuous_recognition()
     result_adaptor.save_as_srt_file(output_file_path, deduplicate=True)
     return output_file_path
+
+
+def transcribe_audio_file_fire_and_forget(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
+    """
+    Transcribes an audio file using Azure AI Speech service in a separate thread. Does not block.
+
+    Tasks are submitted to a ThreadPoolExecutor with a maximum of 10 concurrent workers.
+
+    Args:
+        input_file_path (Path): The path to the audio file to transcribe.
+        language (LanguageCode): The language of the audio file.
+        output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
+    """
+    THREAD_POOL.submit(transcribe_audio_file, input_file_path, language, output_file_path, overwrite)
 
 
 if __name__ == "__main__":

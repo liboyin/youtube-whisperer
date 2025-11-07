@@ -113,26 +113,26 @@ def test_dispatch_transcription_task_for_azure_transcriber_with_conversion(mocke
     """Test dispatching to the Azure transcriber when WAV conversion is needed."""
     mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_save_wav = mocker.patch.object(testee, 'save_as_wav_file', return_value=Path('/path.wav'))
-    mock_transcribe_azure = mocker.patch.object(testee, 'transcribe_audio_file')
+    mock_transcribe_azure_fire_and_forget = mocker.patch.object(testee, 'transcribe_audio_file_fire_and_forget')
     task = Task(source='/path.mp4', transcriber=TranscriberType.AZURE)
     source_path = Path('/path.mp4')
     testee.dispatch_transcription_task(task, source_path)
     mock_validate_gpu.assert_not_called()  # No GPU validation for Azure transcriber
     mock_save_wav.assert_called_once_with(source_path, overwrite=OverwriteMode.NEVER)
-    mock_transcribe_azure.assert_called_once_with(Path('/path.wav'), task.language, overwrite=OverwriteMode.NEVER)
+    mock_transcribe_azure_fire_and_forget.assert_called_once_with(Path('/path.wav'), task.language, overwrite=OverwriteMode.NEVER)
 
 
 def test_dispatch_transcription_task_for_azure_transcriber_no_conversion(mocker):
     """Test dispatching to the Azure transcriber when no WAV conversion is needed."""
     mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_save_wav = mocker.patch.object(testee, 'save_as_wav_file')
-    mock_transcribe_azure = mocker.patch.object(testee, 'transcribe_audio_file')
+    mock_transcribe_azure_fire_and_forget = mocker.patch.object(testee, 'transcribe_audio_file_fire_and_forget')
     task = Task(source='/path.wav', transcriber=TranscriberType.AZURE)
     source_path = Path('/path.wav')
     testee.dispatch_transcription_task(task, source_path)
     mock_validate_gpu.assert_not_called()  # No GPU validation for Azure transcriber
     mock_save_wav.assert_not_called()
-    mock_transcribe_azure.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER)
+    mock_transcribe_azure_fire_and_forget.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER)
 
 
 def test_process_queue_full_flow(mocker, mock_redis):

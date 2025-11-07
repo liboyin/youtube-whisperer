@@ -10,7 +10,7 @@ from redis import StrictRedis
 from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
 from youtube_whisperer.fastapi.models import Task
-from youtube_whisperer.transcriber.azure_transcriber import transcribe_audio_file
+from youtube_whisperer.transcriber.azure_transcriber import transcribe_audio_file_fire_and_forget
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
 from youtube_whisperer.transcriber.waveform_loader import save_as_wav_file
 from youtube_whisperer.utils import TranscriberType, redis_connection, is_url
@@ -89,7 +89,7 @@ def dispatch_transcription_task(task: Task, source: Path) -> None:
                 if not source:
                     print(f"Skipping transcription for {source} as WAV conversion failed")
                     return
-            transcribe_audio_file(source, task.language, overwrite=OverwriteMode.NEVER)
+            transcribe_audio_file_fire_and_forget(source, task.language, overwrite=OverwriteMode.NEVER)
         case _:
             raise ValueError(f'Unsupported transcriber type: {task.transcriber}')
 
