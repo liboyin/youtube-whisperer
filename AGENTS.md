@@ -84,15 +84,30 @@ The application has two main execution environments:
 6.  The corresponding adaptor (`WhisperSegmentAdaptor` or `AzureRecognitionResultAdaptor`) processes the output.
 7.  The result is formatted, deduplicated, and stored as an `.srt` file.
 
-### Future Architecture: Multi-Queue System
+### Future Architecture: Multi-Queue System with Azure Task Pool
 
-To better support concurrent workers and mixed workloads (e.g., GPU-bound local tasks and I/O-bound Azure tasks), the task queue system is planned to be updated to a more robust three-queue design.
+To better support concurrent workers and mixed workloads (e.g., GPU-bound local tasks and I/O-bound Azure tasks), the task queue system is planned to be updated to a more robust design combining a multi-queue system with a dedicated task pool for Azure requests.
 
 *   **Unprocessed Queue**: A central queue where all new tasks are initially submitted.
-*   **Processing Queue**: When a worker is ready, it atomically moves a task from the unprocessed queue to this queue using the `BRPOPLPUSH` command. This serves as a reliable claim on the task, ensuring that even if the worker crashes, the task is not lost and can be recovered.
-*   **Dead-Letter Queue**: If a task fails processing after a certain number of retries, it is moved to this queue for manual inspection. This prevents "poison pill" tasks from repeatedly blocking the system.
+*   **Processing Queue**: When a local worker is ready, it atomically moves a task from the unprocessed queue to this queue using the `BRPOPLPUSH` command. This serves as a reliable claim on the task, ensuring that even if the worker crashes, the task is not lost and can be recovered.
+*   **Dead-Letter Queue**: If a task fails processing, it is moved from the Processing Queue to this queue for manual inspection. This prevents "poison pill" tasks from repeatedly blocking the system.
 
-This design will enable multiple, specialized workers (e.g., GPU workers for local transcription, CPU workers for Azure tasks) to operate concurrently, improving both scalability and reliability.
+#### Azure Task Pool
+
+On top of this queueing system, a dedicated task pool manages Azure transcription tasks to control concurrency.
+
+*   **Concurrency Limiting**: The pool is implemented using a `ThreadPoolExecutor` with a fixed number of worker threads (e.g., 10). This prevents sending too many simultaneous requests to the Azure service, helping to avoid rate-limiting and manage costs.
+
+#### Combined Data Flow
+
+1.  A worker retrieves a task from the **Unprocessed Queue** and moves it to the **Processing Queue**.
+2.  If the task is for the `azure` transcriber, it is submitted to the **Azure Task Pool**.
+    *   If a thread is available in the pool, the task begins execution immediately.
+    *   If all threads are busy, the task waits in the executor's internal queue until a slot becomes free. The worker that submitted the task is not blocked and can continue processing other items if the system is designed to do so.
+3.  If an Azure task fails during its execution in the pool, the error is caught, and the task is moved from the **Processing Queue** to the **Dead-Letter Queue**.
+4.  If the task is for the `local` transcriber, it is executed directly by a worker (ideally one with dedicated GPU resources).
+
+This hybrid design enables specialized workers, improves scalability, and adds resilience by carefully managing both GPU-bound and I/O-bound workloads.
 
 ---
 
