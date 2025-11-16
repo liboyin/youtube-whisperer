@@ -182,7 +182,7 @@ def test_clean_assets(client, mock_assets_dir):
     (mock_assets_dir / "video.mp4").touch()
     (mock_assets_dir / "video.srt").touch()
     (mock_assets_dir / "video.mkv").touch()
-    (mock_assets_dir / "video.seg").touch()
+    (mock_assets_dir / "video.wav").touch()
     (mock_assets_dir / "video.mp3").touch()
     (mock_assets_dir / "another.mp4").touch()
 
@@ -191,10 +191,10 @@ def test_clean_assets(client, mock_assets_dir):
     removed_files = response.json()
     assert len(removed_files) == 3
     assert str(mock_assets_dir / "video.mkv") in removed_files
-    assert str(mock_assets_dir / "video.seg") in removed_files
+    assert str(mock_assets_dir / "video.wav") in removed_files
     assert str(mock_assets_dir / "video.mp3") in removed_files
     assert not (mock_assets_dir / "video.mkv").exists()
-    assert not (mock_assets_dir / "video.seg").exists()
+    assert not (mock_assets_dir / "video.wav").exists()
     assert not (mock_assets_dir / "video.mp3").exists()
     assert (mock_assets_dir / "video.mp4").exists()
     assert (mock_assets_dir / "video.srt").exists()
