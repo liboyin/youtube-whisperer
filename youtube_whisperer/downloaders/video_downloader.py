@@ -24,6 +24,7 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
         'outtmpl': str(target_path),
         'verbose': True,
+        'js_runtimes': {'node': {}},
     }
     if is_firefox_cookies_available():
         ydl_opts['cookiesfrombrowser'] = ('firefox',)
