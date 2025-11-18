@@ -10,7 +10,9 @@ if [ -v APT_PROXY ]; then
 fi
 
 apt-get update
-apt-get install -y --no-install-recommends ffmpeg git python3 python3-pip
+apt-get install -y --no-install-recommends curl ffmpeg git python3 python3-pip
+curl -fsSL https://deb.nodesource.com/setup_25.x | bash -
+apt-get install -y --no-install-recommends nodejs
 ln -s "$(which python3)" "$(dirname "$(which python3)")/python"
 apt-get autoremove -y
 apt-get clean

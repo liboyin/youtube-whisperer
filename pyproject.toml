@@ -21,7 +21,7 @@ dependencies = [
   "redis",
   "soundfile",
   "youtube-transcript-api",
-  "yt-dlp",
+  "yt-dlp[default]",
 ]
 
 [project.optional-dependencies]
