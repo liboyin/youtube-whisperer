@@ -1,8 +1,6 @@
-from pathlib import Path
 import pytest
 
-import youtube_whisperer.utils as testee
-from youtube_whisperer.utils import TranscriberMode, TranscriberType, get_redis_client, is_url, load_and_get_env_vars, redis_connection, strtobool
+from youtube_whisperer.utils import TranscriberMode, TranscriberType, get_redis_client, is_url, redis_connection, strtobool
 
 
 def test_transcriber_type_values():
@@ -82,39 +80,3 @@ def test_redis_connection(mocker):
     with redis_connection() as client:
         assert client is mock_client
     mock_client.close.assert_called_once()
-
-
-def test_load_and_get_env_vars_no_keys():
-    with pytest.raises(AssertionError):
-        load_and_get_env_vars()
-
-
-def test_load_and_get_env_vars_missing_env_file(mocker):
-    mocker.patch('dotenv.find_dotenv', return_value='')
-    with pytest.raises(FileNotFoundError):
-        load_and_get_env_vars('TEST_VAR')
-
-
-def test_load_and_get_env_vars_missing_env_var(mocker):
-    mocker.patch.object(testee, 'prepare_input_file', return_value=Path('/fake/.env'))
-    mocker.patch('dotenv.load_dotenv', return_value=True)
-    mocker.patch.dict('os.environ', {})
-    with pytest.raises(KeyError):
-        load_and_get_env_vars('NONEXISTENT_VAR')
-
-
-def test_load_and_get_env_vars_single_var(mocker):
-    mocker.patch.object(testee, 'prepare_input_file', return_value=Path('/fake/.env'))
-    mocker.patch('dotenv.load_dotenv', return_value=True)
-    mocker.patch.dict('os.environ', {'TEST_VAR': 'test_value'})
-    result = load_and_get_env_vars('TEST_VAR')
-    assert result == 'test_value'
-
-
-def test_load_and_get_env_vars_multiple_vars(mocker):
-    mocker.patch.object(testee, 'prepare_input_file', return_value=Path('/fake/.env'))
-    mocker.patch('dotenv.load_dotenv', return_value=True)
-    env_vars = {'VAR1': 'value1', 'VAR2': 'value2', 'VAR3': 'value3'}
-    mocker.patch.dict('os.environ', env_vars)
-    result = load_and_get_env_vars('VAR1', 'VAR2', 'VAR3')
-    assert result == ['value1', 'value2', 'value3']

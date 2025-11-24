@@ -1,3 +1,4 @@
+import os
 import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -8,9 +9,9 @@ import soundfile as sf
 
 from youtube_whisperer.adaptors.azure_adaptor import AzureRecognitionResultAdaptor
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.utils import load_and_get_env_vars
 
-AZURE_SPEECH_API_KEY, AZURE_SERVICE_REGION = load_and_get_env_vars("AZURE_SPEECH_API_KEY", "AZURE_SERVICE_REGION")
+AZURE_SPEECH_API_KEY = os.getenv("AZURE_SPEECH_API_KEY")
+AZURE_SERVICE_REGION = os.getenv("AZURE_SERVICE_REGION")
 THREAD_POOL = ThreadPoolExecutor(max_workers=10)
 
 

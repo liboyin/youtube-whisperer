@@ -18,6 +18,8 @@ services:
     volumes: *volumes
     environment:
       WHISPER_USE_CUDA: '0'
+    env_file:
+      - .env
     depends_on:
       - redis
     ports:
@@ -35,6 +37,8 @@ services:
     volumes: *volumes
     environment:
       WHISPER_USE_CUDA: '0'
+    env_file:
+      - .env
     depends_on:
       - redis
     entrypoint: ["python", "-m", "youtube_whisperer.worker"]

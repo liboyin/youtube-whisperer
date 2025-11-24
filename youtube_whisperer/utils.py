@@ -1,11 +1,9 @@
 from contextlib import contextmanager
-import dotenv
 from enum import Enum
 import os
 from pathlib import Path
 import re
 
-from pathlib_extensions import prepare_input_file
 import redis
 
 WHISPER_ASSETS_DIR = Path(os.getenv("WHISPER_ASSETS_DIR", Path(__file__).parents[1] / "assets"))
@@ -95,33 +93,3 @@ def redis_connection():
     finally:
         if client:
             client.close()
-
-
-def load_and_get_env_vars(*keys: str) -> str | list[str]:
-    """
-    Load all environment variables from .env file and return queried environment variable(s).
-
-    Args:
-        *keys: Environment variable names to query.
-
-    Returns:
-        str | list[str]: Queried environment variable(s). If only one variable is queried, return a single value. If multiple variables are queried, return a list.
-
-    Raises:
-        AssertionError: If no environment variable name is specified.
-        FileNotFoundError: If the .env file is not found.
-        KeyError: If a queried environment variable is not found.
-    """
-    assert keys
-    dotenv_path = dotenv.find_dotenv()
-    if not dotenv_path:
-        raise FileNotFoundError("No .env file found")
-    print("Located .env file:", dotenv_path)
-    if dotenv.load_dotenv(prepare_input_file(dotenv_path)):
-        print("At least one environment variable is set from", dotenv_path)
-    else:
-        print("No environment variable is set from", dotenv_path)
-    result = [os.environ[arg] for arg in keys]
-    if len(result) == 1:
-        return result[0]
-    return result
