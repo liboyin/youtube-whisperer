@@ -131,14 +131,22 @@ The FastAPI service will be available at `http://localhost:8000`.
 ## CLI Usage
 
 ```bash
-python -m youtube_whisperer <urls_or_files>
+# Download and transcribe a video
+python -m youtube_whisperer <video_url>
+
+# Transcribe a local file
+python -m youtube_whisperer local_audio.mp4
+
+# See all options
 python -m youtube_whisperer --help
 ```
 
 ## Development Environment
 
-*   Install dev dependencies:
+*   Install dependencies:
     ```bash
+    pip install .
+    # For development tools:
     pip install -e ".[dev]"
     ```
 *   Use the provided `.devcontainer` for a consistent development setup.
