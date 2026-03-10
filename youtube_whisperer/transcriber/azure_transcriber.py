@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -41,12 +42,11 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     audio_config = speechsdk.audio.AudioConfig(filename=str(input_file_path))
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     result_adaptor = AzureRecognitionResultAdaptor()
-    done = False
+    done = threading.Event()
 
     def stop_cb(evt):
-        nonlocal done
         print(f'CLOSED: {evt}')
-        done = True
+        done.set()
 
     def recognized_cb(evt):
         print(f'UPDATE: {evt}')
@@ -65,13 +65,10 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     print("Starting transcription on Azure...")
     speech_recognizer.start_continuous_recognition()
 
-    start_time = time.time()
     timeout_seconds = get_audio_duration_seconds(input_file_path)  # time out after audio duration
-    while not done:
-        if time.time() - start_time > timeout_seconds:
-            speech_recognizer.stop_continuous_recognition()
-            raise Exception(f"Transcription timed out after {timeout_seconds} seconds")
-        time.sleep(5)
+    if not done.wait(timeout_seconds):
+        speech_recognizer.stop_continuous_recognition()
+        raise Exception(f"Transcription timed out after {timeout_seconds} seconds")
 
     speech_recognizer.stop_continuous_recognition()
     result_adaptor.save_as_srt_file(output_file_path, deduplicate=True)
