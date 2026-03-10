@@ -10,26 +10,21 @@ from redis import StrictRedis
 
 from youtube_whisperer.fastapi.models import Task, AddTasksResponse, AddAssetsResponse
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, get_redis_client, is_url
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, REDIS_CLIENT, is_url
 
 app = FastAPI(title="YouTube Whisperer")
-
-
-def get_redis() -> Generator[StrictRedis, None, None]:
-    client = get_redis_client()
-    try:
-        yield client
-    finally:
-        if client:
-            client.close()
 
 
 def get_assets_dir() -> Path:
     return WHISPER_ASSETS_DIR
 
 
+def get_redis_client() -> Generator[StrictRedis, None, None]:
+    yield REDIS_CLIENT
+
+
 @app.get("/tasks", response_model=list[Task])
-async def get_tasks(redis_client: StrictRedis = Depends(get_redis)) -> list[Task]:
+async def get_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> list[Task]:
     """
     Retrieve all tasks from the Redis queue.
     """
@@ -55,7 +50,7 @@ def resolve_tasks(pattern: Task) -> list[Task]:
 
 
 @app.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
-async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(get_redis)) -> AddTasksResponse:
+async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(get_redis_client)) -> AddTasksResponse:
     """
     Add new tasks from patterns to the Redis queue.
 
@@ -84,7 +79,7 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
 
 
 @app.delete("/tasks", response_model=list[Task])
-async def clear_tasks(redis_client: StrictRedis = Depends(get_redis)) -> list[Task]:
+async def clear_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> list[Task]:
     """
     Clear all tasks from the Redis queue.
 

@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from enum import Enum
 import os
 from pathlib import Path
@@ -8,6 +7,9 @@ import redis
 
 WHISPER_ASSETS_DIR = Path(os.getenv("WHISPER_ASSETS_DIR", Path(__file__).parents[1] / "assets"))
 WHISPER_MODELS_DIR = Path(os.getenv("WHISPER_MODELS_DIR", Path.home() / ".whisper"))
+
+REDIS_POOL = redis.ConnectionPool(host='redis', socket_connect_timeout=5, health_check_interval=60)
+REDIS_CLIENT = redis.StrictRedis(connection_pool=REDIS_POOL)
 
 
 class TranscriberType(str, Enum):
@@ -58,38 +60,3 @@ def is_url(text: str) -> bool:
         bool: True if the input text is a valid URL, False otherwise.
     """
     return bool(re.match(r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)", text))
-
-
-def get_redis_client() -> redis.StrictRedis:
-    """
-    Returns a new, verified Redis connection.
-
-    Returns:
-        redis.StrictRedis: A Redis client instance.
-
-    Raises:
-        redis.ConnectionError: If there is an issue connecting to the Redis server.
-    """
-    client = redis.StrictRedis(
-        host='redis',
-        socket_connect_timeout=5,  # 5 second timeout for the initial connection
-        health_check_interval=60  # check connection health every 60 seconds
-    )
-    client.ping()  # raise a ConnectionError if the server is unreachable
-    return client
-
-
-@contextmanager
-def redis_connection():
-    """
-    Context manager for a Redis connection.
-
-    Yields:
-        redis.StrictRedis: A Redis client instance.
-    """
-    client = get_redis_client()
-    try:
-        yield client
-    finally:
-        if client:
-            client.close()

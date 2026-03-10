@@ -14,7 +14,7 @@ from youtube_whisperer.utils import TranscriberMode, TranscriberType
 def mock_redis(mocker):
     """Fixture to mock the Redis client and connection context manager."""
     mock_redis_client = mocker.MagicMock()
-    mocker.patch.object(testee, 'redis_connection').return_value.__enter__.return_value = mock_redis_client
+    mocker.patch.object(testee, 'REDIS_CLIENT', mock_redis_client)
     return mock_redis_client
 
 

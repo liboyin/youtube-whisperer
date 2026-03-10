@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from redis import StrictRedis
 from unittest.mock import MagicMock, patch
 
-from youtube_whisperer.fastapi.app import app, get_redis, get_assets_dir, resolve_tasks
+from youtube_whisperer.fastapi.app import app, get_redis_client, get_assets_dir, resolve_tasks
 from youtube_whisperer.fastapi.models import Task, TranscriberMode
 
 
@@ -69,7 +69,7 @@ def mock_assets_dir(tmp_path):
 
 @pytest.fixture(autouse=True)
 def override_dependencies(mock_redis_client, mock_assets_dir):
-    app.dependency_overrides[get_redis] = lambda: mock_redis_client
+    app.dependency_overrides[get_redis_client] = lambda: mock_redis_client
     app.dependency_overrides[get_assets_dir] = lambda: mock_assets_dir
     yield
     app.dependency_overrides = {}

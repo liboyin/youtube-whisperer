@@ -13,7 +13,7 @@ from youtube_whisperer.fastapi.models import Task
 from youtube_whisperer.transcriber.azure_transcriber import transcribe_audio_file_fire_and_forget
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
 from youtube_whisperer.transcriber.waveform_loader import save_as_wav_file
-from youtube_whisperer.utils import TranscriberType, redis_connection, is_url
+from youtube_whisperer.utils import TranscriberType, REDIS_CLIENT, is_url
 
 
 def yield_task(client: StrictRedis, poll_interval_seconds: int = 5) -> Generator[Task, None, None]:
@@ -98,25 +98,24 @@ def process_queue(poll_interval_seconds: int = 5) -> None:
     """
     Continuously monitors the Redis 'tasks' queue and processes incoming transcription tasks.
     """
-    with redis_connection() as client:
-        print("Worker started")
-        for task in yield_task(client, poll_interval_seconds):
-            delete_task = False
-            try:
-                waveform_file_path, transcript_found = resolve_waveform_file_path(task)
-                if not transcript_found:
-                    dispatch_transcription_task(task, waveform_file_path)
-                delete_task = True
-            # validate_gpu_health_or_exit() may raise SystemExit, which is a subclass of BaseException instead of Exception
-            except Exception as e:
-                print(f"An error occurred while processing task {task}: {e}")
-                delete_task = True  # Remove the task from the queue to prevent infinite retries.
-            finally:
-                # delete_task is only False if GPU health check failed
-                if delete_task:
-                    # Assuming a single worker, we can safely LPOP the head.
-                    client.lpop('tasks')
-                    print(f"Removed task: {task}")
+    print("Worker started")
+    for task in yield_task(REDIS_CLIENT, poll_interval_seconds):
+        delete_task = False
+        try:
+            waveform_file_path, transcript_found = resolve_waveform_file_path(task)
+            if not transcript_found:
+                dispatch_transcription_task(task, waveform_file_path)
+            delete_task = True
+        # validate_gpu_health_or_exit() may raise SystemExit, which is a subclass of BaseException instead of Exception
+        except Exception as e:
+            print(f"An error occurred while processing task {task}: {e}")
+            delete_task = True  # Remove the task from the queue to prevent infinite retries.
+        finally:
+            # delete_task is only False if GPU health check failed
+            if delete_task:
+                # Assuming a single worker, we can safely LPOP the head.
+                REDIS_CLIENT.lpop('tasks')
+                print(f"Removed task: {task}")
 
 
 if __name__ == "__main__":

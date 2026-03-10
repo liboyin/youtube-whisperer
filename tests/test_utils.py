@@ -1,6 +1,6 @@
 import pytest
 
-from youtube_whisperer.utils import TranscriberMode, TranscriberType, get_redis_client, is_url, redis_connection, strtobool
+from youtube_whisperer.utils import TranscriberMode, TranscriberType, is_url, strtobool
 
 
 def test_transcriber_type_values():
@@ -62,21 +62,3 @@ def test_strtobool_invalid(input_text):
 ])
 def test_is_url(input_text, expected):
     assert is_url(input_text) == expected
-
-
-def test_get_redis_client(mocker):
-    mock_redis = mocker.patch('redis.StrictRedis')
-    mock_client = mock_redis.return_value
-    mock_client.ping.return_value = True
-    client = get_redis_client()
-    mock_redis.assert_called_once_with(host='redis', socket_connect_timeout=5, health_check_interval=60)
-    mock_client.ping.assert_called_once()
-    assert client == mock_client
-
-
-def test_redis_connection(mocker):
-    mock_client = mocker.MagicMock()
-    mocker.patch('youtube_whisperer.utils.get_redis_client', return_value=mock_client)
-    with redis_connection() as client:
-        assert client is mock_client
-    mock_client.close.assert_called_once()
