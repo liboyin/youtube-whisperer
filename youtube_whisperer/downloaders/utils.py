@@ -18,6 +18,8 @@ def get_video_title(url: str) -> str:
         'verbose': True,
         'js_runtimes': {'deno': {}},
     }
+    if is_firefox_cookies_available():
+        ydl_opts['cookiesfrombrowser'] = ('firefox',)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=False)['title']
 
