@@ -10,9 +10,8 @@ if [ -v APT_PROXY ]; then
 fi
 
 apt-get update
-apt-get install -y --no-install-recommends curl ffmpeg git python3 python3-pip
-curl -fsSL https://deb.nodesource.com/setup_25.x | bash -
-apt-get install -y --no-install-recommends nodejs
+apt-get install -y --no-install-recommends curl ffmpeg git python3 python3-pip unzip
+export DENO_INSTALL=/usr/local && curl -fsSL https://deno.land/install.sh | sh
 ln -s "$(which python3)" "$(dirname "$(which python3)")/python"
 apt-get autoremove -y
 apt-get clean

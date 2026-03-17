@@ -16,7 +16,7 @@ def get_video_title(url: str) -> str:
     ydl_opts = {
         'simulate': True,
         'verbose': True,
-        'js_runtimes': {'node': {}},
+        'js_runtimes': {'deno': {}},
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=False)['title']

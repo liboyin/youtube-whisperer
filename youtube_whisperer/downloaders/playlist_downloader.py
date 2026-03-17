@@ -23,7 +23,7 @@ def yield_video_urls_from_playlist(url: str) -> Generator[str, None, None]:
     ydl_opts: dict[str, Any] = {
         'extract_flat': True,
         'verbose': True,
-        'js_runtimes': {'node': {}},
+        'js_runtimes': {'deno': {}},
     }
     if is_firefox_cookies_available():
         ydl_opts['cookiesfrombrowser'] = ('firefox',)
