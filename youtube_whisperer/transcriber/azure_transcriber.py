@@ -1,8 +1,7 @@
 import os
-import time
 import threading
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 
 import azure.cognitiveservices.speech as speechsdk
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
@@ -75,7 +74,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     return output_file_path
 
 
-def transcribe_audio_file_fire_and_forget(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
+def transcribe_audio_file_fire_and_forget(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Future:
     """
     Transcribes an audio file using Azure AI Speech service in a separate thread. Does not block.
 
@@ -86,8 +85,18 @@ def transcribe_audio_file_fire_and_forget(input_file_path: Path, language: Langu
         language (LanguageCode): The language of the audio file.
         output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
         overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
+
+    Returns:
+        Future: The future representing the transcription task. Callers may ignore this for true fire-and-forget behaviour, or call `.result()` to block and surface exceptions.
     """
-    THREAD_POOL.submit(transcribe_audio_file, input_file_path, language, output_file_path, overwrite)
+    def _log_error(future):
+        if e := future.exception():
+            print(f"Transcription failed for {input_file_path}: {e}")
+
+    future = THREAD_POOL.submit(transcribe_audio_file, input_file_path, language, output_file_path, overwrite)
+    print(f"Transcription task submitted for {input_file_path}. future: {future}")
+    future.add_done_callback(_log_error)
+    return future
 
 
 if __name__ == "__main__":
