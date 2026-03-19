@@ -99,7 +99,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Waveform file paths to transcribe.")
-    parser.add_argument("-l", "--language", type=LanguageCode, help="Language to transcribe waveform files.")
+    parser.add_argument("-l", "--language", type=LanguageCode.from_str, help="Language to transcribe waveform files.")
     parser.add_argument("-m", "--mode", type=TranscriberMode, choices=TranscriberMode.values(), default=TranscriberMode.TRANSCRIBE, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
     parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
     args = parser.parse_args()

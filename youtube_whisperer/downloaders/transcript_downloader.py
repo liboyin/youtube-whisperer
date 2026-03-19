@@ -152,7 +152,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs='+', metavar='url', help="URLs of videos to download transcripts for.")
-    parser.add_argument("-l", "--language", type=LanguageCode, help="Requested transcript language to download.")
+    parser.add_argument("-l", "--language", type=LanguageCode.from_str, help="Requested transcript language to download.")
     parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
     args = parser.parse_args()
     for url in args.urls:

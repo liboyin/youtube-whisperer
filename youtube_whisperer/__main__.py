@@ -65,7 +65,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("sources", nargs='+', metavar='source', help="Waveform file paths to transcribe/translate, or video/playlist URLs to download and transcribe/translate.")
-    parser.add_argument("-l", "--language", type=LanguageCode, help="Language code for transcript download and transcription/translation.")
+    parser.add_argument("-l", "--language", type=LanguageCode.from_str, help="Language code for transcript download and transcription/translation.")
     parser.add_argument("-t", "--transcriber", type=TranscriberType, choices=TranscriberType.values(), default=TranscriberType.LOCAL, help="Transcriber to use for transcription. Defaults to `local`.")
     parser.add_argument("-m", "--mode", type=TranscriberMode, choices=TranscriberMode.values(), default=TranscriberMode.TRANSCRIBE, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
     parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
