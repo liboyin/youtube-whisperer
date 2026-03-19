@@ -12,7 +12,7 @@ from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 
 AZURE_SPEECH_API_KEY = os.getenv("AZURE_SPEECH_API_KEY")
 AZURE_SERVICE_REGION = os.getenv("AZURE_SERVICE_REGION")
-THREAD_POOL = ThreadPoolExecutor(max_workers=10)
+THREAD_POOL = ThreadPoolExecutor(max_workers=5)
 
 
 def get_audio_duration_seconds(audio_file: Path) -> float:
@@ -64,7 +64,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     print("Starting transcription on Azure...")
     speech_recognizer.start_continuous_recognition()
 
-    timeout_seconds = get_audio_duration_seconds(input_file_path)  # time out after audio duration
+    timeout_seconds = get_audio_duration_seconds(input_file_path) * 1.5  # time out after 1.5x audio duration
     if not done.wait(timeout_seconds):
         speech_recognizer.stop_continuous_recognition()
         raise Exception(f"Transcription timed out after {timeout_seconds} seconds")
@@ -78,7 +78,7 @@ def transcribe_audio_file_fire_and_forget(input_file_path: Path, language: Langu
     """
     Transcribes an audio file using Azure AI Speech service in a separate thread. Does not block.
 
-    Tasks are submitted to a ThreadPoolExecutor with a maximum of 10 concurrent workers.
+    Tasks are submitted to a ThreadPoolExecutor with a maximum of 5 concurrent workers.
 
     Args:
         input_file_path (Path): The path to the audio file to transcribe.
