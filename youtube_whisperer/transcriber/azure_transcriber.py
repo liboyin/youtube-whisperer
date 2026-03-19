@@ -42,6 +42,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     result_adaptor = AzureRecognitionResultAdaptor()
     done = threading.Event()
+    transcription_error: Exception | None = None
 
     def stop_cb(evt):
         print(f'CLOSED: {evt}')
@@ -53,9 +54,11 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
             result_adaptor.append(evt.result)
 
     def canceled_cb(evt):
+        nonlocal transcription_error
         print(f'CANCELED: {evt}')
         if evt.cancellation_details.reason == speechsdk.CancellationReason.Error:
-            raise Exception(evt.cancellation_details.error_details)
+            transcription_error = RuntimeError(evt.cancellation_details.error_details)
+        done.set()
 
     speech_recognizer.recognized.connect(recognized_cb)
     speech_recognizer.canceled.connect(canceled_cb)
@@ -65,11 +68,15 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     speech_recognizer.start_continuous_recognition()
 
     timeout_seconds = get_audio_duration_seconds(input_file_path) * 1.5  # time out after 1.5x audio duration
-    if not done.wait(timeout_seconds):
+    try:
+        if not done.wait(timeout_seconds):
+            raise TimeoutError(f"Transcription timed out after {timeout_seconds} seconds")
+    finally:
         speech_recognizer.stop_continuous_recognition()
-        raise Exception(f"Transcription timed out after {timeout_seconds} seconds")
 
-    speech_recognizer.stop_continuous_recognition()
+    if transcription_error is not None:
+        raise transcription_error
+
     result_adaptor.save_as_srt_file(output_file_path, deduplicate=True)
     return output_file_path
 
