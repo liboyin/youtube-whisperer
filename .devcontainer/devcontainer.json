@@ -17,17 +17,18 @@
     "customizations": {
         "vscode": {
             "extensions": [
+                "anthropic.claude-code",
                 "charliermarsh.ruff",
-                "github.copilot",
-                "github.copilot-chat",
                 "mhutchie.git-graph",
                 "ms-python.debugpy",
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ms-vscode.live-server",
+                "openai.chatgpt",
                 "ryu1kn.partial-diff",
                 "streetsidesoftware.code-spell-checker",
-                "tamasfe.even-better-toml"
+                "tamasfe.even-better-toml",
+                "yzhang.markdown-all-in-one"
             ]
         }
     }
