@@ -197,3 +197,12 @@ python -m youtube_whisperer --help
 # Summary
 
 `youtube-whisperer` is a scalable transcription service supporting both CLI and web modes. It integrates YouTube downloaders with both local (Whisper) and cloud-based (Azure) transcription engines. With automatic fallback from transcript downloads to transcription, it provides a flexible and efficient solution for large-scale subtitle generation.
+
+---
+
+# Agent Guidelines
+
+*   **Isolated Workspaces**: Each agent must set up an isolated workspace for its tasks using Git Worktree. This prevents conflicts between concurrent agents working on the same repository.
+    *   Create a worktree: `git worktree add <path-to-new-worktree> <new-branch-name>`
+    *   Perform all task execution, file creation, and modifications within this new isolated worktree directory.
+    *   When the task is completed, remove the worktree: `git worktree remove <path-to-worktree>`
