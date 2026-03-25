@@ -36,3 +36,24 @@ def test_save_as_srt_file(tmp_path):
     assert output_file_path.is_file()
     expected = "1\n00:00:00,000 --> 00:00:01,240\nSegment\n\n2\n00:00:01,240 --> 00:00:04,240\nto\n\n3\n00:00:04,240 --> 00:00:06,240\nSRT\n"
     assert output_file_path.read_text() == expected
+
+
+def test_save_as_srt_file_with_deduplication(tmp_path):
+    duplicate_segments = [
+        Segment(id=1, seek=0, start=0.0, end=1.0, text='Same', tokens=[], temperature=0.0, avg_logprob=0.0, compression_ratio=1.0, no_speech_prob=0.0, words=None),
+        Segment(id=2, seek=0, start=1.0, end=2.0, text='Same', tokens=[], temperature=0.0, avg_logprob=0.0, compression_ratio=1.0, no_speech_prob=0.0, words=None),
+    ]
+    handler = WhisperSegmentAdaptor(duplicate_segments)
+    output_file_path = tmp_path / "output.srt"
+    handler.save_as_srt_file(output_file_path, deduplicate=True, overwrite=OverwriteMode.ALWAYS)
+    assert output_file_path.is_file()
+    # Two identical segments should be merged into one
+    assert output_file_path.read_text().count("Same") == 1
+
+
+def test_save_as_srt_file_skips_existing_when_overwrite_never(tmp_path):
+    output_file_path = tmp_path / "output.srt"
+    output_file_path.write_text("original content")
+    handler = WhisperSegmentAdaptor(SEGMENTS)
+    handler.save_as_srt_file(output_file_path, overwrite=OverwriteMode.NEVER)
+    assert output_file_path.read_text() == "original content"

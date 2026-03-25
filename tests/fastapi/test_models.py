@@ -41,3 +41,19 @@ def test_task_mode_validator():
     assert task.mode == TranscriberMode.TRANSLATE
     with pytest.raises(ValidationError):
         testee.Task(mode="unknown")
+
+
+def test_task_language_accepts_repr_string():
+    task = testee.Task(language="LanguageCode(source='en-us', target=None)")
+    assert task.language == LanguageCode("en-us")
+
+
+def test_task_language_rejects_non_string_value():
+    # Pydantic v2 does not wrap TypeError from plain validators, so it propagates directly
+    with pytest.raises(TypeError, match="Unexpected language"):
+        testee.Task(language=123)
+
+
+def test_task_model_json_schema_includes_language_field():
+    schema = testee.Task.model_json_schema()
+    assert "language" in schema.get("properties", {})

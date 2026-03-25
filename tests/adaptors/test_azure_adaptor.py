@@ -44,3 +44,12 @@ def test_save_as_srt_file(tmp_path):
     result = output_file.read_text()
     expected = "1\n00:00:01,000 --> 00:00:03,000\nHello\n"
     assert result == expected
+
+
+def test_save_as_srt_file_skips_existing_when_overwrite_never(tmp_path):
+    output_file = tmp_path / "test.srt"
+    output_file.write_text("original content")
+    adaptor = AzureRecognitionResultAdaptor()
+    adaptor.append(MockSpeechRecognitionResult(offset=10_000_000, duration=20_000_000, text="Hello"))
+    adaptor.save_as_srt_file(output_file, overwrite=OverwriteMode.NEVER)
+    assert output_file.read_text() == "original content"

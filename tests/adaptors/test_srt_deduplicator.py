@@ -114,3 +114,25 @@ def test_deduplicate_srt_file(temp_srt_file: Path):
         Second line.
         """)
     assert temp_srt_file.read_text().strip() == expected.strip()
+
+
+def test_deduplicate_srt_file_returns_early_when_overwrite_never(tmp_path):
+    srt_file = tmp_path / "test.srt"
+    srt_file.write_text("1\n00:00:01,000 --> 00:00:02,000\nOriginal\n\n")
+    original_content = srt_file.read_text()
+    result = deduplicate_srt_file(srt_file, overwrite=OverwriteMode.NEVER)
+    assert result is srt_file
+    assert srt_file.read_text() == original_content
+
+
+def test_main_deduplicates_given_paths(mocker, tmp_path):
+    from types import SimpleNamespace
+    from youtube_whisperer.adaptors.srt_deduplicator import main
+    srt_file = tmp_path / "test.srt"
+    args = SimpleNamespace(paths=[srt_file], overwrite=OverwriteMode.ALWAYS)
+    mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
+    mock_dedup = mocker.patch("youtube_whisperer.adaptors.srt_deduplicator.deduplicate_srt_file")
+
+    main()
+
+    mock_dedup.assert_called_once_with(srt_file, overwrite=OverwriteMode.ALWAYS)
