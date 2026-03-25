@@ -32,6 +32,7 @@ dev = [
   "pytest-cov",
   "pytest-mock",
   "pytest-randomly",
+  "ruff",
 ]
 
 [tool.mypy]
