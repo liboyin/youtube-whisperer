@@ -102,11 +102,11 @@ def test_transcribe_audio_file_surfaces_azure_cancellation_error_without_timing_
     language = mock.Mock(get_source_as_BCP=mock.Mock(return_value="en-us"))
     adaptor = mock.Mock()
 
-    with mock.patch.object(testee.azure_transcriber, "speechsdk", fake_speechsdk), \
-         mock.patch.object(testee.azure_transcriber, "get_audio_duration_seconds", return_value=0.01), \
-         mock.patch.object(testee.azure_transcriber, "AzureRecognitionResultAdaptor", return_value=adaptor):
+    with mock.patch.object(testee, "speechsdk", fake_speechsdk), \
+         mock.patch.object(testee, "get_audio_duration_seconds", return_value=0.01), \
+         mock.patch.object(testee, "AzureRecognitionResultAdaptor", return_value=adaptor):
         with pytest.raises(RuntimeError, match=error_details):
-            testee.azure_transcriber.transcribe_audio_file(Path("audio.wav"), language)
+            testee.transcribe_audio_file(Path("audio.wav"), language)
 
     assert fake_speechsdk.created_recognizer is not None
     assert fake_speechsdk.created_recognizer.stop_calls == 1
