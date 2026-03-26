@@ -1,8 +1,8 @@
 from faster_whisper.transcribe import Segment
 from pathlib_extensions import OverwriteMode
 
+import youtube_whisperer.adaptors.whisper_adaptor as testee
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock
-from youtube_whisperer.adaptors.whisper_adaptor import WhisperSegmentAdaptor
 
 SEGMENTS = [
     Segment(id=1, seek=2704, start=0.0, end=1.24, text='Segment', tokens=[50365, 4511], temperature=0.0, avg_logprob=-0.309651929245898, compression_ratio=1.2782608695652173, no_speech_prob=0.72765052318573, words=None),
@@ -12,7 +12,7 @@ SEGMENTS = [
 
 
 def test_segment_to_srt_block():
-    srt_block = WhisperSegmentAdaptor.segment_to_srt_block(SEGMENTS[0])
+    srt_block = testee.WhisperSegmentAdaptor.segment_to_srt_block(SEGMENTS[0])
     assert isinstance(srt_block, SrtBlock)
     assert srt_block.start_time == '00:00:00,000'
     assert srt_block.end_time == '00:00:01,240'
@@ -20,7 +20,7 @@ def test_segment_to_srt_block():
 
 
 def test_yield_as_srt_blocks():
-    handler = WhisperSegmentAdaptor(SEGMENTS)
+    handler = testee.WhisperSegmentAdaptor(SEGMENTS)
     srt_blocks = list(handler.yield_as_srt_blocks())
     assert len(srt_blocks) == 3
     assert all(isinstance(x, SrtBlock) for x in srt_blocks)
@@ -30,7 +30,7 @@ def test_yield_as_srt_blocks():
 
 
 def test_save_as_srt_file(tmp_path):
-    handler = WhisperSegmentAdaptor(SEGMENTS)
+    handler = testee.WhisperSegmentAdaptor(SEGMENTS)
     output_file_path = tmp_path / "output.srt"
     handler.save_as_srt_file(output_file_path, deduplicate=False, overwrite=OverwriteMode.ALWAYS)
     assert output_file_path.is_file()
@@ -43,7 +43,7 @@ def test_save_as_srt_file_with_deduplication(tmp_path):
         Segment(id=1, seek=0, start=0.0, end=1.0, text='Same', tokens=[], temperature=0.0, avg_logprob=0.0, compression_ratio=1.0, no_speech_prob=0.0, words=None),
         Segment(id=2, seek=0, start=1.0, end=2.0, text='Same', tokens=[], temperature=0.0, avg_logprob=0.0, compression_ratio=1.0, no_speech_prob=0.0, words=None),
     ]
-    handler = WhisperSegmentAdaptor(duplicate_segments)
+    handler = testee.WhisperSegmentAdaptor(duplicate_segments)
     output_file_path = tmp_path / "output.srt"
     handler.save_as_srt_file(output_file_path, deduplicate=True, overwrite=OverwriteMode.ALWAYS)
     assert output_file_path.is_file()
@@ -54,6 +54,6 @@ def test_save_as_srt_file_with_deduplication(tmp_path):
 def test_save_as_srt_file_skips_existing_when_overwrite_never(tmp_path):
     output_file_path = tmp_path / "output.srt"
     output_file_path.write_text("original content")
-    handler = WhisperSegmentAdaptor(SEGMENTS)
+    handler = testee.WhisperSegmentAdaptor(SEGMENTS)
     handler.save_as_srt_file(output_file_path, overwrite=OverwriteMode.NEVER)
     assert output_file_path.read_text() == "original content"

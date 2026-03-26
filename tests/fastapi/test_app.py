@@ -3,22 +3,15 @@ from fastapi.testclient import TestClient
 from redis import StrictRedis
 from unittest.mock import MagicMock, patch
 
-from youtube_whisperer.fastapi.app import (
-    app,
-    copy_task_with_source,
-    get_assets_dir,
-    get_redis_client,
-    resolve_task_sources,
-    resolve_tasks,
-)
+import youtube_whisperer.fastapi.app as testee
 from youtube_whisperer.fastapi.models import Task, TranscriberMode
 
 
 @pytest.fixture
 def mock_dependencies(mocker):
-    mock_is_url = mocker.patch('youtube_whisperer.fastapi.app.is_url')
-    mock_yield_urls = mocker.patch('youtube_whisperer.fastapi.app.yield_flattened_video_urls')
-    mock_glob = mocker.patch('youtube_whisperer.fastapi.app.glob.glob')
+    mock_is_url = mocker.patch.object(testee, 'is_url')
+    mock_yield_urls = mocker.patch.object(testee, 'yield_flattened_video_urls')
+    mock_glob = mocker.patch.object(testee.glob, 'glob')
     return mock_is_url, mock_yield_urls, mock_glob
 
 
@@ -38,15 +31,15 @@ def mock_assets_dir(tmp_path):
 
 @pytest.fixture(autouse=True)
 def override_dependencies(mock_redis_client, mock_assets_dir):
-    app.dependency_overrides[get_redis_client] = lambda: mock_redis_client
-    app.dependency_overrides[get_assets_dir] = lambda: mock_assets_dir
+    testee.app.dependency_overrides[testee.get_redis_client] = lambda: mock_redis_client
+    testee.app.dependency_overrides[testee.get_assets_dir] = lambda: mock_assets_dir
     yield
-    app.dependency_overrides = {}
+    testee.app.dependency_overrides = {}
 
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(testee.app)
 
 
 def test_get_tasks_empty(client, mock_redis_client):
@@ -76,7 +69,7 @@ def test_resolve_task_sources_with_url(mock_dependencies):
     mock_is_url.return_value = True
     mock_yield_urls.return_value = ['http://example.com/video1', 'http://example.com/video2']
 
-    result = resolve_task_sources('http://example.com/playlist')
+    result = testee.resolve_task_sources('http://example.com/playlist')
 
     assert result == ['http://example.com/video1', 'http://example.com/video2']
     mock_is_url.assert_called_once_with('http://example.com/playlist')
@@ -88,7 +81,7 @@ def test_resolve_task_sources_with_local_path(mock_dependencies):
     mock_is_url.return_value = False
     mock_glob.return_value = ['/path/to/file1.mkv', '/path/to/file2.mkv']
 
-    result = resolve_task_sources('/path/to/*.mkv')
+    result = testee.resolve_task_sources('/path/to/*.mkv')
 
     assert result == ['/path/to/file1.mkv', '/path/to/file2.mkv']
     mock_is_url.assert_called_once_with('/path/to/*.mkv')
@@ -101,7 +94,7 @@ def test_resolve_task_sources_no_match(mock_dependencies):
     mock_yield_urls.return_value = []
     mock_glob.return_value = []
 
-    result = resolve_task_sources('nonexistent_pattern')
+    result = testee.resolve_task_sources('nonexistent_pattern')
 
     assert result == []
     mock_is_url.assert_called_once_with('nonexistent_pattern')
@@ -111,7 +104,7 @@ def test_resolve_task_sources_no_match(mock_dependencies):
 def test_copy_task_with_source_preserves_non_source_fields():
     pattern = Task(source='http://example.com/playlist', language='en', mode=TranscriberMode.TRANSLATE)
 
-    result = copy_task_with_source(pattern, 'http://example.com/video1')
+    result = testee.copy_task_with_source(pattern, 'http://example.com/video1')
 
     assert result.source == 'http://example.com/video1'
     assert result.language == pattern.language
@@ -121,12 +114,13 @@ def test_copy_task_with_source_preserves_non_source_fields():
 
 def test_resolve_tasks_builds_tasks_from_resolved_sources(mocker):
     pattern = Task(source='http://example.com/playlist', language='en')
-    mock_resolve_sources = mocker.patch(
-        'youtube_whisperer.fastapi.app.resolve_task_sources',
+    mock_resolve_sources = mocker.patch.object(
+        testee,
+        'resolve_task_sources',
         return_value=['http://example.com/video1', 'http://example.com/video2'],
     )
 
-    result = resolve_tasks(pattern)
+    result = testee.resolve_tasks(pattern)
 
     assert [task.source for task in result] == ['http://example.com/video1', 'http://example.com/video2']
     assert all(task.language == pattern.language for task in result)
@@ -137,7 +131,7 @@ def test_add_tasks(client, mock_redis_client):
     tasks_to_add = [
         {"source": "http://example.com/video1", "language": "en", "mode": "transcribe"}
     ]
-    with patch('youtube_whisperer.fastapi.app.resolve_tasks') as mock_resolve_tasks:
+    with patch.object(testee, 'resolve_tasks') as mock_resolve_tasks:
         resolved_task = Task(source="http://example.com/video1", language="en", mode=TranscriberMode.TRANSCRIBE)
         mock_resolve_tasks.return_value = [resolved_task]
         response = client.post("/tasks", json=tasks_to_add)
@@ -153,7 +147,7 @@ def test_add_tasks_failed_resolution(client, mock_redis_client):
     tasks_to_add = [
         {"source": "nonexistent", "language": "en", "mode": "transcribe"}
     ]
-    with patch('youtube_whisperer.fastapi.app.resolve_tasks') as mock_resolve_tasks:
+    with patch.object(testee, 'resolve_tasks') as mock_resolve_tasks:
         mock_resolve_tasks.return_value = []
         response = client.post("/tasks", json=tasks_to_add)
     assert response.status_code == 201

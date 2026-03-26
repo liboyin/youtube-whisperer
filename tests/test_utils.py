@@ -1,14 +1,14 @@
 import pytest
 
-from youtube_whisperer.utils import TranscriberMode, TranscriberType, is_url, strtobool
+import youtube_whisperer.utils as testee
 
 
 def test_transcriber_type_values():
-    assert TranscriberType.values() == ('local', 'azure')
+    assert testee.TranscriberType.values() == ('local', 'azure')
 
 
 def test_transcriber_mode_values():
-    assert TranscriberMode.values() == ('transcribe', 'translate')
+    assert testee.TranscriberMode.values() == ('transcribe', 'translate')
 
 
 @pytest.mark.parametrize("input_text, expected", [
@@ -20,7 +20,7 @@ def test_transcriber_mode_values():
     ("1", True),
 ])
 def test_strtobool_true(input_text, expected):
-    assert strtobool(input_text) is expected
+    assert testee.strtobool(input_text) is expected
 
 
 @pytest.mark.parametrize("input_text, expected", [
@@ -32,7 +32,7 @@ def test_strtobool_true(input_text, expected):
     ("0", False),
 ])
 def test_strtobool_false(input_text, expected):
-    assert strtobool(input_text) is expected
+    assert testee.strtobool(input_text) is expected
 
 
 @pytest.mark.parametrize("input_text", [
@@ -43,7 +43,7 @@ def test_strtobool_false(input_text, expected):
 ])
 def test_strtobool_invalid(input_text):
     with pytest.raises(ValueError):
-        strtobool(input_text)
+        testee.strtobool(input_text)
 
 
 @pytest.mark.parametrize("input_text, expected", [
@@ -61,4 +61,4 @@ def test_strtobool_invalid(input_text):
     ("not a url", False),
 ])
 def test_is_url(input_text, expected):
-    assert is_url(input_text) == expected
+    assert testee.is_url(input_text) == expected

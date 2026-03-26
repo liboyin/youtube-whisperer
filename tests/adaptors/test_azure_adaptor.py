@@ -1,6 +1,6 @@
 from pathlib_extensions import OverwriteMode
 
-from youtube_whisperer.adaptors.azure_adaptor import AzureRecognitionResultAdaptor
+import youtube_whisperer.adaptors.azure_adaptor as testee
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock
 
 
@@ -14,7 +14,7 @@ class MockSpeechRecognitionResult:
 def test_recognition_result_to_srt_block():
     # 1 second offset, 2 seconds duration
     segment = MockSpeechRecognitionResult(offset=10_000_000, duration=20_000_000, text="Hello world")
-    result = AzureRecognitionResultAdaptor.recognition_result_to_srt_block(segment)
+    result = testee.AzureRecognitionResultAdaptor.recognition_result_to_srt_block(segment)
     expected = SrtBlock(
         start_time="00:00:01,000",
         end_time="00:00:03,000",
@@ -24,7 +24,7 @@ def test_recognition_result_to_srt_block():
 
 
 def test_yield_as_srt_blocks():
-    adaptor = AzureRecognitionResultAdaptor()
+    adaptor = testee.AzureRecognitionResultAdaptor()
     adaptor.append(MockSpeechRecognitionResult(offset=10_000_000, duration=20_000_000, text="First line"))
     adaptor.append(MockSpeechRecognitionResult(offset=30_000_000, duration=15_000_000, text="Second line"))
     result = list(adaptor.yield_as_srt_blocks())
@@ -37,7 +37,7 @@ def test_yield_as_srt_blocks():
 
 def test_save_as_srt_file(tmp_path):
     output_file = tmp_path / "test.srt"
-    adaptor = AzureRecognitionResultAdaptor()
+    adaptor = testee.AzureRecognitionResultAdaptor()
     adaptor.append(MockSpeechRecognitionResult(offset=10_000_000, duration=20_000_000, text="Hello"))
     adaptor.save_as_srt_file(output_file, overwrite=OverwriteMode.ALWAYS)
     assert output_file.is_file()
@@ -49,7 +49,7 @@ def test_save_as_srt_file(tmp_path):
 def test_save_as_srt_file_skips_existing_when_overwrite_never(tmp_path):
     output_file = tmp_path / "test.srt"
     output_file.write_text("original content")
-    adaptor = AzureRecognitionResultAdaptor()
+    adaptor = testee.AzureRecognitionResultAdaptor()
     adaptor.append(MockSpeechRecognitionResult(offset=10_000_000, duration=20_000_000, text="Hello"))
     adaptor.save_as_srt_file(output_file, overwrite=OverwriteMode.NEVER)
     assert output_file.read_text() == "original content"

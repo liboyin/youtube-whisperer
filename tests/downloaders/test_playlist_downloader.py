@@ -1,14 +1,15 @@
 import inspect
 
-from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
+import youtube_whisperer.downloaders.playlist_downloader as testee
 
 
 def test_yield_flattened_video_urls(mocker):
-    mock_yield_playlist = mocker.patch(
-        'youtube_whisperer.downloaders.playlist_downloader.yield_video_urls_from_playlist',
-        return_value=iter(['video1', 'video2']) 
+    mock_yield_playlist = mocker.patch.object(
+        testee,
+        'yield_video_urls_from_playlist',
+        return_value=iter(['video1', 'video2'])
     )
-    result = yield_flattened_video_urls([
+    result = testee.yield_flattened_video_urls([
         'https://youtube.com/watch?v=direct1',
         'https://youtube.com/playlist?list=123',
         'https://youtube.com/watch?v=direct2',

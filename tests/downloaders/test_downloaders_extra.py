@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
+import youtube_whisperer.downloaders as testee
 import youtube_whisperer.downloaders.playlist_downloader as playlist_testee
 import youtube_whisperer.downloaders.utils as utils_testee
 import youtube_whisperer.downloaders.video_downloader as video_testee
@@ -35,18 +35,20 @@ class FakeYoutubeDL:
 
 def test_download_video_and_transcript_with_default_title_delegates(mocker):
     video_path = Path("/tmp/video.mp4")
-    mock_download_video = mocker.patch(
-        "youtube_whisperer.downloaders.download_video_with_default_title",
+    mock_download_video = mocker.patch.object(
+        testee,
+        "download_video_with_default_title",
         return_value=video_path,
     )
     downloader_instance = mocker.MagicMock()
     downloader_instance.download_as_srt_file.return_value = True
-    mock_downloader = mocker.patch(
-        "youtube_whisperer.downloaders.TranscriptDownloader",
+    mock_downloader = mocker.patch.object(
+        testee,
+        "TranscriptDownloader",
         return_value=downloader_instance,
     )
 
-    result = download_video_and_transcript_with_default_title(
+    result = testee.download_video_and_transcript_with_default_title(
         "https://example.com/watch?v=1",
         LANGUAGE,
         target_dir=Path("/tmp"),

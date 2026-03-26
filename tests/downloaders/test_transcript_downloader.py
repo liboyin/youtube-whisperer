@@ -5,33 +5,26 @@ from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 import youtube_whisperer.downloaders.transcript_downloader as testee
-from youtube_whisperer.downloaders.transcript_downloader import (
-    TranscriptDownloader,
-    fetch_matching_transcript,
-    get_first_matching_lang_code,
-    get_video_id,
-    list_video_transcripts,
-)
 
 
 def test_get_video_id():
-    assert get_video_id('https://youtu.be/n9xhJrPXop4?si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
-    assert get_video_id('https://www.youtube.com/watch?v=n9xhJrPXop4&si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
-    assert get_video_id('https://www.youtube.com/live/3TufaG29B7w?si=b5DQpvYgzcKJjJ0L') == '3TufaG29B7w'
+    assert testee.get_video_id('https://youtu.be/n9xhJrPXop4?si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
+    assert testee.get_video_id('https://www.youtube.com/watch?v=n9xhJrPXop4&si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
+    assert testee.get_video_id('https://www.youtube.com/live/3TufaG29B7w?si=b5DQpvYgzcKJjJ0L') == '3TufaG29B7w'
     with pytest.raises(ValueError):
-        get_video_id('https://example.com')
+        testee.get_video_id('https://example.com')
 
 
 def test_get_first_matching_lang_code():
-    assert get_first_matching_lang_code([], LanguageCode('en')) is None
-    assert get_first_matching_lang_code(['en-US', 'en'], LanguageCode('zh')) is None
-    assert get_first_matching_lang_code(['en-US', 'en'], LanguageCode('en')) == 'en-US'
-    assert get_first_matching_lang_code(['en-US', 'zh-cn', 'en'], LanguageCode('zh')) == 'zh-cn'
+    assert testee.get_first_matching_lang_code([], LanguageCode('en')) is None
+    assert testee.get_first_matching_lang_code(['en-US', 'en'], LanguageCode('zh')) is None
+    assert testee.get_first_matching_lang_code(['en-US', 'en'], LanguageCode('en')) == 'en-US'
+    assert testee.get_first_matching_lang_code(['en-US', 'zh-cn', 'en'], LanguageCode('zh')) == 'zh-cn'
 
 
 @pytest.fixture
 def downloader():
-    return TranscriptDownloader('https://www.youtube.com/watch?v=test_video_id', LanguageCode('en'))
+    return testee.TranscriptDownloader('https://www.youtube.com/watch?v=test_video_id', LanguageCode('en'))
 
 
 def test_list_video_transcripts_returns_transcripts(mocker):
@@ -42,7 +35,7 @@ def test_list_video_transcripts_returns_transcripts(mocker):
     mock_yt_api_instance = mock_yt_api_class.return_value
     mock_yt_api_instance.list.return_value = mock_transcript_list
 
-    result = list_video_transcripts('https://www.youtube.com/watch?v=test_video_id')
+    result = testee.list_video_transcripts('https://www.youtube.com/watch?v=test_video_id')
 
     assert result == mock_transcript_list
     testee.get_video_id.assert_called_once_with('https://www.youtube.com/watch?v=test_video_id')
@@ -57,7 +50,7 @@ def test_list_video_transcripts_returns_none_when_transcripts_are_disabled(mocke
     mock_yt_api_instance = mock_yt_api_class.return_value
     mock_yt_api_instance.list.side_effect = testee.TranscriptsDisabled(mock_video_id)
 
-    result = list_video_transcripts('https://www.youtube.com/watch?v=test_video_id')
+    result = testee.list_video_transcripts('https://www.youtube.com/watch?v=test_video_id')
 
     assert result is None
     mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
@@ -74,7 +67,7 @@ def test_fetch_matching_transcript_returns_transcript_for_matching_language(mock
     mocker.patch.object(testee, 'get_first_matching_lang_code', return_value='en')
     mock_transcript_list.find_transcript.return_value.fetch.return_value = expected_transcript
 
-    result = fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
+    result = testee.fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
 
     assert result == expected_transcript
     mock_transcript_list.find_transcript.assert_called_once_with(['en'])
@@ -87,7 +80,7 @@ def test_fetch_matching_transcript_returns_none_when_no_matching_language(mocker
     mock_transcript_list.__iter__.return_value = iter([mock_transcript_metadata_fr])
     mocker.patch.object(testee, 'get_first_matching_lang_code', return_value=None)
 
-    result = fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
+    result = testee.fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
 
     assert result is None
     mock_transcript_list.find_transcript.assert_not_called()
@@ -102,7 +95,7 @@ def test_fetch_matching_transcript_returns_none_when_transcript_lookup_fails(moc
     mocker.patch.object(testee, 'get_first_matching_lang_code', return_value='en')
     mock_transcript_list.find_transcript.return_value.fetch.side_effect = testee.NoTranscriptFound(mock_video_id, ['en'], {})
 
-    result = fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
+    result = testee.fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
 
     assert result is None
     mock_transcript_list.find_transcript.assert_called_once_with(['en'])

@@ -1,17 +1,11 @@
 from pathlib import Path
 from textwrap import dedent
+from types import SimpleNamespace
 
 from pathlib_extensions import OverwriteMode
 import pytest
 
-from youtube_whisperer.adaptors.srt_deduplicator import (
-    SrtBlock,
-    convert_srt_blocks_to_str,
-    deduplicate_srt_file,
-    yield_deduplicated_srt_blocks,
-    yield_lines_from_srt_blocks,
-    yield_srt_blocks_from_lines,
-)
+import youtube_whisperer.adaptors.srt_deduplicator as testee
 
 
 @pytest.fixture(scope="module")
@@ -35,7 +29,7 @@ def temp_srt_file(tmp_path_factory):
 
 
 def test_srtblock_to_lines():
-    block = SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["Line."])
+    block = testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["Line."])
     expected = ["1", "00:00:01,000 --> 00:00:02,000", "Line.", ""]
     assert block.to_lines(1) == expected
 
@@ -45,7 +39,7 @@ def test_yield_srt_blocks_from_lines():
         "1", "00:00:01,000 --> 00:00:02,000", "First line.", "",
         "2", "00:00:02,000 --> 00:00:03,000", "Second line.", "",
     ]
-    blocks = list(yield_srt_blocks_from_lines(input_lines))
+    blocks = list(testee.yield_srt_blocks_from_lines(input_lines))
     assert len(blocks) == 2
     assert blocks[0].start_time == "00:00:01,000"
     assert blocks[0].end_time == "00:00:02,000"
@@ -55,30 +49,30 @@ def test_yield_srt_blocks_from_lines():
 
 def test_yield_deduplicated_srt_blocks_duplicate_on_head():
     input_blocks = [
-        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
-        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
-        SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
+        testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        testee.SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
     ]
-    deduplicated = list(yield_deduplicated_srt_blocks(input_blocks))
+    deduplicated = list(testee.yield_deduplicated_srt_blocks(input_blocks))
     assert len(deduplicated) == 2  # Should merge the last two blocks
     assert deduplicated[1].end_time == "00:00:03,000"
 
 
 def test_yield_deduplicated_srt_blocks_duplicate_on_tail():
     input_blocks = [
-        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
-        SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
-        SrtBlock(start_time="00:00:03,000", end_time="00:00:04,000", content=["Second line."]),
+        testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        testee.SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
+        testee.SrtBlock(start_time="00:00:03,000", end_time="00:00:04,000", content=["Second line."]),
     ]
-    deduplicated = list(yield_deduplicated_srt_blocks(input_blocks))
+    deduplicated = list(testee.yield_deduplicated_srt_blocks(input_blocks))
     assert len(deduplicated) == 2  # Should merge the last two blocks
     assert deduplicated[1].end_time == "00:00:04,000"
 
 
 def test_yield_lines_from_srt_blocks():
     blocks = [
-        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
-        SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
+        testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        testee.SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
     ]
     expected = [
         "1",
@@ -90,20 +84,20 @@ def test_yield_lines_from_srt_blocks():
         "Second line.",
         "",
     ]
-    assert list(yield_lines_from_srt_blocks(blocks)) == expected
+    assert list(testee.yield_lines_from_srt_blocks(blocks)) == expected
 
 
 def test_convert_srt_blocks_to_str():
     blocks = [
-        SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
-        SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
+        testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
+        testee.SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
     ]
     expected = "1\n00:00:01,000 --> 00:00:02,000\nFirst line.\n\n2\n00:00:02,000 --> 00:00:03,000\nSecond line.\n"
-    assert convert_srt_blocks_to_str(blocks) == expected
+    assert testee.convert_srt_blocks_to_str(blocks) == expected
 
 
 def test_deduplicate_srt_file(temp_srt_file: Path):
-    assert deduplicate_srt_file(temp_srt_file, overwrite=OverwriteMode.ALWAYS) is temp_srt_file
+    assert testee.deduplicate_srt_file(temp_srt_file, overwrite=OverwriteMode.ALWAYS) is temp_srt_file
     expected = dedent("""\
         1
         00:00:01,000 --> 00:00:02,000
@@ -120,19 +114,17 @@ def test_deduplicate_srt_file_returns_early_when_overwrite_never(tmp_path):
     srt_file = tmp_path / "test.srt"
     srt_file.write_text("1\n00:00:01,000 --> 00:00:02,000\nOriginal\n\n")
     original_content = srt_file.read_text()
-    result = deduplicate_srt_file(srt_file, overwrite=OverwriteMode.NEVER)
+    result = testee.deduplicate_srt_file(srt_file, overwrite=OverwriteMode.NEVER)
     assert result is srt_file
     assert srt_file.read_text() == original_content
 
 
 def test_main_deduplicates_given_paths(mocker, tmp_path):
-    from types import SimpleNamespace
-    from youtube_whisperer.adaptors.srt_deduplicator import main
     srt_file = tmp_path / "test.srt"
     args = SimpleNamespace(paths=[srt_file], overwrite=OverwriteMode.ALWAYS)
     mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
-    mock_dedup = mocker.patch("youtube_whisperer.adaptors.srt_deduplicator.deduplicate_srt_file")
+    mock_dedup = mocker.patch.object(testee, "deduplicate_srt_file")
 
-    main()
+    testee.main()
 
     mock_dedup.assert_called_once_with(srt_file, overwrite=OverwriteMode.ALWAYS)
