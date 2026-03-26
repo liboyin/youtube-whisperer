@@ -2,6 +2,7 @@ from collections import defaultdict
 import glob
 import os
 from pathlib import Path
+import shutil
 from typing import Generator
 
 from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File
@@ -141,8 +142,7 @@ async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depen
             target_path = prepare_output_file(dir_path / upload.filename)
             try:
                 with target_path.open("wb") as f:
-                    content = await upload.read()
-                    f.write(content)
+                    shutil.copyfileobj(upload.file, f)
                 saved_files.append(str(target_path))
             except Exception:
                 failed_files.append(upload.filename)

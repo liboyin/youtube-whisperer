@@ -19,7 +19,7 @@ This document is intended for AI agents to document issues and antipatterns foun
 **File:** `fastapi/app.py`
 * **Issue:** `resolve_tasks(pattern)` inside `add_tasks` invokes `yt_dlp`, which makes blocking synchronous HTTP requests to YouTube inside an `async def` endpoint.
 * **Design rationale:** The blocking behaviour is intentional. Running `yt_dlp` sequentially ensures all YouTube interactions originate from a single request context, simulating single-user behaviour and avoiding potential EULA violations from concurrent scraping. See `README.md` for the blocking I/O design decision.
-* **Remaining concern:** `add_assets` reads the entire file upload into memory before writing it synchronously. This is unrelated to the EULA rationale and could cause memory bloat for large uploads.
+* **Resolved concern:** `add_assets` previously read the entire file upload into memory before writing it synchronously. Fixed by replacing `await upload.read()` + `f.write(content)` with `shutil.copyfileobj(upload.file, f)`, which streams directly from the upload to disk in fixed-size chunks.
 
 # 3. Worker & Subsystem Antipatterns
 
@@ -33,11 +33,11 @@ This document is intended for AI agents to document issues and antipatterns foun
 * **Issue:** `worker.py` -> `yield_task` polls the queue using `time.sleep(poll_interval)`. (Rejected)
     * *Recommendation:* Use Redis blocking operations natively (`BLPOP`).
 
-## 3.3 Expensive Eager File Checks
+## 3.3 Expensive Eager File Checks (Fixed)
 **File:** `downloaders/utils.py` -> `is_firefox_cookies_available()`
 * **Issue:** Uses `Path(...).rglob('cookies.sqlite')` on massive home directories like `~/.mozilla/firefox`.
 * **Impact:** This is executed synchronously *every time* `download_video` or `playlist_downloader` is invoked. Traversing the entire Firefox directory structure recursively can be extremely slow and blocking.
-* **Recommendation:** Cache the exact cookie path using Python's `functools.lru_cache` after finding it once, or limit the search depth rather than using `rglob`.
+* **Fix:** Added `@functools.lru_cache` to `is_firefox_cookies_available()`. The `rglob` search now runs at most once per process lifetime; subsequent calls return the cached result immediately.
 
 # 4. General Python Best Practices
 
