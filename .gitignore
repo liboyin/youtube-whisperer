@@ -63,6 +63,7 @@ dmypy.json
 .ropeproject/
 .spyderproject
 .spyproject
+.claude/
 .vscode/
 profile_default/
 ipython_config.py

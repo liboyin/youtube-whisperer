@@ -11,6 +11,7 @@ ISSUES.md
 .env
 .env.*
 !.env.example
+.claude/
 .devcontainer/
 .idea/
 .vscode/
