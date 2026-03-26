@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import Generator, Iterable
+from typing import Iterable
 
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
@@ -10,6 +10,7 @@ from pathlib_extensions import OverwriteMode, overwrite_existing_path
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.whisper_adaptor import WhisperSegmentAdaptor
 from youtube_whisperer.transcriber.model_parameters import get_default_whisper_model_parameters
+from youtube_whisperer.transcriber.rejection_policy import RejectedTranscriptionError, reject_bad_segments
 from youtube_whisperer.transcriber.waveform_loader import load_whisper_waveform_from_file
 from youtube_whisperer.utils import TranscriberMode
 
@@ -52,17 +53,6 @@ def transcribe_waveform_with_default_model(waveform: np.ndarray, mode: Transcrib
     return transcribe_waveform(model, waveform, mode, language)
 
 
-def early_stopper(segments_generator: Iterable[Segment]) -> Generator[Segment, None, None]:
-    """
-    Stop transcription/translation upon a known error case.
-    """
-    for x in segments_generator:
-        print(x)
-        if x.text == '请不吝点赞 订阅 转发 打赏支持明镜与点点栏目':
-            return
-        yield x
-
-
 def transcribe_file_with_default_model(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, mode: TranscriberMode = TranscriberMode.TRANSCRIBE) -> Path | None:
     """
     Transcribe a waveform file using default model parameters and save the output to an SRT file.
@@ -85,9 +75,12 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
         print(f'Skipping {input_file_path} because empty waveform is loaded')
         return None
     try:
-        segments_generator = early_stopper(transcribe_waveform_with_default_model(waveform, mode, language))
+        segments_generator = reject_bad_segments(transcribe_waveform_with_default_model(waveform, mode, language))
         WhisperSegmentAdaptor(segments_generator).save_as_srt_file(output_file_path, overwrite=overwrite)
         return output_file_path
+    except RejectedTranscriptionError as e:
+        print(f"Rejected Whisper transcription for {input_file_path}: {e}")
+        return None
     except Exception as e:
         print(f"An error occurred while transcribing {input_file_path}: {e}")
         return None

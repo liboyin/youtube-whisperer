@@ -46,6 +46,9 @@ The worker uses a non-atomic `LRANGE` + `LPOP` sequence by design. With a single
 ### Dual Transcription Engines
 The project started as a privacy-focused transcriber using local Whisper. Azure Speech was added later for two reasons: (1) transcribing public content where local privacy guarantees are unnecessary, and (2) working around occasional Whisper failures on non-English audio. Azure was chosen over other cloud providers as the most cost-effective option available in Sydney, Australia.
 
+### Known-Bad Whisper Output Rejection
+Some local Whisper runs occasionally emit known nonsense phrases instead of a real transcription. Those phrases are tracked in a centralized rejection list, and any local Whisper segment containing one of them causes the whole local run to be rejected without writing an SRT file.
+
 ### Filesystem as the Source of Truth
 The asset directory is intentionally a human-browsable media library rather than a cache. For YouTube sources, the video is archived locally even if a matching transcript already exists. Completed work is inferred from files on disk rather than from a separate metadata store.
 

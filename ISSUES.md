@@ -39,12 +39,6 @@ This document is intended for AI agents to document issues and antipatterns foun
 * **Impact:** This is executed synchronously *every time* `download_video` or `playlist_downloader` is invoked. Traversing the entire Firefox directory structure recursively can be extremely slow and blocking.
 * **Recommendation:** Cache the exact cookie path using Python's `functools.lru_cache` after finding it once, or limit the search depth rather than using `rglob`.
 
-## 3.4 Hardcoded Known-Bad Whisper Output Filter
-**File:** `transcriber/whisper_transcriber.py` -> `early_stopper`
-* **Issue:** The code hardcodes a project-specific known-bad Whisper output string inside the generalized core transcriber: `if x.text == '请不吝点赞 订阅 转发 打赏支持明镜与点点栏目': return`.
-* **Context:** Discarding known-invalid outputs is an accepted policy, but encoding that policy as a literal string inside the core transcriber is still a leaky abstraction.
-* **Recommendation:** Move known-bad output filters into a configurable predicate, policy layer, or dedicated post-processing step.
-
 # 4. General Python Best Practices
 
 * **Overuse of `print` vs `logging`:** Across the entire codebase, `print()` is heavily used for tracking state and errors. Logs lack structured data, log levels (INFO, WARN, ERROR), and timestamps. Switching to the standard `logging` library or `loguru` is highly advised.

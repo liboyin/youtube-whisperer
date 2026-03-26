@@ -5,6 +5,7 @@ import numpy as np
 from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
+from youtube_whisperer.transcriber.rejection_policy import REJECTED_SUBSTRINGS
 import youtube_whisperer.transcriber.whisper_transcriber as testee
 from youtube_whisperer.utils import TranscriberMode
 
@@ -45,18 +46,6 @@ def test_transcribe_waveform_with_default_model_builds_model_from_default_parame
     mock_transcribe.assert_called_once_with(model, waveform, TranscriberMode.TRANSCRIBE, LANGUAGE)
 
 
-def test_early_stopper_stops_at_known_bad_segment():
-    segments = [
-        make_segment("hello"),
-        make_segment("请不吝点赞 订阅 转发 打赏支持明镜与点点栏目"),
-        make_segment("world"),
-    ]
-
-    result = list(testee.early_stopper(segments))
-
-    assert [segment.text for segment in result] == ["hello"]
-
-
 def test_transcribe_file_with_default_model_returns_existing_output_when_overwrite_denied(mocker, tmp_path):
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
@@ -84,6 +73,23 @@ def test_transcribe_file_with_default_model_skips_empty_waveform(mocker, tmp_pat
 
     assert result is None
     assert f"Skipping {input_path} because empty waveform is loaded" in capsys.readouterr().out
+
+
+def test_transcribe_file_with_default_model_returns_none_on_rejected_transcription(mocker, tmp_path, capsys):
+    input_path = tmp_path / "audio.wav"
+    output_path = tmp_path / "audio.srt"
+    mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
+    mocker.patch.object(
+        testee,
+        "transcribe_waveform_with_default_model",
+        return_value=[make_segment(f"prefix {REJECTED_SUBSTRINGS[0]} suffix")],
+    )
+
+    result = testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output_path)
+
+    assert result is None
+    assert not output_path.exists()
+    assert f"Rejected Whisper transcription for {input_path}" in capsys.readouterr().out
 
 
 def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
