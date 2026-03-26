@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pathlib_extensions import OverwriteMode
@@ -44,6 +45,18 @@ def test_yield_task(mock_redis, mocker):
         next(task_generator)
     mock_sleep.assert_called_once_with(1)
     assert mock_redis.lrange.call_count == 3
+
+
+def test_is_gpu_healthy_returns_true_when_nvidia_smi_succeeds(mocker):
+    mocker.patch.object(testee.subprocess, "run", return_value=SimpleNamespace(returncode=0))
+
+    assert testee.is_gpu_healthy() is True
+
+
+def test_is_gpu_healthy_returns_false_when_subprocess_raises(mocker):
+    mocker.patch.object(testee.subprocess, "run", side_effect=OSError("missing"))
+
+    assert testee.is_gpu_healthy() is False
 
 
 def test_validate_gpu_health_or_exit_healthy(mocker):
@@ -135,6 +148,25 @@ def test_dispatch_transcription_task_for_azure_transcriber_no_conversion(mocker)
     mock_transcribe_azure_fire_and_forget.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER)
 
 
+def test_dispatch_transcription_task_for_azure_returns_early_when_wav_conversion_fails(mocker, capsys):
+    mock_save = mocker.patch.object(testee, "save_as_wav_file", return_value=None)
+    mock_transcribe = mocker.patch.object(testee, "transcribe_audio_file_fire_and_forget")
+    task = Task(source="/tmp/audio.mp3", language="en", transcriber=TranscriberType.AZURE)
+
+    testee.dispatch_transcription_task(task, Path("/tmp/audio.mp3"))
+
+    mock_save.assert_called_once_with(Path("/tmp/audio.mp3"), overwrite=OverwriteMode.NEVER)
+    mock_transcribe.assert_not_called()
+    assert "Skipping transcription for None as WAV conversion failed" in capsys.readouterr().out
+
+
+def test_dispatch_transcription_task_rejects_unknown_transcriber():
+    task = SimpleNamespace(transcriber="remote", mode="transcribe", language="en")
+
+    with pytest.raises(ValueError, match="Unsupported transcriber type"):
+        testee.dispatch_transcription_task(task, Path("/tmp/audio.wav"))
+
+
 def test_process_queue_full_flow(mocker, mock_redis):
     """Test the integration of functions within process_queue for a successful transcription."""
     mock_yield_task = mocker.patch.object(testee, 'yield_task')
@@ -163,3 +195,17 @@ def test_process_queue_skips_transcription_if_transcript_ready(mocker, mock_redi
     mock_resolve_path.assert_called_once_with(task)
     mock_dispatch.assert_not_called()  # The key assertion
     mock_redis.lpop.assert_called_once_with('tasks')
+
+
+def test_process_queue_deletes_failed_tasks(mocker):
+    mock_redis = mocker.MagicMock()
+    mocker.patch.object(testee, "REDIS_CLIENT", mock_redis)
+    task = Task(source="http://example.com/video", language="en")
+    mocker.patch.object(testee, "yield_task", return_value=iter([task]))
+    mocker.patch.object(testee, "resolve_waveform_file_path", side_effect=RuntimeError("boom"))
+    mock_dispatch = mocker.patch.object(testee, "dispatch_transcription_task")
+
+    testee.process_queue()
+
+    mock_dispatch.assert_not_called()
+    mock_redis.lpop.assert_called_once_with("tasks")
