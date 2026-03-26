@@ -39,14 +39,28 @@ def resolve_tasks(pattern: Task) -> list[Task]:
     """
     Resolve a Task pattern into a list of concrete Tasks.
     """
-    result: list[Task] = []
-    if is_url(pattern.source):
-        for url in yield_flattened_video_urls([pattern.source]):
-            result.append(Task(source=url, transcriber=pattern.transcriber, language=pattern.language, mode=pattern.mode))
-    else:
-        for path in glob.glob(os.path.expanduser(pattern.source)):
-            result.append(Task(source=str(path), transcriber=pattern.transcriber, language=pattern.language, mode=pattern.mode))
-    return result
+    return [copy_task_with_source(pattern, source) for source in resolve_task_sources(pattern.source)]
+
+
+def resolve_task_sources(source: str) -> list[str]:
+    """
+    Resolve a URL or glob pattern into a list of concrete sources.
+    """
+    if is_url(source):
+        return list(yield_flattened_video_urls([source]))
+    return [str(path) for path in glob.glob(os.path.expanduser(source))]
+
+
+def copy_task_with_source(pattern: Task, source: str) -> Task:
+    """
+    Copy a task pattern while replacing its source with a concrete value.
+    """
+    return Task(
+        source=source,
+        transcriber=pattern.transcriber,
+        language=pattern.language,
+        mode=pattern.mode,
+    )
 
 
 @app.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)

@@ -5,7 +5,13 @@ from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 import youtube_whisperer.downloaders.transcript_downloader as testee
-from youtube_whisperer.downloaders.transcript_downloader import TranscriptDownloader, get_video_id, get_first_matching_lang_code
+from youtube_whisperer.downloaders.transcript_downloader import (
+    TranscriptDownloader,
+    fetch_matching_transcript,
+    get_first_matching_lang_code,
+    get_video_id,
+    list_video_transcripts,
+)
 
 
 def test_get_video_id():
@@ -28,15 +34,38 @@ def downloader():
     return TranscriptDownloader('https://www.youtube.com/watch?v=test_video_id', LanguageCode('en'))
 
 
-def test_download_success(mocker, downloader):
-    """Test successful transcript download."""
+def test_list_video_transcripts_returns_transcripts(mocker):
     mock_video_id = 'test_video_id'
-    expected_transcript = [{'text': 'hello', 'start': 0.0, 'duration': 1.0}]
+    mock_transcript_list = MagicMock()
     mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
     mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
     mock_yt_api_instance = mock_yt_api_class.return_value
-    mock_transcript_list = MagicMock()
     mock_yt_api_instance.list.return_value = mock_transcript_list
+
+    result = list_video_transcripts('https://www.youtube.com/watch?v=test_video_id')
+
+    assert result == mock_transcript_list
+    testee.get_video_id.assert_called_once_with('https://www.youtube.com/watch?v=test_video_id')
+    mock_yt_api_class.assert_called_once_with()
+    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
+
+
+def test_list_video_transcripts_returns_none_when_transcripts_are_disabled(mocker):
+    mock_video_id = 'test_video_id'
+    mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
+    mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
+    mock_yt_api_instance = mock_yt_api_class.return_value
+    mock_yt_api_instance.list.side_effect = testee.TranscriptsDisabled(mock_video_id)
+
+    result = list_video_transcripts('https://www.youtube.com/watch?v=test_video_id')
+
+    assert result is None
+    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
+
+
+def test_fetch_matching_transcript_returns_transcript_for_matching_language(mocker):
+    expected_transcript = [{'text': 'hello', 'start': 0.0, 'duration': 1.0}]
+    mock_transcript_list = MagicMock()
     mock_transcript_metadata_en = MagicMock()
     mock_transcript_metadata_en.language_code = 'en'
     mock_transcript_metadata_fr = MagicMock()
@@ -44,62 +73,52 @@ def test_download_success(mocker, downloader):
     mock_transcript_list.__iter__.return_value = iter([mock_transcript_metadata_en, mock_transcript_metadata_fr])
     mocker.patch.object(testee, 'get_first_matching_lang_code', return_value='en')
     mock_transcript_list.find_transcript.return_value.fetch.return_value = expected_transcript
-    result = downloader.download()
+
+    result = fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
+
     assert result == expected_transcript
-    testee.get_video_id.assert_called_once_with(downloader.url)
-    mock_yt_api_class.assert_called_once_with()
-    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
     mock_transcript_list.find_transcript.assert_called_once_with(['en'])
 
 
-def test_download_disabled(mocker, downloader):
-    """Test when transcripts are disabled."""
-    mock_video_id = 'test_video_id'
-    mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
-    mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
-    mock_yt_api_instance = mock_yt_api_class.return_value
-    mock_yt_api_instance.list.side_effect = testee.TranscriptsDisabled(mock_video_id)
-    result = downloader.download()
-    assert result is None
-    testee.get_video_id.assert_called_once_with(downloader.url)
-    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
-
-
-def test_download_no_matching_language(mocker, downloader):
-    """Test when no matching language is found."""
-    mock_video_id = 'test_video_id'
-    mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
-    mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
-    mock_yt_api_instance = mock_yt_api_class.return_value
+def test_fetch_matching_transcript_returns_none_when_no_matching_language(mocker):
     mock_transcript_list = MagicMock()
-    mock_yt_api_instance.list.return_value = mock_transcript_list
     mock_transcript_metadata_fr = MagicMock()
     mock_transcript_metadata_fr.language_code = 'fr'
     mock_transcript_list.__iter__.return_value = iter([mock_transcript_metadata_fr])
     mocker.patch.object(testee, 'get_first_matching_lang_code', return_value=None)
-    result = downloader.download()
+
+    result = fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
+
     assert result is None
-    testee.get_video_id.assert_called_once_with(downloader.url)
-    mock_yt_api_instance.list.assert_called_once_with(mock_video_id)
     mock_transcript_list.find_transcript.assert_not_called()
 
 
-def test_download_no_transcript_found(mocker, downloader):
-    """Test when transcript is listed but not found."""
+def test_fetch_matching_transcript_returns_none_when_transcript_lookup_fails(mocker):
     mock_video_id = 'test_video_id'
-    mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
-    mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
-    mock_yt_api_instance = mock_yt_api_class.return_value
     mock_transcript_list = MagicMock()
-    mock_yt_api_instance.list.return_value = mock_transcript_list
     mock_transcript_metadata_en = MagicMock()
     mock_transcript_metadata_en.language_code = 'en'
     mock_transcript_list.__iter__.return_value = iter([mock_transcript_metadata_en])
     mocker.patch.object(testee, 'get_first_matching_lang_code', return_value='en')
     mock_transcript_list.find_transcript.return_value.fetch.side_effect = testee.NoTranscriptFound(mock_video_id, ['en'], {})
-    result = downloader.download()
+
+    result = fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
+
     assert result is None
     mock_transcript_list.find_transcript.assert_called_once_with(['en'])
+
+
+def test_download_delegates_to_listing_and_matching_helpers(mocker, downloader):
+    transcripts = MagicMock()
+    expected_transcript = [{'text': 'hello', 'start': 0.0, 'duration': 1.0}]
+    mock_list_video_transcripts = mocker.patch.object(testee, 'list_video_transcripts', return_value=transcripts)
+    mock_fetch_matching = mocker.patch.object(testee, 'fetch_matching_transcript', return_value=expected_transcript)
+
+    result = downloader.download()
+
+    assert result == expected_transcript
+    mock_list_video_transcripts.assert_called_once_with(downloader.url)
+    mock_fetch_matching.assert_called_once_with(transcripts, downloader.language, downloader.url)
 
 
 def test_download_as_srt_text_success(mocker, downloader):

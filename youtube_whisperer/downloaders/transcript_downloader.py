@@ -69,6 +69,34 @@ def get_first_matching_lang_code(candidates: Collection[str], requested: Languag
     return None
 
 
+def list_video_transcripts(url: str):
+    """
+    Lists available transcripts for a YouTube video.
+    """
+    video_id = get_video_id(url)
+    try:
+        transcripts = YouTubeTranscriptApi().list(video_id)
+    except TranscriptsDisabled:
+        print(f"Transcripts are disabled for {url}")
+        return None
+    return transcripts
+
+
+def fetch_matching_transcript(transcripts, language: LanguageCode, url: str) -> FetchedTranscript | None:
+    """
+    Fetches the transcript matching the requested language from a transcript list.
+    """
+    lang_code = get_first_matching_lang_code([x.language_code for x in transcripts], language)
+    if lang_code is None:
+        return None
+    try:
+        result = transcripts.find_transcript([lang_code]).fetch()
+        print(f"Successfully downloaded transcript with {len(result)} blocks for {url}")
+        return result
+    except NoTranscriptFound:
+        return None
+
+
 class TranscriptDownloader:
     def __init__(self, url: str, language: LanguageCode) -> None:
         self.url = url
@@ -81,20 +109,10 @@ class TranscriptDownloader:
         Returns:
             FetchedTranscript | None: Downloaded transcript, or `None` if no transcript in the requested language is available.
         """
-        try:
-            transcripts = YouTubeTranscriptApi().list(get_video_id(self.url))
-        except TranscriptsDisabled:
-            print(f"Transcripts are disabled for {self.url}")
+        transcripts = list_video_transcripts(self.url)
+        if transcripts is None:
             return None
-        lang_code = get_first_matching_lang_code([x.language_code for x in transcripts], self.language)
-        if lang_code is None:
-            return None
-        try:
-            result = transcripts.find_transcript([lang_code]).fetch()
-            print(f"Successfully downloaded transcript with {len(result)} blocks for {self.url}")
-            return result
-        except NoTranscriptFound:
-            return None
+        return fetch_matching_transcript(transcripts, self.language, self.url)
     
     def download_as_srt_text(self) -> str | None:
         """
