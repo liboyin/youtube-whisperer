@@ -2,6 +2,8 @@ import inspect
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
@@ -11,6 +13,13 @@ import youtube_whisperer.downloaders.utils as utils_testee
 
 
 LANGUAGE = LanguageCode("en")
+
+
+@pytest.fixture(autouse=True)
+def clear_firefox_cookies_cache():
+    utils_testee.is_firefox_cookies_available.cache_clear()
+    yield
+    utils_testee.is_firefox_cookies_available.cache_clear()
 
 
 class FakeYoutubeDL:

@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 
 import yt_dlp
@@ -24,6 +25,7 @@ def get_video_title(url: str) -> str:
         return ydl.extract_info(url, download=False)['title']
 
 
+@lru_cache(maxsize=None)
 def is_firefox_cookies_available() -> bool:
     """
     Returns whether the Firefox cookies file is available in the file system.
