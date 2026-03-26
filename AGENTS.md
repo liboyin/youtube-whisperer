@@ -14,7 +14,7 @@ Testing and static analysis tools have been configured for this project. After a
 
 # Code Review
 
-If you noticed any issues or antipatterns during the code review, please update ISSUES.md . Feel free to reorganise that file to best suit the current state of the project.
+Review your own code changes after making code changes. If you noticed any issues or antipatterns, try to resolve them. If the issue or antipattern is related to the architecture or design of this project, please update ISSUES.md . Feel free to reorganise ISSUES.md to best suit the current state of the project.
 
 # Isolated Workspaces
 
