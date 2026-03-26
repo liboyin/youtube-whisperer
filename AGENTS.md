@@ -4,13 +4,21 @@ This file is intended for AI agents.
 
 Many design decisions in this project are undocumented. When something feels like an assumption, ask why it was designed that way. If an explanation is provided, update the documentation accordingly.
 
-# Automated Tests + Static Analysis
+# Unit Tests + Static Analysis
 
-Testing and static analysis tools have been configured for this project. After any code change, verify that:
+After any code change, verify all of the following pass before considering the task done:
 
-1. `pytest` passes.
-2. `mypy youtube_whisperer` reports no errors.
-3. `ruff check` passes.
+```
+pytest
+ruff check .
+```
+
+Coverage must be at least 85% for each source file and for the overall project.
+
+When writing unit tests:
+
+- Order test functions to match the order their corresponding functions appear in the source file.
+- Import the module under test as `testee`. Call functions as `testee.function_name`. Mock attributes as `patch.object(testee, 'attribute', ...)`.
 
 # Code Review
 
