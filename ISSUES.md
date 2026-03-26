@@ -23,16 +23,14 @@ This document is intended for AI agents to document issues and antipatterns foun
 
 # 3. Worker & Subsystem Antipatterns
 
-## 3.1 Unhandled Futures in Azure Transcriber (Intermediate solution — superseded by multi-queue migration)
-**File:** `transcriber/azure_transcriber.py` -> `transcribe_audio_file_fire_and_forget()`
-* **Issue:** Uses `THREAD_POOL.submit(...)` but ignores the returned `Future` object. Exceptions thrown inside the thread (e.g. Azure API errors, timeouts) are silently swallowed.
-* **Context:** The current thread-pool dispatch is an intermediate solution. The planned multi-queue system (see `README.md`) will replace this with proper per-engine queues and failure handling. Once that migration is complete, this pattern will be removed.
-* **Until then:** Attaching a `.add_done_callback()` for error logging would reduce silent failure risk.
+## 3.1 Azure Task Completion Is Not Durable (Accepted: known gap until multi-queue migration)
+**File:** `worker.py` -> `dispatch_transcription_task()` / `process_queue()`, `transcriber/azure_transcriber.py` -> `transcribe_audio_file_fire_and_forget()`
+* **Issue:** For Azure, the worker submits transcription to a local thread pool and immediately removes the Redis task. If Azure later fails, the failure is only printed by a callback; there is no retry, task status, or dead-letter record.
+* **Context:** This is a known gap in the current single-queue model. The planned multi-queue migration (see `README.md`) is expected to add proper pending/active queues and a dead-letter queue.
+* **Recommendation:** Track Azure tasks until completion, or move them into an explicit active/dead-letter state rather than treating thread-pool submission as success.
 
 ## 3.2 Polling / Busy Waiting
-* **Issue 1:** `azure_transcriber.py` -> `transcribe_audio_file` uses a `while not done: time.sleep(5)` loop to wait for event callbacks. (Accepted)
-    * *Recommendation:* Use `threading.Event` and call `event.wait(timeout_seconds)`. This eliminates arbitrary sleep cycles and wakes up immediately upon completion.
-* **Issue 2:** `worker.py` -> `yield_task` polls the queue using `time.sleep(poll_interval)`. (Rejected)
+* **Issue:** `worker.py` -> `yield_task` polls the queue using `time.sleep(poll_interval)`. (Rejected)
     * *Recommendation:* Use Redis blocking operations natively (`BLPOP`).
 
 ## 3.3 Expensive Eager File Checks
@@ -41,11 +39,11 @@ This document is intended for AI agents to document issues and antipatterns foun
 * **Impact:** This is executed synchronously *every time* `download_video` or `playlist_downloader` is invoked. Traversing the entire Firefox directory structure recursively can be extremely slow and blocking.
 * **Recommendation:** Cache the exact cookie path using Python's `functools.lru_cache` after finding it once, or limit the search depth rather than using `rglob`.
 
-## 3.4 Hardcoded Magic String in Core Logic
+## 3.4 Hardcoded Known-Bad Whisper Output Filter
 **File:** `transcriber/whisper_transcriber.py` -> `early_stopper`
-* **Issue:** The code hardcodes a suspicious domain-specific string check inside the generalized core transcriber: `if x.text == '请不吝点赞 订阅 转发 打赏支持明镜与点点栏目': return`.
-* **Impact:** This is a classic "Leaky Abstraction" / hardcoding antipattern. It forces behavior for a very specific use-case inside a generic transcribe function used by the whole app. 
-* **Recommendation:** Remove this immediately. Such logic should be injected via a generic filtering predicate or post-processing hook, rather than hardcoded in the primary transcriber flow.
+* **Issue:** The code hardcodes a project-specific known-bad Whisper output string inside the generalized core transcriber: `if x.text == '请不吝点赞 订阅 转发 打赏支持明镜与点点栏目': return`.
+* **Context:** Discarding known-invalid outputs is an accepted policy, but encoding that policy as a literal string inside the core transcriber is still a leaky abstraction.
+* **Recommendation:** Move known-bad output filters into a configurable predicate, policy layer, or dedicated post-processing step.
 
 # 4. General Python Best Practices
 
