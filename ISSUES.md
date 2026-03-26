@@ -2,11 +2,10 @@ This document is intended for AI agents to document issues and antipatterns foun
 
 # 1. Critical Concurrency & Architecture Flaws
 
-## 1.1 Non-Atomic Queue Processing in Worker (Rejcted: local transcriber works asynchronously because there is only one GPU. Azure transcribers are dispatched in a thread pool. See Future Work section in README.md)
+## 1.1 Non-Atomic Queue Processing in Worker (Rejected: intentional design for GPU failure recovery)
 **File:** `worker.py` -> `process_queue()` and `yield_task()`
 * **Issue:** The worker uses `lrange('tasks', 0, 0)` to read a task, processes it (which could take minutes), and then calls `lpop('tasks')` to remove it.
-* **Impact:** In a multi-worker setup, both workers will read the exact same task from `lrange` and process it redundantly. When they finish, they both execute `lpop`. If one worker finishes first, it pops the task. When the second finishes, it pops the *next* task in the queue, completely dropping a task without processing it!
-* **Recommendation:** The architectural document (AGENTS.md) specifies using `BRPOPLPUSH` for atomic consumption. The code does not reflect this. It should use `BLPOP` or `BRPOPLPUSH` to atomically grab tasks and maintain a processing queue.
+* **Design rationale:** There is exactly one worker per GPU. The non-atomic sequence is deliberate: if the GPU fails mid-task and the worker container is restarted, the in-progress task remains at the head of the queue and is automatically reprocessed — no dead-letter queue required. See `README.md` for the single-worker queue model design decision.
 
 ## 1.2 Redis Connection Exhaustion (Addressed)
 **File:** `utils.py` -> `get_redis_client()`
@@ -16,23 +15,19 @@ This document is intended for AI agents to document issues and antipatterns foun
 
 # 2. Web API (FastAPI) Antipatterns
 
-## 2.1 Blocking I/O in Async Endpoints
+## 2.1 Blocking I/O in Async Endpoints (Rejected: intentional design for EULA compliance)
 **File:** `fastapi/app.py`
-* **Issue:** You have several async endpoints executing synchronous blocking functions:
-    * `resolve_tasks(pattern)` inside `add_tasks`: It eventually invokes `yt_dlp` which makes heavy, blocking synchronous HTTP requests to YouTube.
-    * `add_assets`: Reads the whole file upload into memory (`await upload.read()`) then writes it via synchronous I/O (`with target_path.open("wb") as f: f.write(...)`). Uploading a 2GB file will cause extreme memory bloat and block the event loop while saving to disk.
-* **Impact:** Because these endpoints are defined as `async def`, any blocking call halts the *entire* FastAPI event loop. Other requests won't be served while `yt_dlp` is fetching information or a file is saving.
-* **Recommendation:** 
-    * Use thread pools for blocking functions: `await anyio.to_thread.run_sync(resolve_tasks, ...)`.
-    * For file uploads, use `shutil.copyfileobj` in a thread, or async filesystem operations. Avoid reading the entire file contents into RAM.
+* **Issue:** `resolve_tasks(pattern)` inside `add_tasks` invokes `yt_dlp`, which makes blocking synchronous HTTP requests to YouTube inside an `async def` endpoint.
+* **Design rationale:** The blocking behaviour is intentional. Running `yt_dlp` sequentially ensures all YouTube interactions originate from a single request context, simulating single-user behaviour and avoiding potential EULA violations from concurrent scraping. See `README.md` for the blocking I/O design decision.
+* **Remaining concern:** `add_assets` reads the entire file upload into memory before writing it synchronously. This is unrelated to the EULA rationale and could cause memory bloat for large uploads.
 
 # 3. Worker & Subsystem Antipatterns
 
-## 3.1 Silent Threat: Unhandled Futures (Addressed)
+## 3.1 Unhandled Futures in Azure Transcriber (Intermediate solution — superseded by multi-queue migration)
 **File:** `transcriber/azure_transcriber.py` -> `transcribe_audio_file_fire_and_forget()`
-* **Issue:** Uses `THREAD_POOL.submit(...)` but ignores the returned `Future` object.
-* **Impact:** If `transcribe_audio_file` throws an exception (e.g., Azure API error or timeout), the exception gets swallowed completely and silently because the future is never awaited or a callback is never attached (`.add_done_callback()`).
-* **Recommendation:** Attach an error-checking callback to the future to at least log failures, or better, implement proper dead-letter queue behavior as per the architecture spec.
+* **Issue:** Uses `THREAD_POOL.submit(...)` but ignores the returned `Future` object. Exceptions thrown inside the thread (e.g. Azure API errors, timeouts) are silently swallowed.
+* **Context:** The current thread-pool dispatch is an intermediate solution. The planned multi-queue system (see `README.md`) will replace this with proper per-engine queues and failure handling. Once that migration is complete, this pattern will be removed.
+* **Until then:** Attaching a `.add_done_callback()` for error logging would reduce silent failure risk.
 
 ## 3.2 Polling / Busy Waiting
 * **Issue 1:** `azure_transcriber.py` -> `transcribe_audio_file` uses a `while not done: time.sleep(5)` loop to wait for event callbacks. (Accepted)

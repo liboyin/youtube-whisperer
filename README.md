@@ -38,9 +38,29 @@ Three main components:
 4. For URLs, the worker first attempts to fetch a pre-existing transcript; if unavailable, it downloads the video/audio.
 5. The transcription engine processes the audio and an adaptor converts the output to an `.srt` file.
 
+## Design Decisions
+
+### Single-Worker Queue Model
+The worker uses a non-atomic `LRANGE` + `LPOP` sequence by design. With a single GPU worker, atomicity is not a concern. This approach also provides automatic failure recovery: if the GPU fails mid-task (requiring a Docker container restart), the unfinished task remains at the head of the queue and is reprocessed automatically when the worker comes back online — no dead-letter queue needed.
+
+### Dual Transcription Engines
+The project started as a privacy-focused transcriber using local Whisper. Azure Speech was added later for two reasons: (1) transcribing public content where local privacy guarantees are unnecessary, and (2) working around occasional Whisper failures on non-English audio. Azure was chosen over other cloud providers as the most cost-effective option available in Sydney, Australia.
+
+### Worker as a Separate Process
+The worker runs as an independent Docker service rather than background tasks within FastAPI, in preparation for scaling to multiple GPUs. Each GPU will run its own dedicated worker process.
+
+### Blocking I/O in Async Endpoints
+`resolve_tasks()` makes blocking `yt-dlp` calls inside `async def` endpoints intentionally. This ensures all YouTube interactions originate from a single sequential request context, simulating single-user behaviour and avoiding potential EULA violations from concurrent scraping.
+
+### SRT as the Output Format
+SRT was chosen to match an existing library of subtitle files. The conversion logic is isolated in the `adaptors/` layer, making it straightforward to support additional output formats (e.g. WebVTT, JSON) in the future.
+
+### CLI as a Development Tool
+The CLI runs the full pipeline in-process without Redis. It was designed primarily for development and testing within the devcontainer, not as a production interface.
+
 ## Future Work: Multi-Queue System
 
-The current single global queue does not scale well and makes resource management per engine difficult. A planned migration to a multi-queue system (motivated in part by adding a second GPU) would introduce:
+The current single global queue does not scale well and makes resource management per engine difficult. A migration to a multi-queue system is ready for execution (motivated by adding a second GPU) and would introduce:
 
 - **Local pending queue** — Unprocessed local transcription tasks waiting to be picked up.
 - **Local active queue** — One slot per GPU; ensures no GPU is double-booked.
