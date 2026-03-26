@@ -152,6 +152,14 @@ def test_download_as_srt_file_no_transcript(mocker, tmp_path, downloader):
     downloader.download_as_srt_text.assert_called_once_with()
 
 
+def test_download_as_srt_file_returns_true_when_file_exists_and_no_overwrite(tmp_path, downloader):
+    output_path = tmp_path / "output.srt"
+    output_path.write_text("existing content")
+    result = downloader.download_as_srt_file(output_path, OverwriteMode.NEVER)
+    assert result is True
+    assert output_path.read_text() == "existing content"
+
+
 def test_download_as_srt_file_with_default_title_success(mocker, tmp_path, downloader):
     """Test with custom parameters."""
     mock_title = "Test Video"
@@ -173,33 +181,6 @@ def test_download_as_srt_file_with_default_title_failure(mocker, downloader):
     downloader.download_as_srt_file.assert_called()
 
 
-def test_download_as_srt_file_returns_true_when_file_exists_and_no_overwrite(tmp_path, downloader):
-    output_path = tmp_path / "output.srt"
-    output_path.write_text("existing content")
-    result = downloader.download_as_srt_file(output_path, OverwriteMode.NEVER)
-    assert result is True
-    assert output_path.read_text() == "existing content"
-
-
-def test_main_downloads_given_urls(mocker):
-    from types import SimpleNamespace
-    args = SimpleNamespace(
-        urls=["https://www.youtube.com/watch?v=test"],
-        language=LanguageCode("en"),
-        overwrite=OverwriteMode.ALWAYS,
-    )
-    mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
-    mock_downloader_cls = mocker.patch.object(testee, "TranscriptDownloader")
-    mock_downloader_cls.return_value.download_as_srt_file_with_default_title.return_value = None
-
-    testee.main()
-
-    mock_downloader_cls.assert_called_once_with("https://www.youtube.com/watch?v=test", LanguageCode("en"))
-    mock_downloader_cls.return_value.download_as_srt_file_with_default_title.assert_called_once_with(
-        overwrite=OverwriteMode.ALWAYS
-    )
-
-
 def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, tmp_path, downloader):
     """Test with a long title containing invalid characters."""
     long_title = "a/b\\c?d*e:f|g<h>i\"j" * 20
@@ -219,3 +200,22 @@ def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, 
     assert '<' not in result.name
     assert '>' not in result.name
     assert '"' not in result.name
+
+
+def test_main_downloads_given_urls(mocker):
+    from types import SimpleNamespace
+    args = SimpleNamespace(
+        urls=["https://www.youtube.com/watch?v=test"],
+        language=LanguageCode("en"),
+        overwrite=OverwriteMode.ALWAYS,
+    )
+    mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
+    mock_downloader_cls = mocker.patch.object(testee, "TranscriptDownloader")
+    mock_downloader_cls.return_value.download_as_srt_file_with_default_title.return_value = None
+
+    testee.main()
+
+    mock_downloader_cls.assert_called_once_with("https://www.youtube.com/watch?v=test", LanguageCode("en"))
+    mock_downloader_cls.return_value.download_as_srt_file_with_default_title.assert_called_once_with(
+        overwrite=OverwriteMode.ALWAYS
+    )

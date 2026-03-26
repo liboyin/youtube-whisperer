@@ -130,23 +130,6 @@ def test_playlist_main_parses_urls_and_forwards_overwrite(mocker):
     ]
 
 
-def test_is_firefox_cookies_available_detects_cookie_file(monkeypatch, tmp_path, capsys):
-    monkeypatch.setenv("HOME", str(tmp_path))
-    cookies = tmp_path / ".mozilla" / "firefox" / "profile" / "cookies.sqlite"
-    cookies.parent.mkdir(parents=True)
-    cookies.write_text("cookie")
-
-    assert utils_testee.is_firefox_cookies_available() is True
-    assert "Found Firefox cookies:" in capsys.readouterr().out
-
-
-def test_is_firefox_cookies_available_returns_false_when_missing(monkeypatch, tmp_path, capsys):
-    monkeypatch.setenv("HOME", str(tmp_path))
-
-    assert utils_testee.is_firefox_cookies_available() is False
-    assert "No Firefox cookies found" in capsys.readouterr().out
-
-
 def test_get_video_title_uses_yt_dlp_and_optional_firefox_cookies(mocker):
     created = {}
 
@@ -163,6 +146,23 @@ def test_get_video_title_uses_yt_dlp_and_optional_firefox_cookies(mocker):
     assert created["ydl"].options["simulate"] is True
     assert created["ydl"].options["cookiesfrombrowser"] == ("firefox",)
     assert created["ydl"].extract_info_call == ("https://example.com/watch?v=1", False)
+
+
+def test_is_firefox_cookies_available_detects_cookie_file(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    cookies = tmp_path / ".mozilla" / "firefox" / "profile" / "cookies.sqlite"
+    cookies.parent.mkdir(parents=True)
+    cookies.write_text("cookie")
+
+    assert utils_testee.is_firefox_cookies_available() is True
+    assert "Found Firefox cookies:" in capsys.readouterr().out
+
+
+def test_is_firefox_cookies_available_returns_false_when_missing(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert utils_testee.is_firefox_cookies_available() is False
+    assert "No Firefox cookies found" in capsys.readouterr().out
 
 
 def test_download_video_returns_early_when_existing_file_should_not_be_overwritten(mocker, tmp_path):

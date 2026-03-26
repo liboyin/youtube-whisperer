@@ -23,13 +23,6 @@ def test_get_tasks_raises_http_500_when_redis_fails(mocker):
         asyncio.run(testee.get_tasks(redis_client=redis_client))
 
 
-def test_list_assets_raises_http_500_when_directory_listing_fails():
-    bad_dir = Path("/definitely/missing")
-
-    with pytest.raises(HTTPException, match="No such file or directory"):
-        asyncio.run(testee.list_assets(dir_path=bad_dir))
-
-
 def test_add_tasks_raises_http_500_when_redis_fails(mocker):
     from youtube_whisperer.fastapi.models import Task
     redis_client = mocker.MagicMock()
@@ -47,6 +40,13 @@ def test_clear_tasks_raises_http_500_when_redis_fails(mocker):
 
     with pytest.raises(HTTPException, match="redis down"):
         asyncio.run(testee.clear_tasks(redis_client=redis_client))
+
+
+def test_list_assets_raises_http_500_when_directory_listing_fails():
+    bad_dir = Path("/definitely/missing")
+
+    with pytest.raises(HTTPException, match="No such file or directory"):
+        asyncio.run(testee.list_assets(dir_path=bad_dir))
 
 
 def test_add_assets_catches_individual_file_write_failure(mocker, tmp_path):

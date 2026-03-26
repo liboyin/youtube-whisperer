@@ -34,6 +34,12 @@ def temp_srt_file(tmp_path_factory):
     file_path.unlink()
 
 
+def test_srtblock_to_lines():
+    block = SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["Line."])
+    expected = ["1", "00:00:01,000 --> 00:00:02,000", "Line.", ""]
+    assert block.to_lines(1) == expected
+
+
 def test_yield_srt_blocks_from_lines():
     input_lines = [
         "1", "00:00:01,000 --> 00:00:02,000", "First line.", "",
@@ -67,12 +73,6 @@ def test_yield_deduplicated_srt_blocks_duplicate_on_tail():
     deduplicated = list(yield_deduplicated_srt_blocks(input_blocks))
     assert len(deduplicated) == 2  # Should merge the last two blocks
     assert deduplicated[1].end_time == "00:00:04,000"
-
-
-def test_srtblock_to_lines():
-    block = SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["Line."])
-    expected = ["1", "00:00:01,000 --> 00:00:02,000", "Line.", ""]
-    assert block.to_lines(1) == expected
 
 
 def test_yield_lines_from_srt_blocks():
