@@ -8,7 +8,7 @@ from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.fastapi.models import Task
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
 from youtube_whisperer.utils import TranscriberType
-from youtube_whisperer.workers.common import process_active_slot_queue
+from youtube_whisperer.workers.common import TranscriptionWorker
 
 
 def is_gpu_healthy() -> bool:
@@ -44,40 +44,31 @@ def validate_gpu_health_or_exit() -> None:
         sys.exit(2)
 
 
-def dispatch_task(task: Task, source: Path) -> None:
-    """Run Whisper transcription for a resolved filesystem source.
+class WhisperWorker(TranscriptionWorker):
 
-    The worker validates GPU availability when CUDA is enabled and then invokes
-    the standard transcription entrypoint to write subtitle files for the media
-    source represented by the queued task.
+    def __init__(self, slot: str) -> None:
+        """Initialize the Whisper transcription worker.
 
-    Args:
-        task: The transcription task that provides language and mode settings
-            for the Whisper run.
-        source: The concrete filesystem path to the media file that should be
-            transcribed.
+        Args:
+            slot: The worker slot identifier determining which active queue to run under.
+        """
+        super().__init__(TranscriberType.WHISPER, slot)
 
-    Returns:
-        None. Subtitle files are written to disk as a side effect.
-    """
-    validate_gpu_health_or_exit()
-    transcribe_to_srt_files([source], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+    def dispatch_task(self, task: Task, source: Path) -> None:
+        """Run Whisper transcription for a resolved filesystem source.
 
+        The worker validates GPU availability when CUDA is enabled and then invokes
+        the standard transcription entrypoint to write subtitle files for the media
+        source represented by the queued task.
 
-def process_queue(slot: str, poll_interval_seconds: int = 5) -> None:
-    """Process Whisper tasks assigned to a specific active worker slot.
+        Args:
+            task: The transcription task that provides language and mode settings
+                for the Whisper run.
+            source: The concrete filesystem path to the media file that should be
+                transcribed.
 
-    The worker listens to its slot-specific active queue, resolves task sources
-    to local paths, and passes each item to the Whisper dispatcher for
-    transcription.
-
-    Args:
-        slot: Active-slot identifier used to select the Redis queue this worker
-            should consume.
-        poll_interval_seconds: Number of seconds to wait between Redis polling
-            attempts while the active queue is empty.
-
-    Returns:
-        None. The function runs until the worker process is stopped.
-    """
-    process_active_slot_queue(TranscriberType.WHISPER, slot, dispatch_task, poll_interval_seconds)
+        Returns:
+            None. Subtitle files are written to disk as a side effect.
+        """
+        validate_gpu_health_or_exit()
+        transcribe_to_srt_files([source], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)

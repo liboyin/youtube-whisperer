@@ -1,4 +1,5 @@
 import os
+from abc import ABC, abstractmethod
 from pathlib import Path
 import time
 from typing import Callable, Generator, cast
@@ -132,35 +133,123 @@ def resolve_worker_slot(slot: str | None, role_name: str) -> str:
     return slot or os.getenv('WORKER_SLOT') or os.getenv('HOSTNAME') or f'{role_name}-0'
 
 
-def process_active_slot_queue(transcriber: TranscriberType, slot: str, dispatch_task: TaskDispatcher, poll_interval_seconds: int = 5) -> None:
-    """
-    Process tasks assigned to a transcriber-specific active worker slot.
+class BaseWorker(ABC):
+    """Abstract base worker providing a robust task-processing loop."""
 
-    Args:
-        transcriber: Transcriber whose pending and active queues should be processed.
-        slot: Active-slot identifier owned by the worker process.
-        dispatch_task: Callable that performs the transcriber-specific work for
-            a claimed filesystem media file.
-        poll_interval_seconds: Number of seconds to wait before retrying when no work is available.
+    @abstractmethod
+    def get_queue_name(self) -> str:
+        """Return the active queue name for the worker.
 
-    Returns:
-        None.
+        Returns:
+            The Redis key string for the queue this worker consumes.
+        """
+        pass
+
+    @abstractmethod
+    def yield_tasks(self, poll_interval_seconds: int) -> Generator[Task, None, None]:
+        """Yield tasks from the worker's queue.
+
+        Args:
+            poll_interval_seconds: Number of seconds to wait before checking again when the queue is empty.
+
+        Yields:
+            Validated task models in the order they appear at the queue head.
+        """
+        pass
+
+    @abstractmethod
+    def process_task(self, task: Task) -> None:
+        """Process a single task.
+
+        Args:
+            task: The task to be processed by this worker.
+        """
+        pass
+
+    def process_queue(self, poll_interval_seconds: int = 5) -> None:
+        """Poll the queue indefinitely and process tasks.
+
+        Args:
+            poll_interval_seconds: Number of seconds to wait before checking again when the queue is empty.
+        """
+        queue_name = self.get_queue_name()
+        for task in self.yield_tasks(poll_interval_seconds):
+            delete_task = False
+            try:
+                self.process_task(task)
+                delete_task = True
+            except Exception as e:
+                print(f"An error occurred while processing task {task}: {e}")
+                queue_dead_letter(REDIS_CLIENT, task, queue_name, str(e))
+                delete_task = True
+            finally:
+                if delete_task:
+                    REDIS_CLIENT.lpop(queue_name)
+                    print(f"Removed task from {queue_name}: {task}")
+
+
+class TranscriptionWorker(BaseWorker):
+    """Base class for transcriber workers.
+    
+    Transcription workers consume slot-specific active queues, resolve media
+    files to concrete paths, and apply a transcriber-specific implementation
+    for subtitle generation.
     """
-    pending_queue_name = get_pending_queue_name(transcriber)
-    active_queue_name = get_active_queue_name(transcriber, slot)
-    print(f"{transcriber.value.title()} worker started with slot {slot}")
-    for task in yield_active_slot_task(REDIS_CLIENT, pending_queue_name, active_queue_name, poll_interval_seconds):
-        delete_task = False
-        try:
-            if is_url(task.source):
-                raise ValueError(f"Transcription worker received URL task: {task.source}")
-            dispatch_task(task, Path(task.source))
-            delete_task = True
-        except Exception as e:
-            print(f"An error occurred while processing task {task}: {e}")
-            queue_dead_letter(REDIS_CLIENT, task, active_queue_name, str(e))
-            delete_task = True
-        finally:
-            if delete_task:
-                REDIS_CLIENT.lpop(active_queue_name)
-                print(f"Removed task from {active_queue_name}: {task}")
+
+    def __init__(self, transcriber: TranscriberType, slot: str) -> None:
+        """Initialize the transcription worker.
+
+        Args:
+            transcriber: Transcriber whose pending and active queues should be
+                processed.
+            slot: Active-slot identifier owned by the worker process.
+        """
+        self.transcriber = transcriber
+        self.slot = slot
+        self.active_queue_name = get_active_queue_name(self.transcriber, slot)
+        self.pending_queue_name = get_pending_queue_name(self.transcriber)
+
+    def get_queue_name(self) -> str:
+        """Return the active queue name configured for this transcriber slot.
+
+        Returns:
+            The Redis key string for the active slot queue.
+        """
+        return self.active_queue_name
+
+    def yield_tasks(self, poll_interval_seconds: int) -> Generator[Task, None, None]:
+        """Yield tasks assigned to the worker's active slot or pending queue.
+
+        Args:
+            poll_interval_seconds: Number of seconds to wait before checking again when the queues are empty.
+
+        Yields:
+            Tasks claimed into the worker's active slot.
+        """
+        print(f"{self.transcriber.value.title()} worker started with slot {self.slot}")
+        return yield_active_slot_task(REDIS_CLIENT, self.pending_queue_name, self.active_queue_name, poll_interval_seconds)
+
+    def process_task(self, task: Task) -> None:
+        """Resolve the valid media file path and dispatch the task for transcription.
+
+        Args:
+            task: The transcription task that requires processing.
+
+        Raises:
+            ValueError: If the task's source is a URL instead of a valid local filesystem path.
+        """
+        if is_url(task.source):
+            raise ValueError(f"Transcription worker received URL task: {task.source}")
+        self.dispatch_task(task, Path(task.source))
+
+    @abstractmethod
+    def dispatch_task(self, task: Task, source: Path) -> None:
+        """Perform transcriber-specific work for a claimed filesystem media file.
+
+        Args:
+            task: Task containing transcriber configuration.
+            source: Local filesystem path to the media file.
+        """
+        pass
+
+

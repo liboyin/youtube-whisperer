@@ -2,10 +2,10 @@ import argparse
 from enum import Enum
 import os
 
-from youtube_whisperer.workers.azure_worker import process_queue as process_azure_queue
+from youtube_whisperer.workers.azure_worker import AzureWorker
 from youtube_whisperer.workers.common import resolve_worker_slot
-from youtube_whisperer.workers.whisper_worker import process_queue as process_whisper_queue
-from youtube_whisperer.workers.youtube_worker import process_queue as process_youtube_queue
+from youtube_whisperer.workers.whisper_worker import WhisperWorker
+from youtube_whisperer.workers.youtube_worker import YouTubeWorker
 
 
 class WorkerRole(str, Enum):
@@ -50,14 +50,15 @@ def process_queue(role: WorkerRole | str = WorkerRole.WHISPER, slot: str | None 
         role = WorkerRole(role)
     except ValueError as exc:
         raise ValueError(f'Unsupported worker role: {role}') from exc
-    if role is WorkerRole.YOUTUBE:
-        process_youtube_queue(poll_interval_seconds=poll_interval_seconds)
-        return
-    resolved_slot = resolve_worker_slot(slot, role.value)
-    if role is WorkerRole.WHISPER:
-        process_whisper_queue(resolved_slot, poll_interval_seconds=poll_interval_seconds)
-        return
-    process_azure_queue(resolved_slot, poll_interval_seconds=poll_interval_seconds)
+    match role:
+        case WorkerRole.YOUTUBE:
+            YouTubeWorker().process_queue(poll_interval_seconds=poll_interval_seconds)
+        case WorkerRole.WHISPER:
+            resolved_slot = resolve_worker_slot(slot, role.value)
+            WhisperWorker(resolved_slot).process_queue(poll_interval_seconds=poll_interval_seconds)
+        case WorkerRole.AZURE:
+            resolved_slot = resolve_worker_slot(slot, role.value)
+            AzureWorker(resolved_slot).process_queue(poll_interval_seconds=poll_interval_seconds)
 
 
 def main() -> None:

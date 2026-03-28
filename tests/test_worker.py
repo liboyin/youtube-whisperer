@@ -18,33 +18,36 @@ def test_worker_role_rejects_legacy_local_alias():
 
 def test_process_queue_routes_youtube_work(mocker):
     """Test that the queue entry point dispatches YouTube work to the YouTube processor."""
-    mock_process = mocker.patch.object(testee, 'process_youtube_queue')
+    mock_worker = mocker.patch.object(testee, 'YouTubeWorker')
 
     testee.process_queue(role=testee.WorkerRole.YOUTUBE, poll_interval_seconds=7)
 
-    mock_process.assert_called_once_with(poll_interval_seconds=7)
+    mock_worker.assert_called_once_with()
+    mock_worker.return_value.process_queue.assert_called_once_with(poll_interval_seconds=7)
 
 
 def test_process_queue_routes_whisper_work(mocker):
     """Test that the queue entry point dispatches Whisper work with a resolved slot."""
     mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='gpu-0')
-    mock_process = mocker.patch.object(testee, 'process_whisper_queue')
+    mock_worker = mocker.patch.object(testee, 'WhisperWorker')
 
     testee.process_queue(role=testee.WorkerRole.WHISPER, poll_interval_seconds=7)
 
     mock_slot.assert_called_once_with(None, testee.WorkerRole.WHISPER.value)
-    mock_process.assert_called_once_with('gpu-0', poll_interval_seconds=7)
+    mock_worker.assert_called_once_with('gpu-0')
+    mock_worker.return_value.process_queue.assert_called_once_with(poll_interval_seconds=7)
 
 
 def test_process_queue_routes_azure_work(mocker):
     """Test that the queue entry point dispatches Azure work with a resolved slot."""
     mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='azure-0')
-    mock_process = mocker.patch.object(testee, 'process_azure_queue')
+    mock_worker = mocker.patch.object(testee, 'AzureWorker')
 
     testee.process_queue(role=testee.WorkerRole.AZURE, poll_interval_seconds=7)
 
     mock_slot.assert_called_once_with(None, testee.WorkerRole.AZURE.value)
-    mock_process.assert_called_once_with('azure-0', poll_interval_seconds=7)
+    mock_worker.assert_called_once_with('azure-0')
+    mock_worker.return_value.process_queue.assert_called_once_with(poll_interval_seconds=7)
 
 
 def test_process_queue_rejects_unknown_worker_role():

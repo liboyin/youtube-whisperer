@@ -165,15 +165,21 @@ def test_resolve_worker_slot_falls_back_to_hostname_and_role_default(mocker):
     assert testee.resolve_worker_slot(None, TranscriberType.AZURE.value) == 'azure-0'
 
 
+class MockWorker(testee.TranscriptionWorker):
+    def dispatch_task(self, task: Task, source: Path) -> None:
+        pass
+
+
 def test_process_active_slot_queue_full_flow(mocker, mock_redis):
     """Test successful end-to-end processing of a transcription slot task."""
     task = Task(source='/tmp/audio.wav', language='en', transcriber=TranscriberType.WHISPER)
     mocker.patch.object(testee, 'yield_active_slot_task', return_value=iter([task]))
     mocker.patch.object(testee, 'is_url', return_value=False)
-    dispatch_task = mocker.MagicMock()
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
+    dispatch_task = mocker.patch.object(worker, 'dispatch_task')
     mock_dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
 
-    testee.process_active_slot_queue(TranscriberType.WHISPER, 'gpu-0', dispatch_task)
+    worker.process_queue()
 
     dispatch_task.assert_called_once_with(task, Path('/tmp/audio.wav'))
     mock_dead_letter.assert_not_called()
@@ -185,10 +191,11 @@ def test_process_active_slot_queue_dead_letters_failures(mocker, mock_redis):
     task = Task(source='/tmp/audio.wav', language='en', transcriber=TranscriberType.WHISPER)
     mocker.patch.object(testee, 'yield_active_slot_task', return_value=iter([task]))
     mocker.patch.object(testee, 'is_url', return_value=False)
-    dispatch_task = mocker.MagicMock(side_effect=RuntimeError('boom'))
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
+    dispatch_task = mocker.patch.object(worker, 'dispatch_task', side_effect=RuntimeError('boom'))
     mock_dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
 
-    testee.process_active_slot_queue(TranscriberType.WHISPER, 'gpu-0', dispatch_task)
+    worker.process_queue()
 
     dispatch_task.assert_called_once_with(task, Path('/tmp/audio.wav'))
     mock_dead_letter.assert_called_once_with(
@@ -205,10 +212,11 @@ def test_process_active_slot_queue_dead_letters_url_tasks(mocker, mock_redis):
     task = Task(source='https://example.com/video', language='en', transcriber=TranscriberType.WHISPER)
     mocker.patch.object(testee, 'yield_active_slot_task', return_value=iter([task]))
     mocker.patch.object(testee, 'is_url', return_value=True)
-    dispatch_task = mocker.MagicMock()
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
+    dispatch_task = mocker.patch.object(worker, 'dispatch_task')
     mock_dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
 
-    testee.process_active_slot_queue(TranscriberType.WHISPER, 'gpu-0', dispatch_task)
+    worker.process_queue()
 
     dispatch_task.assert_not_called()
     mock_dead_letter.assert_called_once()

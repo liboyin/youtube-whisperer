@@ -63,16 +63,10 @@ def test_dispatch_task_for_whisper_transcriber(mocker):
     task = Task(source='/path.mp4', transcriber=TranscriberType.WHISPER, mode=TranscriberMode.TRANSCRIBE)
     source_path = Path('/path.mp4')
 
-    testee.dispatch_task(task, source_path)
+    testee.WhisperWorker('gpu-0').dispatch_task(task, source_path)
 
     mock_validate_gpu.assert_called_once()
     mock_transcribe.assert_called_once_with([source_path], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
 
 
-def test_process_queue_forwards_to_common_slot_processor(mocker):
-    """Test that the Whisper worker delegates queue processing to the common slot processor."""
-    mock_process = mocker.patch.object(testee, 'process_active_slot_queue')
 
-    testee.process_queue('gpu-0', poll_interval_seconds=7)
-
-    mock_process.assert_called_once_with(TranscriberType.WHISPER, 'gpu-0', testee.dispatch_task, 7)
