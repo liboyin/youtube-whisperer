@@ -7,6 +7,7 @@ from youtube_whisperer.utils import TranscriberMode, TranscriberType
 
 
 def test_task_source_validator():
+    """Test that task sources are stripped and blank sources are rejected."""
     task = testee.Task(source="  http://example.com/video  ")
     assert task.source == "http://example.com/video"
     with pytest.raises(ValidationError):
@@ -14,15 +15,19 @@ def test_task_source_validator():
 
 
 def test_task_transcriber_validator():
-    task = testee.Task(transcriber="local")
-    assert task.transcriber == TranscriberType.LOCAL
+    """Test that task transcribers accept supported values and reject invalid ones."""
+    task = testee.Task(transcriber="whisper")
+    assert task.transcriber == TranscriberType.WHISPER
     task = testee.Task(transcriber=TranscriberType.AZURE)
     assert task.transcriber == TranscriberType.AZURE
     with pytest.raises(ValidationError):
         testee.Task(transcriber="unknown")
+    with pytest.raises(ValidationError):
+        testee.Task(transcriber="local")
 
 
 def test_task_language_validator():
+    """Test that task languages accept valid codes and reject invalid ones."""
     english = LanguageCode("en")
     task = testee.Task(language="en")
     assert task.language == english
@@ -35,6 +40,7 @@ def test_task_language_validator():
 
 
 def test_task_mode_validator():
+    """Test that task modes accept supported values and reject unknown ones."""
     task = testee.Task(mode="transcribe")
     assert task.mode == TranscriberMode.TRANSCRIBE
     task = testee.Task(mode=TranscriberMode.TRANSLATE)
@@ -44,16 +50,45 @@ def test_task_mode_validator():
 
 
 def test_task_language_accepts_repr_string():
+    """Test that task languages can be parsed from a LanguageCode repr string."""
     task = testee.Task(language="LanguageCode(source='en-us', target=None)")
     assert task.language == LanguageCode("en-us")
 
 
 def test_task_language_rejects_non_string_value():
+    """Test that non-string language values raise a direct TypeError."""
     # Pydantic v2 does not wrap TypeError from plain validators, so it propagates directly
     with pytest.raises(TypeError, match="Unexpected language"):
         testee.Task(language=123)
 
 
 def test_task_model_json_schema_includes_language_field():
+    """Test that the task schema exposes the language field."""
     schema = testee.Task.model_json_schema()
     assert "language" in schema.get("properties", {})
+
+
+def test_task_queues_model_accepts_grouped_tasks():
+    """Test that grouped queue snapshots accept task lists for each queue."""
+    task = testee.Task(source="/tmp/audio.wav", language="en")
+
+    result = testee.TaskQueues(
+        youtube=[],
+        whisper_pending=[task],
+        whisper_active=[],
+        azure_pending=[],
+        azure_active=[],
+    )
+
+    assert result.whisper_pending == [task]
+
+
+def test_dead_letter_model_wraps_task_error_context():
+    """Test that dead-letter models retain the failed task, queue, and error."""
+    task = testee.Task(source="/tmp/audio.wav", language="en")
+
+    result = testee.DeadLetter(task=task, queue="tasks:whisper:active:gpu-0", error="boom")
+
+    assert result.task == task
+    assert result.queue == "tasks:whisper:active:gpu-0"
+    assert result.error == "boom"

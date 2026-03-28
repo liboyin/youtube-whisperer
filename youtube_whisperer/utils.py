@@ -13,7 +13,7 @@ REDIS_CLIENT = redis.StrictRedis(connection_pool=REDIS_POOL)
 
 
 class TranscriberType(str, Enum):
-    LOCAL = 'local'
+    WHISPER = 'whisper'
     AZURE = 'azure'
 
     @classmethod

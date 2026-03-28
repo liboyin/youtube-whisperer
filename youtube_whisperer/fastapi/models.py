@@ -9,11 +9,11 @@ from youtube_whisperer.utils import TranscriberMode, TranscriberType
 class Task(BaseModel):
     """
     source: str
-        At input time, source can be a URL of a YouTube video or a playlist, or a glob pattern for local files.
-        After resolution, it will be a concrete URL of a YouTube video or a local file path.
+        At input time, source can be a URL of a YouTube video or a playlist, or a glob pattern for filesystem files.
+        After resolution, it will be a concrete URL of a YouTube video or a filesystem file path.
 
     transcriber: TranscriberType
-        `local` for Whisper or `azure` for Azure Speech Recognition API. Defaults to `local`.
+        `whisper` for faster-whisper or `azure` for Azure Speech Recognition API. Defaults to `whisper`.
 
     language: LanguageCode
         The output language of transcription/translation. Must follow BCP-47 (works for Azure and Whisper) or ISO 639-1 (works for Whisper only).
@@ -22,7 +22,7 @@ class Task(BaseModel):
         Whether to run Whisper in transcribe mode or translate mode.
     """
     source: str = f'assets/{datetime.date.today().year}*.mkv'
-    transcriber: TranscriberType = TranscriberType.LOCAL
+    transcriber: TranscriberType = TranscriberType.WHISPER
     language: LanguageCode = LanguageCode('en-us')  # validation is handled by LanguageCode.__get_pydantic_core_schema__
     mode: TranscriberMode = TranscriberMode.TRANSCRIBE
 
@@ -56,3 +56,17 @@ class AddTasksResponse(BaseModel):
 class AddAssetsResponse(BaseModel):
     successful: list[str]
     failed: list[str]
+
+
+class TaskQueues(BaseModel):
+    youtube: list[Task]
+    whisper_pending: list[Task]
+    whisper_active: list[Task]
+    azure_pending: list[Task]
+    azure_active: list[Task]
+
+
+class DeadLetter(BaseModel):
+    task: Task
+    queue: str
+    error: str

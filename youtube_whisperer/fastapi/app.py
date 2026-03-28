@@ -9,8 +9,8 @@ from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File
 from pathlib_extensions import prepare_output_file
 from redis import StrictRedis
 
-from youtube_whisperer.fastapi.models import Task, AddTasksResponse, AddAssetsResponse
-from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
+from youtube_whisperer.fastapi.models import AddAssetsResponse, AddTasksResponse, DeadLetter, Task, TaskQueues
+from youtube_whisperer.queueing import DEAD_LETTER_QUEUE, YOUTUBE_QUEUE, clear_task_queues, list_dead_letters, list_task_queues, queue_task, queue_tasks
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR, REDIS_CLIENT, is_url
 
 app = FastAPI(title="YouTube Whisperer")
@@ -24,31 +24,28 @@ def get_redis_client() -> Generator[StrictRedis, None, None]:
     yield REDIS_CLIENT
 
 
-@app.get("/tasks", response_model=list[Task])
-async def get_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> list[Task]:
+@app.get("/tasks", response_model=TaskQueues)
+async def get_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> TaskQueues:
     """
-    Retrieve all tasks from the Redis queue.
+    Retrieve all pending and active tasks from the Redis queues.
     """
     try:
-        tasks = redis_client.lrange('tasks', 0, -1)
-        return [Task.model_validate_json(task) for task in tasks]
+        return list_task_queues(redis_client)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def resolve_tasks(pattern: Task) -> list[Task]:
+def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
     """
-    Resolve a Task pattern into a list of concrete Tasks.
+    Resolve a filesystem task pattern into a list of concrete Tasks.
     """
-    return [copy_task_with_source(pattern, source) for source in resolve_task_sources(pattern.source)]
+    return [copy_task_with_source(pattern, source) for source in resolve_filesystem_task_sources(pattern.source)]
 
 
-def resolve_task_sources(source: str) -> list[str]:
+def resolve_filesystem_task_sources(source: str) -> list[str]:
     """
-    Resolve a URL or glob pattern into a list of concrete sources.
+    Resolve a filesystem glob pattern into a list of concrete sources.
     """
-    if is_url(source):
-        return list(yield_flattened_video_urls([source]))
     return [str(path) for path in glob.glob(os.path.expanduser(source))]
 
 
@@ -67,7 +64,7 @@ def copy_task_with_source(pattern: Task, source: str) -> Task:
 @app.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
 async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(get_redis_client)) -> AddTasksResponse:
     """
-    Add new tasks from patterns to the Redis queue.
+    Add new tasks to the appropriate Redis queues.
 
     Args:
         patterns (list[Task]): List of task patterns.
@@ -80,31 +77,61 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
     """
     successful_tasks: list[Task] = []
     failed_tasks: list[Task] = []
+    youtube_tasks: list[Task] = []
+    transcription_tasks: list[Task] = []
     try:
         for pattern in patterns:
-            if resolved_tasks := resolve_tasks(pattern):
+            if is_url(pattern.source):
+                successful_tasks.append(pattern)
+                youtube_tasks.append(pattern)
+            elif resolved_tasks := resolve_filesystem_tasks(pattern):
                 successful_tasks.extend(resolved_tasks)
+                transcription_tasks.extend(resolved_tasks)
             else:
                 failed_tasks.append(pattern)
-        if successful_tasks:
-            redis_client.rpush('tasks', *(task.model_dump_json() for task in successful_tasks))
+        for task in youtube_tasks:
+            queue_task(redis_client, YOUTUBE_QUEUE, task)
+        if transcription_tasks:
+            queue_tasks(redis_client, transcription_tasks)
         return AddTasksResponse(successful=successful_tasks, failed=failed_tasks)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/tasks", response_model=list[Task])
-async def clear_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> list[Task]:
+@app.delete("/tasks", response_model=TaskQueues)
+async def clear_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> TaskQueues:
     """
-    Clear all tasks from the Redis queue.
+    Clear all pending and active tasks from the Redis queues.
 
     Returns:
-        list[Task]: List of tasks that were deleted from the queue.
+        TaskQueues: Snapshot of the deleted tasks.
     """
     try:
-        deleted = [Task.model_validate_json(task) for task in redis_client.lrange('tasks', 0, -1)]
-        redis_client.delete('tasks')
-        return deleted
+        return clear_task_queues(redis_client)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/dead-letters", response_model=list[DeadLetter])
+async def get_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)) -> list[DeadLetter]:
+    """
+    Retrieve failed tasks from the dead-letter queue.
+    """
+    try:
+        return list_dead_letters(redis_client)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/dead-letters", response_model=list[DeadLetter])
+async def clear_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)) -> list[DeadLetter]:
+    """
+    Clear the dead-letter queue.
+    """
+    try:
+        dead_letters = list_dead_letters(redis_client)
+        redis_client.delete(DEAD_LETTER_QUEUE)
+        return dead_letters
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

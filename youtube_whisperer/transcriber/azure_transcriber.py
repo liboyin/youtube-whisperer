@@ -1,7 +1,7 @@
 import os
 import threading
 from pathlib import Path
-from concurrent.futures import Future, ThreadPoolExecutor
+from typing import Any
 
 import azure.cognitiveservices.speech as speechsdk
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
@@ -12,7 +12,6 @@ from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 
 AZURE_SPEECH_API_KEY = os.getenv("AZURE_SPEECH_API_KEY")
 AZURE_SERVICE_REGION = os.getenv("AZURE_SERVICE_REGION")
-THREAD_POOL = ThreadPoolExecutor(max_workers=5)
 
 
 def get_audio_duration_seconds(audio_file: Path) -> float:
@@ -22,7 +21,11 @@ def get_audio_duration_seconds(audio_file: Path) -> float:
 
 def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
     """
-    Transcribes an audio file using Azure AI Speech service. Blocks until the transcription is complete/failed/timed out.
+    Transcribes an audio file using Azure AI Speech service.
+
+    This function blocks until Azure recognition completes, fails, or times
+    out. The synchronous behavior keeps queue state aligned with actual task
+    completion in the Azure worker.
 
     Args:
         input_file_path (Path): The path to the audio file to transcribe.
@@ -44,16 +47,16 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     done = threading.Event()
     transcription_error: Exception | None = None
 
-    def stop_cb(evt):
+    def stop_cb(evt: Any) -> None:
         print(f'CLOSED: {evt}')
         done.set()
 
-    def recognized_cb(evt):
+    def recognized_cb(evt: Any) -> None:
         print(f'UPDATE: {evt}')
         if evt.result.text:  # sometimes there is an empty update at the end of the recognition
             result_adaptor.append(evt.result)
 
-    def canceled_cb(evt):
+    def canceled_cb(evt: Any) -> None:
         nonlocal transcription_error
         print(f'CANCELED: {evt}')
         if evt.cancellation_details.reason == speechsdk.CancellationReason.Error:
@@ -79,31 +82,6 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
 
     result_adaptor.save_as_srt_file(output_file_path, deduplicate=True)
     return output_file_path
-
-
-def transcribe_audio_file_fire_and_forget(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Future:
-    """
-    Transcribes an audio file using Azure AI Speech service in a separate thread. Does not block.
-
-    Tasks are submitted to a ThreadPoolExecutor with a maximum of 5 concurrent workers.
-
-    Args:
-        input_file_path (Path): The path to the audio file to transcribe.
-        language (LanguageCode): The language of the audio file.
-        output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
-
-    Returns:
-        Future: The future representing the transcription task. Callers may ignore this for true fire-and-forget behaviour, or call `.result()` to block and surface exceptions.
-    """
-    def _log_error(future):
-        if e := future.exception():
-            print(f"Transcription failed for {input_file_path}: {e}")
-
-    future = THREAD_POOL.submit(transcribe_audio_file, input_file_path, language, output_file_path, overwrite)
-    print(f"Transcription task submitted for {input_file_path}. future: {future}")
-    future.add_done_callback(_log_error)
-    return future
 
 
 if __name__ == "__main__":

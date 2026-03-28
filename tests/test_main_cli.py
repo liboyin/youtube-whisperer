@@ -13,6 +13,7 @@ LANGUAGE = LanguageCode("en")
 
 
 def test_try_download_videos_and_transcripts_collects_only_missing_transcripts(mocker):
+    """Test that downloaded files are returned only when transcripts are still missing."""
     mocker.patch.object(
         testee,
         "yield_flattened_video_urls",
@@ -41,6 +42,7 @@ def test_try_download_videos_and_transcripts_collects_only_missing_transcripts(m
 
 
 def test_transcribe_to_srt_files_routes_to_azure_transcriber(mocker):
+    """Test that Azure transcription requests are routed to the Azure transcriber."""
     azure = mocker.patch.object(testee, "transcribe_audio_file", return_value=Path("/tmp/azure.srt"))
 
     testee.transcribe_to_srt_files(
@@ -53,26 +55,27 @@ def test_transcribe_to_srt_files_routes_to_azure_transcriber(mocker):
     azure.assert_called_once_with(Path("/tmp/azure.wav"), LANGUAGE, overwrite=OverwriteMode.ALWAYS)
 
 
-def test_transcribe_to_srt_files_routes_to_local_transcriber(mocker):
-    local = mocker.patch.object(testee, "transcribe_file_with_default_model", return_value=Path("/tmp/local.srt"))
+def test_transcribe_to_srt_files_routes_to_whisper_transcriber(mocker):
+    """Test that Whisper transcription requests are routed to the Whisper transcriber."""
+    whisper = mocker.patch.object(testee, "transcribe_file_with_default_model", return_value=Path("/tmp/whisper.srt"))
 
     testee.transcribe_to_srt_files(
-        [Path("/tmp/local-1.wav"), Path("/tmp/local-2.wav")],
+        [Path("/tmp/whisper-1.wav"), Path("/tmp/whisper-2.wav")],
         LANGUAGE,
-        transcriber=TranscriberType.LOCAL,
+        transcriber=TranscriberType.WHISPER,
         mode=TranscriberMode.TRANSLATE,
         overwrite=OverwriteMode.NEVER,
     )
 
-    assert local.call_args_list == [
+    assert whisper.call_args_list == [
         mocker.call(
-            Path("/tmp/local-1.wav"),
+            Path("/tmp/whisper-1.wav"),
             language=LANGUAGE,
             mode=TranscriberMode.TRANSLATE,
             overwrite=OverwriteMode.NEVER,
         ),
         mocker.call(
-            Path("/tmp/local-2.wav"),
+            Path("/tmp/whisper-2.wav"),
             language=LANGUAGE,
             mode=TranscriberMode.TRANSLATE,
             overwrite=OverwriteMode.NEVER,
@@ -81,22 +84,25 @@ def test_transcribe_to_srt_files_routes_to_local_transcriber(mocker):
 
 
 def test_transcribe_to_srt_files_prints_saved_srt_file_on_success(mocker, capsys):
-    mocker.patch.object(testee, "transcribe_file_with_default_model", return_value=Path("/tmp/local.srt"))
+    """Test that successful transcriptions print the saved SRT path."""
+    mocker.patch.object(testee, "transcribe_file_with_default_model", return_value=Path("/tmp/whisper.srt"))
 
-    testee.transcribe_to_srt_files([Path("/tmp/local.wav")], LANGUAGE, transcriber=TranscriberType.LOCAL)
+    testee.transcribe_to_srt_files([Path("/tmp/whisper.wav")], LANGUAGE, transcriber=TranscriberType.WHISPER)
 
-    assert "Saved SRT file: /tmp/local.srt" in capsys.readouterr().out
+    assert "Saved SRT file: /tmp/whisper.srt" in capsys.readouterr().out
 
 
 def test_transcribe_to_srt_files_prints_failure_on_none_result(mocker, capsys):
+    """Test that failed transcriptions print the original source path."""
     mocker.patch.object(testee, "transcribe_file_with_default_model", return_value=None)
 
-    testee.transcribe_to_srt_files([Path("/tmp/local.wav")], LANGUAGE, transcriber=TranscriberType.LOCAL)
+    testee.transcribe_to_srt_files([Path("/tmp/whisper.wav")], LANGUAGE, transcriber=TranscriberType.WHISPER)
 
-    assert "Failed to transcribe file: /tmp/local.wav" in capsys.readouterr().out
+    assert "Failed to transcribe file: /tmp/whisper.wav" in capsys.readouterr().out
 
 
 def test_transcribe_to_srt_files_rejects_unsupported_transcriber():
+    """Test that unsupported transcriber names raise a clear error."""
     with pytest.raises(ValueError, match="Unsupported transcriber type"):
         testee.transcribe_to_srt_files(
             [Path("/tmp/input.wav")],
@@ -106,8 +112,9 @@ def test_transcribe_to_srt_files_rejects_unsupported_transcriber():
 
 
 def test_main_partitions_sources_and_passes_arguments(mocker):
+    """Test that the CLI splits URL and filesystem sources before dispatching work."""
     args = SimpleNamespace(
-        sources=["https://example.com/video", "local.wav"],
+        sources=["https://example.com/video", "whisper.wav"],
         language=LANGUAGE,
         transcriber=TranscriberType.AZURE,
         mode=TranscriberMode.TRANSLATE,
@@ -129,7 +136,7 @@ def test_main_partitions_sources_and_passes_arguments(mocker):
         OverwriteMode.NEVER,
     )
     transcribe_args = mock_transcribe.call_args.args
-    assert list(transcribe_args[0]) == [Path("/tmp/downloaded.wav"), Path("local.wav")]
+    assert list(transcribe_args[0]) == [Path("/tmp/downloaded.wav"), Path("whisper.wav")]
     assert transcribe_args[1:] == (
         LANGUAGE,
         TranscriberType.AZURE,

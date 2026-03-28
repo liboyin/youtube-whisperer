@@ -4,10 +4,18 @@ import youtube_whisperer.utils as testee
 
 
 def test_transcriber_type_values():
-    assert testee.TranscriberType.values() == ('local', 'azure')
+    """Test that the transcriber enum exposes the supported transcriber names."""
+    assert testee.TranscriberType.values() == ('whisper', 'azure')
+
+
+def test_transcriber_type_rejects_legacy_local_alias():
+    """Test that the legacy local transcriber alias is rejected."""
+    with pytest.raises(ValueError, match="'local' is not a valid TranscriberType"):
+        testee.TranscriberType('local')
 
 
 def test_transcriber_mode_values():
+    """Test that the transcriber mode enum exposes the supported mode names."""
     assert testee.TranscriberMode.values() == ('transcribe', 'translate')
 
 
@@ -20,6 +28,7 @@ def test_transcriber_mode_values():
     ("1", True),
 ])
 def test_strtobool_true(input_text, expected):
+    """Test that truthy string inputs are converted to True."""
     assert testee.strtobool(input_text) is expected
 
 
@@ -32,6 +41,7 @@ def test_strtobool_true(input_text, expected):
     ("0", False),
 ])
 def test_strtobool_false(input_text, expected):
+    """Test that falsy string inputs are converted to False."""
     assert testee.strtobool(input_text) is expected
 
 
@@ -42,6 +52,7 @@ def test_strtobool_false(input_text, expected):
     "yesno",
 ])
 def test_strtobool_invalid(input_text):
+    """Test that invalid boolean-like strings raise ValueError."""
     with pytest.raises(ValueError):
         testee.strtobool(input_text)
 
@@ -61,4 +72,5 @@ def test_strtobool_invalid(input_text):
     ("not a url", False),
 ])
 def test_is_url(input_text, expected):
+    """Test that URL detection distinguishes valid HTTP URLs from other strings."""
     assert testee.is_url(input_text) == expected

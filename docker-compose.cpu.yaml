@@ -27,11 +27,10 @@ services:
     # uvicorn youtube_whisperer.fastapi.app:app --host 0.0.0.0 --port 8001 --log-level debug
     entrypoint: ["uvicorn", "youtube_whisperer.fastapi.app:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "debug"]
 
-  worker:
+  youtube_worker:
     build:
       context: .
       args: *build-args
-    container_name: youtube-whisperer-worker
     init: true
     restart: unless-stopped
     volumes: *volumes
@@ -41,7 +40,37 @@ services:
       - .env
     depends_on:
       - redis
-    entrypoint: ["python", "-m", "youtube_whisperer.worker"]
+    entrypoint: ["python", "-m", "youtube_whisperer.workers", "youtube"]
+
+  whisper_worker:
+    build:
+      context: .
+      args: *build-args
+    init: true
+    restart: unless-stopped
+    volumes: *volumes
+    environment:
+      WHISPER_USE_CUDA: '0'
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    entrypoint: ["python", "-m", "youtube_whisperer.workers", "whisper"]
+
+  azure_worker:
+    build:
+      context: .
+      args: *build-args
+    init: true
+    restart: unless-stopped
+    volumes: *volumes
+    environment:
+      WHISPER_USE_CUDA: '0'
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    entrypoint: ["python", "-m", "youtube_whisperer.workers", "azure"]
 
   redis:
     image: redis:latest

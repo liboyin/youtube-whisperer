@@ -1,211 +1,66 @@
-import json
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from pathlib_extensions import OverwriteMode
 
-from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-import youtube_whisperer.worker as testee
-from youtube_whisperer.fastapi.models import Task
-from youtube_whisperer.utils import TranscriberMode, TranscriberType
+import youtube_whisperer.workers.__main__ as testee
 
 
-@pytest.fixture
-def mock_redis(mocker):
-    """Fixture to mock the Redis client and connection context manager."""
-    mock_redis_client = mocker.MagicMock()
-    mocker.patch.object(testee, 'REDIS_CLIENT', mock_redis_client)
-    return mock_redis_client
+def test_worker_role_values():
+    """Test that the worker role enum exposes the expected CLI values."""
+    assert testee.WorkerRole.values() == ('youtube', 'whisper', 'azure')
 
 
-def test_yield_task(mock_redis, mocker):
-    """Test the task generator for correct yielding, polling, and validation."""
-    task_dict = {'source': 'http://example.com', 'language': 'en'}
-    task_json = json.dumps(task_dict).encode('utf-8')
-    expected_task = Task(
-        source=task_dict['source'],
-        language=LanguageCode(task_dict['language']),
-        transcriber=TranscriberType.LOCAL,
-        mode=TranscriberMode.TRANSCRIBE
+def test_worker_role_rejects_legacy_local_alias():
+    """Test that the worker role enum no longer accepts the legacy `local` alias."""
+    with pytest.raises(ValueError, match="'local' is not a valid WorkerRole"):
+        testee.WorkerRole('local')
+
+
+def test_process_queue_routes_youtube_work(mocker):
+    """Test that the queue entry point dispatches YouTube work to the YouTube processor."""
+    mock_process = mocker.patch.object(testee, 'process_youtube_queue')
+
+    testee.process_queue(role=testee.WorkerRole.YOUTUBE, poll_interval_seconds=7)
+
+    mock_process.assert_called_once_with(poll_interval_seconds=7)
+
+
+def test_process_queue_routes_whisper_work(mocker):
+    """Test that the queue entry point dispatches Whisper work with a resolved slot."""
+    mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='gpu-0')
+    mock_process = mocker.patch.object(testee, 'process_whisper_queue')
+
+    testee.process_queue(role=testee.WorkerRole.WHISPER, poll_interval_seconds=7)
+
+    mock_slot.assert_called_once_with(None, testee.WorkerRole.WHISPER.value)
+    mock_process.assert_called_once_with('gpu-0', poll_interval_seconds=7)
+
+
+def test_process_queue_routes_azure_work(mocker):
+    """Test that the queue entry point dispatches Azure work with a resolved slot."""
+    mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='azure-0')
+    mock_process = mocker.patch.object(testee, 'process_azure_queue')
+
+    testee.process_queue(role=testee.WorkerRole.AZURE, poll_interval_seconds=7)
+
+    mock_slot.assert_called_once_with(None, testee.WorkerRole.AZURE.value)
+    mock_process.assert_called_once_with('azure-0', poll_interval_seconds=7)
+
+
+def test_process_queue_rejects_unknown_worker_role():
+    """Test that unsupported worker roles raise a clear error."""
+    with pytest.raises(ValueError, match='Unsupported worker role'):
+        testee.process_queue(role='remote')
+
+
+def test_main_parses_arguments_and_dispatches(mocker):
+    """Test that the worker CLI parses arguments and dispatches to `process_queue`."""
+    mock_process = mocker.patch.object(testee, 'process_queue')
+    mocker.patch(
+        'argparse.ArgumentParser.parse_args',
+        return_value=SimpleNamespace(role='youtube', slot='yt-0', poll_interval_seconds=9),
     )
-    mock_sleep = mocker.patch('time.sleep')
-    # Simulate Redis returning a task, then nothing, then raising an exception
-    mock_redis.lrange.side_effect = [
-        [task_json],
-        None,
-        Exception("Test exception"),
-    ]
-    task_generator = testee.yield_task(mock_redis, poll_interval_seconds=1)
-    # First iteration should yield the task
-    yielded_task = next(task_generator)
-    assert yielded_task == expected_task
-    # Second iteration should sleep, continue, and then raise an exception on the next lrange call
-    with pytest.raises(Exception):
-        next(task_generator)
-    mock_sleep.assert_called_once_with(1)
-    assert mock_redis.lrange.call_count == 3
 
+    testee.main()
 
-def test_is_gpu_healthy_returns_true_when_nvidia_smi_succeeds(mocker):
-    mocker.patch.object(testee.subprocess, "run", return_value=SimpleNamespace(returncode=0))
-
-    assert testee.is_gpu_healthy() is True
-
-
-def test_is_gpu_healthy_returns_false_when_subprocess_raises(mocker):
-    mocker.patch.object(testee.subprocess, "run", side_effect=OSError("missing"))
-
-    assert testee.is_gpu_healthy() is False
-
-
-def test_validate_gpu_health_or_exit_healthy(mocker):
-    """Test that sys.exit is not called when the GPU is healthy."""
-    mocker.patch.object(testee, 'use_cuda', return_value=True)
-    mocker.patch.object(testee, 'is_gpu_healthy', return_value=True)
-    mock_exit = mocker.patch('sys.exit')
-    testee.validate_gpu_health_or_exit()
-    mock_exit.assert_not_called()
-
-
-def test_validate_gpu_health_or_exit_unhealthy(mocker):
-    """Test that sys.exit is called when the GPU is unhealthy."""
-    mocker.patch.object(testee, 'use_cuda', return_value=True)
-    mocker.patch.object(testee, 'is_gpu_healthy', return_value=False)
-    mock_exit = mocker.patch('sys.exit')
-    testee.validate_gpu_health_or_exit()
-    mock_exit.assert_called_once_with(2)
-
-
-def test_validate_gpu_health_or_exit_no_cuda(mocker):
-    """Test that is_gpu_healthy and sys.exit are not called when CUDA is not used."""
-    mocker.patch.object(testee, 'use_cuda', return_value=False)
-    mock_is_gpu_healthy = mocker.patch.object(testee, 'is_gpu_healthy')
-    mock_exit = mocker.patch('sys.exit')
-    testee.validate_gpu_health_or_exit()
-    mock_is_gpu_healthy.assert_not_called()
-    mock_exit.assert_not_called()
-
-
-def test_resolve_waveform_file_path_for_url(mocker):
-    """Test resolving a task source from a URL."""
-    mock_is_url = mocker.patch.object(testee, 'is_url', return_value=True)
-    mock_download = mocker.patch.object(testee, 'download_video_and_transcript_with_default_title', return_value=(Path('/path/to/video.mp4'), False))
-    task = Task(source='http://example.com', language='en')
-    path, transcript_found = testee.resolve_waveform_file_path(task)
-    mock_is_url.assert_called_once_with(task.source)
-    mock_download.assert_called_once_with(task.source, task.language, overwrite=OverwriteMode.NEVER)
-    assert path == Path('/path/to/video.mp4')
-    assert not transcript_found
-
-
-def test_resolve_waveform_file_path_for_local_file(mocker):
-    """Test resolving a task source from a local file path."""
-    mock_is_url = mocker.patch.object(testee, 'is_url', return_value=False)
-    mock_download = mocker.patch.object(testee, 'download_video_and_transcript_with_default_title')
-    task = Task(source='/local/path.mp4', language='en')
-    path, transcript_found = testee.resolve_waveform_file_path(task)
-    mock_is_url.assert_called_once_with(task.source)
-    mock_download.assert_not_called()
-    assert path == Path('/local/path.mp4')
-    assert not transcript_found
-
-
-def test_dispatch_transcription_task_for_local_transcriber(mocker):
-    """Test dispatching to the local Whisper transcriber."""
-    mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
-    mock_transcribe = mocker.patch.object(testee, 'transcribe_to_srt_files')
-    task = Task(source='/path.mp4', transcriber=TranscriberType.LOCAL, mode=TranscriberMode.TRANSCRIBE)
-    source_path = Path('/path.mp4')
-    testee.dispatch_transcription_task(task, source_path)
-    mock_validate_gpu.assert_called_once()
-    mock_transcribe.assert_called_once_with([source_path], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
-
-
-def test_dispatch_transcription_task_for_azure_transcriber_with_conversion(mocker):
-    """Test dispatching to the Azure transcriber when WAV conversion is needed."""
-    mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
-    mock_save_wav = mocker.patch.object(testee, 'save_as_wav_file', return_value=Path('/path.wav'))
-    mock_transcribe_azure_fire_and_forget = mocker.patch.object(testee, 'transcribe_audio_file_fire_and_forget')
-    task = Task(source='/path.mp4', transcriber=TranscriberType.AZURE)
-    source_path = Path('/path.mp4')
-    testee.dispatch_transcription_task(task, source_path)
-    mock_validate_gpu.assert_not_called()  # No GPU validation for Azure transcriber
-    mock_save_wav.assert_called_once_with(source_path, overwrite=OverwriteMode.NEVER)
-    mock_transcribe_azure_fire_and_forget.assert_called_once_with(Path('/path.wav'), task.language, overwrite=OverwriteMode.NEVER)
-
-
-def test_dispatch_transcription_task_for_azure_transcriber_no_conversion(mocker):
-    """Test dispatching to the Azure transcriber when no WAV conversion is needed."""
-    mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
-    mock_save_wav = mocker.patch.object(testee, 'save_as_wav_file')
-    mock_transcribe_azure_fire_and_forget = mocker.patch.object(testee, 'transcribe_audio_file_fire_and_forget')
-    task = Task(source='/path.wav', transcriber=TranscriberType.AZURE)
-    source_path = Path('/path.wav')
-    testee.dispatch_transcription_task(task, source_path)
-    mock_validate_gpu.assert_not_called()  # No GPU validation for Azure transcriber
-    mock_save_wav.assert_not_called()
-    mock_transcribe_azure_fire_and_forget.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER)
-
-
-def test_dispatch_transcription_task_for_azure_returns_early_when_wav_conversion_fails(mocker, capsys):
-    mock_save = mocker.patch.object(testee, "save_as_wav_file", return_value=None)
-    mock_transcribe = mocker.patch.object(testee, "transcribe_audio_file_fire_and_forget")
-    task = Task(source="/tmp/audio.mp3", language="en", transcriber=TranscriberType.AZURE)
-
-    testee.dispatch_transcription_task(task, Path("/tmp/audio.mp3"))
-
-    mock_save.assert_called_once_with(Path("/tmp/audio.mp3"), overwrite=OverwriteMode.NEVER)
-    mock_transcribe.assert_not_called()
-    assert "Skipping transcription for None as WAV conversion failed" in capsys.readouterr().out
-
-
-def test_dispatch_transcription_task_rejects_unknown_transcriber():
-    task = SimpleNamespace(transcriber="remote", mode="transcribe", language="en")
-
-    with pytest.raises(ValueError, match="Unsupported transcriber type"):
-        testee.dispatch_transcription_task(task, Path("/tmp/audio.wav"))
-
-
-def test_process_queue_full_flow(mocker, mock_redis):
-    """Test the integration of functions within process_queue for a successful transcription."""
-    mock_yield_task = mocker.patch.object(testee, 'yield_task')
-    mock_resolve_path = mocker.patch.object(testee, 'resolve_waveform_file_path')
-    mock_dispatch = mocker.patch.object(testee, 'dispatch_transcription_task')
-    task = Task(source='http://example.com', language='en')
-    waveform_path = Path('/path/to/video.mp4')
-    mock_yield_task.return_value = iter([task])  # Yield one task and stop
-    mock_resolve_path.return_value = (waveform_path, False)  # Simulate no existing transcript
-    testee.process_queue()
-    mock_resolve_path.assert_called_once_with(task)
-    mock_dispatch.assert_called_once_with(task, waveform_path)
-    mock_redis.lpop.assert_called_once_with('tasks')
-
-
-def test_process_queue_skips_transcription_if_transcript_ready(mocker, mock_redis):
-    """Test that transcription is skipped if a transcript is already available."""
-    mock_yield_task = mocker.patch.object(testee, 'yield_task')
-    mock_resolve_path = mocker.patch.object(testee, 'resolve_waveform_file_path')
-    mock_dispatch = mocker.patch.object(testee, 'dispatch_transcription_task')
-    task = Task(source='http://example.com', language='en')
-    waveform_path = Path('/path/to/video.mp4')
-    mock_yield_task.return_value = iter([task])
-    mock_resolve_path.return_value = (waveform_path, True)  # Simulate transcript exists
-    testee.process_queue()
-    mock_resolve_path.assert_called_once_with(task)
-    mock_dispatch.assert_not_called()  # The key assertion
-    mock_redis.lpop.assert_called_once_with('tasks')
-
-
-def test_process_queue_deletes_failed_tasks(mocker):
-    mock_redis = mocker.MagicMock()
-    mocker.patch.object(testee, "REDIS_CLIENT", mock_redis)
-    task = Task(source="http://example.com/video", language="en")
-    mocker.patch.object(testee, "yield_task", return_value=iter([task]))
-    mocker.patch.object(testee, "resolve_waveform_file_path", side_effect=RuntimeError("boom"))
-    mock_dispatch = mocker.patch.object(testee, "dispatch_transcription_task")
-
-    testee.process_queue()
-
-    mock_dispatch.assert_not_called()
-    mock_redis.lpop.assert_called_once_with("tasks")
+    mock_process.assert_called_once_with(role='youtube', slot='yt-0', poll_interval_seconds=9)

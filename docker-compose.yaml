@@ -7,13 +7,23 @@ services:
       WHISPER_USE_CUDA: '1'
     runtime: nvidia
 
-  worker:
+  whisper_worker:
     extends:
       file: docker-compose.cpu.yaml
-      service: worker
+      service: whisper_worker
     environment:
       WHISPER_USE_CUDA: '1'
     runtime: nvidia
+
+  youtube_worker:
+    extends:
+      file: docker-compose.cpu.yaml
+      service: youtube_worker
+
+  azure_worker:
+    extends:
+      file: docker-compose.cpu.yaml
+      service: azure_worker
 
   redis:
     extends:

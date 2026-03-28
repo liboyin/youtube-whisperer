@@ -1,22 +1,15 @@
 import asyncio
 from pathlib import Path
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from redis import StrictRedis
-from unittest.mock import MagicMock, patch
 
 import youtube_whisperer.fastapi.app as testee
-from youtube_whisperer.fastapi.models import Task, TranscriberMode
-
-
-@pytest.fixture
-def mock_dependencies(mocker):
-    mock_is_url = mocker.patch.object(testee, 'is_url')
-    mock_yield_urls = mocker.patch.object(testee, 'yield_flattened_video_urls')
-    mock_glob = mocker.patch.object(testee.glob, 'glob')
-    return mock_is_url, mock_yield_urls, mock_glob
+from youtube_whisperer.fastapi.models import DeadLetter, Task, TaskQueues
+from youtube_whisperer.utils import TranscriberMode
 
 
 @pytest.fixture
@@ -25,6 +18,7 @@ def mock_redis_client():
     mock_client.lrange.return_value = []
     mock_client.rpush.return_value = 1
     mock_client.delete.return_value = 1
+    mock_client.scan_iter.return_value = iter([])
     return mock_client
 
 
@@ -47,184 +41,214 @@ def client():
 
 
 def test_get_assets_dir_returns_configured_directory():
+    """Test that the assets dependency returns the configured assets directory."""
     assert testee.get_assets_dir() == testee.WHISPER_ASSETS_DIR
 
 
 def test_get_redis_client_yields_configured_client():
+    """Test that the Redis dependency yields the configured Redis client."""
     assert next(testee.get_redis_client()) is testee.REDIS_CLIENT
 
 
-def test_get_tasks_empty(client, mock_redis_client):
+def test_get_tasks_returns_queue_snapshot(client, mocker):
+    """Test that the tasks endpoint returns the grouped queue snapshot."""
+    queue_snapshot = TaskQueues(youtube=[], whisper_pending=[], whisper_active=[], azure_pending=[], azure_active=[])
+    mock_list = mocker.patch.object(testee, 'list_task_queues', return_value=queue_snapshot)
+
     response = client.get("/tasks")
+
     assert response.status_code == 200
-    assert response.json() == []
-    mock_redis_client.lrange.assert_called_once_with('tasks', 0, -1)
+    assert response.json() == queue_snapshot.model_dump(mode='json')
+    mock_list.assert_called_once()
 
 
-def test_get_tasks_with_data(client, mock_redis_client):
-    tasks_data = [
-        Task(source="http://example.com/video1", language="zh", mode=TranscriberMode.TRANSCRIBE),
-        Task(source="http://example.com/video2", language="en", mode=TranscriberMode.TRANSLATE),
-    ]
-    mock_redis_client.lrange.return_value = [task.model_dump_json().encode('utf-8') for task in tasks_data]
-    response = client.get("/tasks")
-    assert response.status_code == 200
-    response_json = response.json()
-    assert len(response_json) == 2
-    assert response_json[0]["source"] == "http://example.com/video1"
-    assert response_json[1]["source"] == "http://example.com/video2"
-    mock_redis_client.lrange.assert_called_once_with('tasks', 0, -1)
-
-
-def test_get_tasks_raises_http_500_when_redis_fails(mocker):
+def test_get_tasks_raises_http_500_when_queue_lookup_fails(mocker):
+    """Test that task lookup failures are surfaced as HTTP 500 errors."""
     redis_client = mocker.MagicMock()
-    redis_client.lrange.side_effect = RuntimeError("redis down")
+    mocker.patch.object(testee, 'list_task_queues', side_effect=RuntimeError("redis down"))
 
     with pytest.raises(HTTPException, match="redis down"):
         asyncio.run(testee.get_tasks(redis_client=redis_client))
 
 
-def test_resolve_tasks_builds_tasks_from_resolved_sources(mocker):
-    pattern = Task(source='http://example.com/playlist', language='en')
+def test_resolve_filesystem_tasks_builds_tasks_from_resolved_sources(mocker):
+    """Test that filesystem task expansion preserves metadata across resolved sources."""
+    pattern = Task(source='/tmp/*.wav', language='en')
     mock_resolve_sources = mocker.patch.object(
         testee,
-        'resolve_task_sources',
-        return_value=['http://example.com/video1', 'http://example.com/video2'],
+        'resolve_filesystem_task_sources',
+        return_value=['/tmp/one.wav', '/tmp/two.wav'],
     )
 
-    result = testee.resolve_tasks(pattern)
+    result = testee.resolve_filesystem_tasks(pattern)
 
-    assert [task.source for task in result] == ['http://example.com/video1', 'http://example.com/video2']
+    assert [task.source for task in result] == ['/tmp/one.wav', '/tmp/two.wav']
     assert all(task.language == pattern.language for task in result)
     mock_resolve_sources.assert_called_once_with(pattern.source)
 
 
-def test_resolve_task_sources_with_url(mock_dependencies):
-    mock_is_url, mock_yield_urls, _ = mock_dependencies
-    mock_is_url.return_value = True
-    mock_yield_urls.return_value = ['http://example.com/video1', 'http://example.com/video2']
+def test_resolve_filesystem_task_sources_expands_globs(mocker):
+    """Test that filesystem task source resolution expands glob patterns."""
+    mock_glob = mocker.patch.object(testee.glob, 'glob', return_value=['/path/to/file1.mkv', '/path/to/file2.mkv'])
 
-    result = testee.resolve_task_sources('http://example.com/playlist')
-
-    assert result == ['http://example.com/video1', 'http://example.com/video2']
-    mock_is_url.assert_called_once_with('http://example.com/playlist')
-    mock_yield_urls.assert_called_once_with(['http://example.com/playlist'])
-
-
-def test_resolve_task_sources_with_local_path(mock_dependencies):
-    mock_is_url, _, mock_glob = mock_dependencies
-    mock_is_url.return_value = False
-    mock_glob.return_value = ['/path/to/file1.mkv', '/path/to/file2.mkv']
-
-    result = testee.resolve_task_sources('/path/to/*.mkv')
+    result = testee.resolve_filesystem_task_sources('/path/to/*.mkv')
 
     assert result == ['/path/to/file1.mkv', '/path/to/file2.mkv']
-    mock_is_url.assert_called_once_with('/path/to/*.mkv')
     mock_glob.assert_called_once_with('/path/to/*.mkv')
 
 
-def test_resolve_task_sources_no_match(mock_dependencies):
-    mock_is_url, mock_yield_urls, mock_glob = mock_dependencies
-    mock_is_url.return_value = False
-    mock_yield_urls.return_value = []
-    mock_glob.return_value = []
-
-    result = testee.resolve_task_sources('nonexistent_pattern')
-
-    assert result == []
-    mock_is_url.assert_called_once_with('nonexistent_pattern')
-    mock_glob.assert_called_once_with('nonexistent_pattern')
-
-
 def test_copy_task_with_source_preserves_non_source_fields():
-    pattern = Task(source='http://example.com/playlist', language='en', mode=TranscriberMode.TRANSLATE)
+    """Test that copying a task with a new source preserves its other fields."""
+    pattern = Task(source='https://example.com/playlist', language='en', mode=TranscriberMode.TRANSLATE)
 
-    result = testee.copy_task_with_source(pattern, 'http://example.com/video1')
+    result = testee.copy_task_with_source(pattern, 'https://example.com/video1')
 
-    assert result.source == 'http://example.com/video1'
+    assert result.source == 'https://example.com/video1'
     assert result.language == pattern.language
     assert result.transcriber == pattern.transcriber
     assert result.mode == pattern.mode
 
 
-def test_add_tasks(client, mock_redis_client):
-    tasks_to_add = [
-        {"source": "http://example.com/video1", "language": "en", "mode": "transcribe"}
-    ]
-    with patch.object(testee, 'resolve_tasks') as mock_resolve_tasks:
-        resolved_task = Task(source="http://example.com/video1", language="en", mode=TranscriberMode.TRANSCRIBE)
-        mock_resolve_tasks.return_value = [resolved_task]
-        response = client.post("/tasks", json=tasks_to_add)
+def test_add_tasks_routes_youtube_and_whisper_work(client, mocker):
+    """Test that the add-tasks endpoint splits YouTube and filesystem work correctly."""
+    url_task = Task(source='https://example.com/video', language='en')
+    resolved_whisper_task = Task(source='/tmp/audio.wav', language='en')
+    mocker.patch.object(testee, 'is_url', side_effect=lambda source: source.startswith('http'))
+    mock_resolve_filesystem = mocker.patch.object(testee, 'resolve_filesystem_tasks', return_value=[resolved_whisper_task])
+    mock_queue_task = mocker.patch.object(testee, 'queue_task')
+    mock_queue_tasks = mocker.patch.object(testee, 'queue_tasks')
+
+    response = client.post(
+        "/tasks",
+        json=[
+            url_task.model_dump(mode='json'),
+            Task(source='/tmp/*.wav', language='en').model_dump(mode='json'),
+        ],
+    )
+
     assert response.status_code == 201
-    response_json = response.json()
-    assert len(response_json["successful"]) == 1
-    assert response_json["successful"][0]["source"] == "http://example.com/video1"
-    assert len(response_json["failed"]) == 0
-    mock_redis_client.rpush.assert_called_once_with('tasks', resolved_task.model_dump_json())
+    assert response.json() == {
+        'successful': [url_task.model_dump(mode='json'), resolved_whisper_task.model_dump(mode='json')],
+        'failed': [],
+    }
+    mock_resolve_filesystem.assert_called_once()
+    mock_queue_task.assert_called_once_with(ANY, testee.YOUTUBE_QUEUE, url_task)
+    mock_queue_tasks.assert_called_once_with(ANY, [resolved_whisper_task])
 
 
-def test_add_tasks_failed_resolution(client, mock_redis_client):
-    tasks_to_add = [
-        {"source": "nonexistent", "language": "en", "mode": "transcribe"}
-    ]
-    with patch.object(testee, 'resolve_tasks') as mock_resolve_tasks:
-        mock_resolve_tasks.return_value = []
-        response = client.post("/tasks", json=tasks_to_add)
+def test_add_tasks_failed_resolution(client, mocker):
+    """Test that unresolved filesystem tasks are returned in the failed list."""
+    task = Task(source='/tmp/*.wav', language='en')
+    mocker.patch.object(testee, 'is_url', return_value=False)
+    mocker.patch.object(testee, 'resolve_filesystem_tasks', return_value=[])
+    mock_queue_task = mocker.patch.object(testee, 'queue_task')
+    mock_queue_tasks = mocker.patch.object(testee, 'queue_tasks')
+
+    response = client.post("/tasks", json=[task.model_dump(mode='json')])
+
     assert response.status_code == 201
-    response_json = response.json()
-    assert len(response_json["successful"]) == 0
-    assert len(response_json["failed"]) == 1
-    assert response_json["failed"][0]["source"] == "nonexistent"
-    mock_redis_client.rpush.assert_not_called()
+    assert response.json() == {'successful': [], 'failed': [task.model_dump(mode='json')]}
+    mock_queue_task.assert_not_called()
+    mock_queue_tasks.assert_not_called()
 
 
-def test_add_tasks_raises_http_500_when_redis_fails(mocker):
+def test_add_tasks_raises_http_500_when_queueing_fails(mocker):
+    """Test that queueing failures in add_tasks are surfaced as HTTP 500 errors."""
     redis_client = mocker.MagicMock()
-    redis_client.rpush.side_effect = RuntimeError("redis down")
-    task = Task(source="http://example.com/video", language="en")
-    mocker.patch("youtube_whisperer.fastapi.app.resolve_tasks", return_value=[task])
+    task = Task(source="/tmp/audio.wav", language="en")
+    mocker.patch.object(testee, 'is_url', return_value=False)
+    mocker.patch.object(testee, 'resolve_filesystem_tasks', return_value=[task])
+    mocker.patch.object(testee, 'queue_tasks', side_effect=RuntimeError("redis down"))
 
     with pytest.raises(HTTPException, match="redis down"):
         asyncio.run(testee.add_tasks([task], redis_client=redis_client))
 
 
-def test_clear_tasks(client, mock_redis_client):
-    tasks_data = [
-        Task(source="http://example.com/video1", language="en", mode=TranscriberMode.TRANSCRIBE),
-    ]
-    mock_redis_client.lrange.return_value = [task.model_dump_json().encode('utf-8') for task in tasks_data]
+def test_clear_tasks_returns_deleted_queue_snapshot(client, mocker):
+    """Test that deleting tasks returns the snapshot of removed queue contents."""
+    queue_snapshot = TaskQueues(youtube=[], whisper_pending=[], whisper_active=[], azure_pending=[], azure_active=[])
+    mock_clear = mocker.patch.object(testee, 'clear_task_queues', return_value=queue_snapshot)
+
     response = client.delete("/tasks")
+
     assert response.status_code == 200
-    response_json = response.json()
-    assert len(response_json) == 1
-    assert response_json[0]["source"] == "http://example.com/video1"
-    mock_redis_client.lrange.assert_called_once_with('tasks', 0, -1)
-    mock_redis_client.delete.assert_called_once_with('tasks')
+    assert response.json() == queue_snapshot.model_dump(mode='json')
+    mock_clear.assert_called_once()
 
 
-def test_clear_tasks_raises_http_500_when_redis_fails(mocker):
+def test_clear_tasks_raises_http_500_when_queue_clearing_fails(mocker):
+    """Test that task-clearing failures are surfaced as HTTP 500 errors."""
     redis_client = mocker.MagicMock()
-    redis_client.lrange.side_effect = RuntimeError("redis down")
+    mocker.patch.object(testee, 'clear_task_queues', side_effect=RuntimeError("redis down"))
 
     with pytest.raises(HTTPException, match="redis down"):
         asyncio.run(testee.clear_tasks(redis_client=redis_client))
 
 
+def test_get_dead_letters_returns_queue_contents(client, mocker):
+    """Test that the dead-letter endpoint returns the queued dead-letter entries."""
+    dead_letter = DeadLetter(task=Task(source='/tmp/audio.wav', language='en'), queue='tasks:whisper:active:gpu-0', error='boom')
+    mock_list = mocker.patch.object(testee, 'list_dead_letters', return_value=[dead_letter])
+
+    response = client.get("/dead-letters")
+
+    assert response.status_code == 200
+    assert response.json() == [dead_letter.model_dump(mode='json')]
+    mock_list.assert_called_once()
+
+
+def test_get_dead_letters_raises_http_500_when_lookup_fails(mocker):
+    """Test that dead-letter lookup failures are surfaced as HTTP 500 errors."""
+    redis_client = mocker.MagicMock()
+    mocker.patch.object(testee, 'list_dead_letters', side_effect=RuntimeError("redis down"))
+
+    with pytest.raises(HTTPException, match="redis down"):
+        asyncio.run(testee.get_dead_letters(redis_client=redis_client))
+
+
+def test_clear_dead_letters_returns_deleted_items(client, mocker, mock_redis_client):
+    """Test that clearing dead letters returns the deleted entries and removes the queue key."""
+    dead_letter = DeadLetter(task=Task(source='/tmp/audio.wav', language='en'), queue='tasks:whisper:active:gpu-0', error='boom')
+    mock_list = mocker.patch.object(testee, 'list_dead_letters', return_value=[dead_letter])
+
+    response = client.delete("/dead-letters")
+
+    assert response.status_code == 200
+    assert response.json() == [dead_letter.model_dump(mode='json')]
+    mock_list.assert_called_once()
+    mock_redis_client.delete.assert_called_once_with(testee.DEAD_LETTER_QUEUE)
+
+
+def test_clear_dead_letters_raises_http_500_when_delete_fails(mocker):
+    """Test that dead-letter clearing failures are surfaced as HTTP 500 errors."""
+    redis_client = mocker.MagicMock()
+    mocker.patch.object(testee, 'list_dead_letters', side_effect=RuntimeError("redis down"))
+
+    with pytest.raises(HTTPException, match="redis down"):
+        asyncio.run(testee.clear_dead_letters(redis_client=redis_client))
+
+
 def test_list_assets_empty(client):
+    """Test that the assets endpoint returns an empty list when no files exist."""
     response = client.get("/assets")
+
     assert response.status_code == 200
     assert response.json() == []
 
 
 def test_list_assets_with_files(client, mock_assets_dir):
+    """Test that the assets endpoint lists files present in the assets directory."""
     (mock_assets_dir / "file1.txt").touch()
     (mock_assets_dir / "file2.txt").touch()
+
     response = client.get("/assets")
+
     assert response.status_code == 200
     assert sorted(response.json()) == [str(mock_assets_dir / "file1.txt"), str(mock_assets_dir / "file2.txt")]
 
 
 def test_list_assets_raises_http_500_when_directory_listing_fails():
+    """Test that asset-listing failures are surfaced as HTTP 500 errors."""
     bad_dir = Path("/definitely/missing")
 
     with pytest.raises(HTTPException, match="No such file or directory"):
@@ -232,12 +256,15 @@ def test_list_assets_raises_http_500_when_directory_listing_fails():
 
 
 def test_add_assets(client, mock_assets_dir):
+    """Test that uploaded asset files are saved and reported as successful."""
     files = [
         ("file1.txt", b"content1"),
         ("file2.txt", b"content2"),
     ]
     upload_files = [("files", (name, content, "text/plain")) for name, content in files]
+
     response = client.post("/assets", files=upload_files)
+
     assert response.status_code == 201
     response_json = response.json()
     assert len(response_json["successful"]) == 2
@@ -249,6 +276,7 @@ def test_add_assets(client, mock_assets_dir):
 
 
 def test_add_assets_catches_individual_file_write_failure(mocker, tmp_path):
+    """Test that individual asset write failures are reported without crashing the request."""
     mock_upload = mocker.MagicMock()
     mock_upload.filename = "test.txt"
     bad_path = mocker.MagicMock()
@@ -262,6 +290,7 @@ def test_add_assets_catches_individual_file_write_failure(mocker, tmp_path):
 
 
 def test_add_assets_raises_http_500_when_filename_is_missing(mocker, tmp_path):
+    """Test that uploads without filenames raise an HTTP 500 error."""
     mock_upload = mocker.MagicMock()
     mock_upload.filename = None
 
@@ -270,6 +299,7 @@ def test_add_assets_raises_http_500_when_filename_is_missing(mocker, tmp_path):
 
 
 def test_clean_assets(client, mock_assets_dir):
+    """Test that cleaning assets removes only transient media files."""
     (mock_assets_dir / "video.mp4").touch()
     (mock_assets_dir / "video.srt").touch()
     (mock_assets_dir / "video.mkv").touch()
@@ -278,6 +308,7 @@ def test_clean_assets(client, mock_assets_dir):
     (mock_assets_dir / "another.mp4").touch()
 
     response = client.delete("/assets")
+
     assert response.status_code == 200
     removed_files = response.json()
     assert len(removed_files) == 3
@@ -293,6 +324,7 @@ def test_clean_assets(client, mock_assets_dir):
 
 
 def test_clean_assets_raises_http_500_when_directory_listing_fails():
+    """Test that asset-cleaning listing failures are surfaced as HTTP 500 errors."""
     bad_dir = Path("/definitely/missing")
 
     with pytest.raises(HTTPException, match="No such file or directory"):
