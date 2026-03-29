@@ -1,9 +1,9 @@
 import argparse
 from enum import Enum
 import os
+import socket
 
 from youtube_whisperer.workers.azure_worker import AzureWorker
-from youtube_whisperer.workers.common import resolve_worker_slot
 from youtube_whisperer.workers.whisper_worker import WhisperWorker
 from youtube_whisperer.workers.youtube_worker import YouTubeWorker
 
@@ -22,6 +22,25 @@ class WorkerRole(str, Enum):
             order.
         """
         return tuple(role.value for role in cls)
+
+
+def resolve_worker_slot(slot: str | None, role_name: str) -> str:
+    """
+    Resolve the slot name a worker should use for active-queue ownership.
+
+    Args:
+        slot: Explicit slot override, if provided.
+        role_name: Worker role name used when constructing the fallback slot name.
+
+    Returns:
+        The resolved slot name from the explicit value, environment, or role-based default.
+    """
+    if slot:
+        return slot
+    slot_id = os.getenv('WORKER_SLOT_ID')
+    if slot_id is not None:
+        return f'{role_name}-{slot_id}'
+    return socket.gethostname()
 
 
 def process_queue(role: WorkerRole | str = WorkerRole.WHISPER, slot: str | None = None, poll_interval_seconds: int = 5) -> None:
@@ -50,14 +69,13 @@ def process_queue(role: WorkerRole | str = WorkerRole.WHISPER, slot: str | None 
         role = WorkerRole(role)
     except ValueError as exc:
         raise ValueError(f'Unsupported worker role: {role}') from exc
+    resolved_slot = resolve_worker_slot(slot, role.value)
     match role:
         case WorkerRole.YOUTUBE:
-            YouTubeWorker().process_queue(poll_interval_seconds=poll_interval_seconds)
+            YouTubeWorker(resolved_slot).process_queue(poll_interval_seconds=poll_interval_seconds)
         case WorkerRole.WHISPER:
-            resolved_slot = resolve_worker_slot(slot, role.value)
             WhisperWorker(resolved_slot).process_queue(poll_interval_seconds=poll_interval_seconds)
         case WorkerRole.AZURE:
-            resolved_slot = resolve_worker_slot(slot, role.value)
             AzureWorker(resolved_slot).process_queue(poll_interval_seconds=poll_interval_seconds)
 
 
@@ -73,7 +91,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('role', nargs='?', choices=WorkerRole.values(), default=os.getenv('WORKER_ROLE', WorkerRole.WHISPER.value))
-    parser.add_argument('--slot', default=None, help="Active-slot identifier for whisper/Azure workers. Defaults to WORKER_SLOT, then HOSTNAME.")
+    parser.add_argument('--slot', default=None, help="Active-slot identifier for whisper/Azure workers. Defaults to WORKER_SLOT_ID, then machine hostname.")
     parser.add_argument('--poll-interval-seconds', type=int, default=5)
     args = parser.parse_args()
     process_queue(role=args.role, slot=args.slot, poll_interval_seconds=args.poll_interval_seconds)

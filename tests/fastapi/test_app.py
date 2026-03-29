@@ -71,37 +71,23 @@ def test_get_tasks_raises_http_500_when_queue_lookup_fails(mocker):
         asyncio.run(testee.get_tasks(redis_client=redis_client))
 
 
-def test_resolve_filesystem_tasks_builds_tasks_from_resolved_sources(mocker):
-    """Test that filesystem task expansion preserves metadata across resolved sources."""
+def test_resolve_filesystem_tasks_expands_globs(mocker):
+    """Test that filesystem task expansion expands glob patterns and preserves metadata."""
     pattern = Task(source='/tmp/*.wav', language='en')
-    mock_resolve_sources = mocker.patch.object(
-        testee,
-        'resolve_filesystem_task_sources',
-        return_value=['/tmp/one.wav', '/tmp/two.wav'],
-    )
+    mock_glob = mocker.patch.object(testee.glob, 'glob', return_value=['/tmp/one.wav', '/tmp/two.wav'])
 
     result = testee.resolve_filesystem_tasks(pattern)
 
     assert [task.source for task in result] == ['/tmp/one.wav', '/tmp/two.wav']
     assert all(task.language == pattern.language for task in result)
-    mock_resolve_sources.assert_called_once_with(pattern.source)
+    mock_glob.assert_called_once_with('/tmp/*.wav')
 
 
-def test_resolve_filesystem_task_sources_expands_globs(mocker):
-    """Test that filesystem task source resolution expands glob patterns."""
-    mock_glob = mocker.patch.object(testee.glob, 'glob', return_value=['/path/to/file1.mkv', '/path/to/file2.mkv'])
-
-    result = testee.resolve_filesystem_task_sources('/path/to/*.mkv')
-
-    assert result == ['/path/to/file1.mkv', '/path/to/file2.mkv']
-    mock_glob.assert_called_once_with('/path/to/*.mkv')
-
-
-def test_copy_task_with_source_preserves_non_source_fields():
+def test_model_copy_preserves_non_source_fields():
     """Test that copying a task with a new source preserves its other fields."""
     pattern = Task(source='https://example.com/playlist', language='en', mode=TranscriberMode.TRANSLATE)
 
-    result = testee.copy_task_with_source(pattern, 'https://example.com/video1')
+    result = pattern.model_copy(update={'source': 'https://example.com/video1'})
 
     assert result.source == 'https://example.com/video1'
     assert result.language == pattern.language
@@ -115,8 +101,8 @@ def test_add_tasks_routes_youtube_and_whisper_work(client, mocker):
     resolved_whisper_task = Task(source='/tmp/audio.wav', language='en')
     mocker.patch.object(testee, 'is_url', side_effect=lambda source: source.startswith('http'))
     mock_resolve_filesystem = mocker.patch.object(testee, 'resolve_filesystem_tasks', return_value=[resolved_whisper_task])
-    mock_queue_task = mocker.patch.object(testee, 'queue_task')
-    mock_queue_tasks = mocker.patch.object(testee, 'queue_tasks')
+    mock_queue_youtube_task = mocker.patch.object(testee, 'queue_youtube_task')
+    mock_queue_transcription_tasks = mocker.patch.object(testee, 'queue_transcription_tasks')
 
     response = client.post(
         "/tasks",
@@ -132,8 +118,8 @@ def test_add_tasks_routes_youtube_and_whisper_work(client, mocker):
         'failed': [],
     }
     mock_resolve_filesystem.assert_called_once()
-    mock_queue_task.assert_called_once_with(ANY, testee.YOUTUBE_QUEUE, url_task)
-    mock_queue_tasks.assert_called_once_with(ANY, [resolved_whisper_task])
+    mock_queue_youtube_task.assert_called_once_with(ANY, url_task)
+    mock_queue_transcription_tasks.assert_called_once_with(ANY, [resolved_whisper_task])
 
 
 def test_add_tasks_failed_resolution(client, mocker):
@@ -141,15 +127,15 @@ def test_add_tasks_failed_resolution(client, mocker):
     task = Task(source='/tmp/*.wav', language='en')
     mocker.patch.object(testee, 'is_url', return_value=False)
     mocker.patch.object(testee, 'resolve_filesystem_tasks', return_value=[])
-    mock_queue_task = mocker.patch.object(testee, 'queue_task')
-    mock_queue_tasks = mocker.patch.object(testee, 'queue_tasks')
+    mock_queue_youtube_task = mocker.patch.object(testee, 'queue_youtube_task')
+    mock_queue_transcription_tasks = mocker.patch.object(testee, 'queue_transcription_tasks')
 
     response = client.post("/tasks", json=[task.model_dump(mode='json')])
 
     assert response.status_code == 201
     assert response.json() == {'successful': [], 'failed': [task.model_dump(mode='json')]}
-    mock_queue_task.assert_not_called()
-    mock_queue_tasks.assert_not_called()
+    mock_queue_youtube_task.assert_not_called()
+    mock_queue_transcription_tasks.assert_not_called()
 
 
 def test_add_tasks_raises_http_500_when_queueing_fails(mocker):
@@ -158,7 +144,7 @@ def test_add_tasks_raises_http_500_when_queueing_fails(mocker):
     task = Task(source="/tmp/audio.wav", language="en")
     mocker.patch.object(testee, 'is_url', return_value=False)
     mocker.patch.object(testee, 'resolve_filesystem_tasks', return_value=[task])
-    mocker.patch.object(testee, 'queue_tasks', side_effect=RuntimeError("redis down"))
+    mocker.patch.object(testee, 'queue_transcription_tasks', side_effect=RuntimeError("redis down"))
 
     with pytest.raises(HTTPException, match="redis down"):
         asyncio.run(testee.add_tasks([task], redis_client=redis_client))
@@ -187,7 +173,7 @@ def test_clear_tasks_raises_http_500_when_queue_clearing_fails(mocker):
 
 def test_get_dead_letters_returns_queue_contents(client, mocker):
     """Test that the dead-letter endpoint returns the queued dead-letter entries."""
-    dead_letter = DeadLetter(task=Task(source='/tmp/audio.wav', language='en'), queue='tasks:whisper:active:gpu-0', error='boom')
+    dead_letter = DeadLetter(task=Task(source='/tmp/audio.wav', language='en'), queue='stream:whisper', error='boom')
     mock_list = mocker.patch.object(testee, 'list_dead_letters', return_value=[dead_letter])
 
     response = client.get("/dead-letters")
@@ -208,7 +194,7 @@ def test_get_dead_letters_raises_http_500_when_lookup_fails(mocker):
 
 def test_clear_dead_letters_returns_deleted_items(client, mocker, mock_redis_client):
     """Test that clearing dead letters returns the deleted entries and removes the queue key."""
-    dead_letter = DeadLetter(task=Task(source='/tmp/audio.wav', language='en'), queue='tasks:whisper:active:gpu-0', error='boom')
+    dead_letter = DeadLetter(task=Task(source='/tmp/audio.wav', language='en'), queue='stream:whisper', error='boom')
     mock_list = mocker.patch.object(testee, 'list_dead_letters', return_value=[dead_letter])
 
     response = client.delete("/dead-letters")

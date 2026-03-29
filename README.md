@@ -9,8 +9,8 @@
 - **Download:** YouTube videos, playlists, and existing transcripts in a user-specified language.
 - **Transcribe:** Generate SRT subtitle files from filesystem video/audio files.
 - **Whisper transcriber:** `faster-whisper` on an NVIDIA GPU or CPU. Default model is `large-v3` (~9 GB RAM/VRAM). Runs synchronously.
-- **Cloud transcriber:** Azure AI Speech Services, tracked synchronously per worker slot so Redis state matches final SRT output.
-- **Task queue:** Redis-backed multi-queue scheduling with pending, active-slot, and dead-letter queues.
+- **Cloud transcriber:** Azure AI Speech Services, tracked synchronously per worker.
+- **Task stream:** Redis-backed multi-stream scheduling with native Consumer Groups for dynamic assignment, failure catching, and message tracking.
 - **Containerization:** Docker Compose with GPU and CPU support.
 
 ## Tech Stack
@@ -28,34 +28,32 @@ Four main components cooperate:
 
 1. **REST API** — Accepts tasks and assets. URL tasks are queued directly for the YouTube worker. Filesystem globs are still resolved in the API because they are cheap and do not require network I/O.
 2. **YouTube worker** — Expands playlists, downloads video/audio, attempts transcript download, and enqueues follow-up filesystem media tasks for the requested transcriber only when an SRT is still missing.
-3. **Transcription workers** — Whisper and Azure workers each consume their own pending queue and claim one active slot queue per worker process.
-4. **Redis** — Stores the YouTube queue, transcriber pending queues, active slot queues, and the dead-letter queue.
+3. **Transcription workers** — Whisper and Azure workers consume native Redis Streams utilizing Consumer Groups to track assignment identities.
+4. **Redis** — Stores the streaming queues, tracks Consumer Pending Entries Lists (PEL), and archives dead letters.
 
 ## Data Flow
 
 1. A user submits a task via CLI or REST API, specifying the transcriber (`whisper` or `azure`) and language.
-2. FastAPI routes URL tasks to `tasks:youtube`. Filesystem glob patterns are expanded immediately and concrete file paths are pushed to `tasks:whisper:pending` or `tasks:azure:pending`.
+2. FastAPI routes URL tasks to `stream:youtube`. Filesystem glob patterns are expanded immediately and concrete file paths are pushed to `stream:whisper` or `stream:azure`.
 3. The YouTube worker expands playlist URLs, downloads media, and tries to fetch an existing transcript.
 4. If a transcript is already present, the filesystem is considered complete and no follow-up transcription task is queued.
-5. If a transcript is missing, the YouTube worker enqueues a concrete filesystem media task into the requested transcriber's pending queue.
-6. A Whisper or Azure worker atomically claims work into its own active slot queue, processes the media, and removes the task from Redis only after success or dead-lettering.
+5. If a transcript is missing, the YouTube worker enqueues a concrete filesystem media task into the requested transcriber's stream.
+6. A Whisper or Azure worker consumes the assignment natively via Consumer Groups, processes the media, and executes an `XACK` and `XDEL` against Redis after success or dead-lettering to preserve stream memory capacity.
 
 ## Queue Layout
 
-- **`tasks:youtube`** — Raw URL tasks waiting for playlist expansion, downloads, and transcript lookup.
-- **`tasks:whisper:pending`** — Concrete filesystem media files waiting for Whisper.
-- **`tasks:whisper:active:<slot>`** — One active task per Whisper worker slot, typically one slot per GPU.
-- **`tasks:azure:pending`** — Concrete filesystem media files waiting for Azure Speech.
-- **`tasks:azure:active:<slot>`** — One active task per Azure worker slot. Run as many Azure workers as your concurrency budget allows.
-- **`tasks:dead-letter`** — Failed tasks plus the queue that failed and the error message.
+- **`stream:youtube`** — Raw URL tasks waiting for playlist expansion, downloads, and transcript lookup.
+- **`stream:whisper`** — Concrete filesystem media files waiting for Whisper transcription.
+- **`stream:azure`** — Concrete filesystem media files waiting for Azure Speech processing.
+- **`tasks:dead-letter`** — Failed tasks alongside origin stream strings and the execution stack trace causing unsuitability.
 
-`GET /tasks` returns a snapshot of the YouTube, pending, and active queues. `GET /dead-letters` returns failed tasks.
+`GET /tasks` queries `XRANGE` and `XPENDING` natively over streams to produce snapshots differentiating Unclaimed assignments vs Actively Claimed tasks natively managed through Stream allocations. `GET /dead-letters` returns fully retired components from standard string lists.
 
 ## Design Decisions
 
-### Slot-Based Active Queues
+### Redis Streams and Consumer Groups
 
-The Whisper and Azure active queues are implemented as slot-specific Redis lists such as `tasks:whisper:active:gpu-0`. This was the simplest way to satisfy "one slot per GPU" while keeping restart recovery: when a worker restarts, it first checks its own active queue and resumes the task already assigned to that slot before claiming new work.
+The Whisper, Azure, and YouTube workers distribute work natively employing Redis Streams (`XADD` / `XREADGROUP`). Rather than implementing manual lists simulating "pending" vs explicit "active" bindings, system tasks are managed frictionlessly by a unified consumer group topology (`workers`). If an identity (e.g. `gpu-0`) fatally crashes midsentence, any subsequent pods launched inheriting identity `gpu-0` automatically extract their outstanding debts identically via their PEL (`0-0` inspection) before asking for new jobs.
 
 ### YouTube Work Runs Outside FastAPI
 
@@ -63,7 +61,7 @@ FastAPI only performs filesystem glob expansion. All network-facing YouTube work
 
 ### Durable Azure Completion
 
-Azure work no longer uses fire-and-forget dispatch from the queue consumer. An Azure worker now keeps the task in its active slot until `transcribe_audio_file()` finishes, so later Azure failures are dead-lettered instead of disappearing into logs.
+Azure work uses Consumer Group flow natively. An Azure worker maintains the assignment mapped identically until `transcribe_audio_file()` finishes inside its local memory scope, acknowledging explicitly `XACK` so later Azure failures hit dead-letter logic securely.
 
 ### Dual Transcription Engines
 
@@ -79,7 +77,7 @@ The asset directory is intentionally a human-browsable media library rather than
 
 ### Worker as Separate Processes
 
-Workers run as independent Docker services rather than background tasks within FastAPI. The default compose files now define `youtube_worker`, `whisper_worker`, and `azure_worker` services. Whisper and Azure workers derive their slot from `WORKER_SLOT`, then `HOSTNAME`, so scaled worker containers naturally get distinct active-slot queues. The implementation is split across `workers/common.py`, `workers/youtube_worker.py`, `workers/whisper_worker.py`, `workers/azure_worker.py`, and `workers/__main__.py`, which serves as the package entrypoint for `python -m youtube_whisperer.workers`.
+Workers run as independent Docker services rather than background tasks within FastAPI. The default compose files now define `youtube_worker`, `whisper_worker`, and `azure_worker` services. Whisper and Azure workers derive their consumer name from `WORKER_SLOT_ID`, then the machine hostname, so scaled worker containers naturally govern exclusive message queues securely across parallel environments. The implementation is split across `workers/common.py` mapping stream architectures recursively onto standard abstract layers like `workers/youtube_worker.py`.
 
 ### SRT as the Output Format
 
@@ -94,4 +92,4 @@ The CLI runs the full pipeline in-process without Redis. It was designed primari
 - Run exactly one `youtube_worker` unless you also introduce a YouTube active-slot policy.
 - Run one `whisper_worker` per GPU.
 - Run as many `azure_worker` processes as your Azure concurrency limit allows.
-- If you want a stable slot name instead of the default container hostname, set `WORKER_SLOT`.
+- If you want a stable slot name instead of the default container hostname, set `WORKER_SLOT_ID` to an integer.

@@ -10,7 +10,7 @@ from pathlib_extensions import prepare_output_file
 from redis import StrictRedis
 
 from youtube_whisperer.fastapi.models import AddAssetsResponse, AddTasksResponse, DeadLetter, Task, TaskQueues
-from youtube_whisperer.queueing import DEAD_LETTER_QUEUE, YOUTUBE_QUEUE, clear_task_queues, list_dead_letters, list_task_queues, queue_task, queue_tasks
+from youtube_whisperer.queueing import DEAD_LETTER_QUEUE, clear_task_queues, list_dead_letters, list_task_queues, queue_transcription_tasks, queue_youtube_task
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR, REDIS_CLIENT, is_url
 
 app = FastAPI(title="YouTube Whisperer")
@@ -39,26 +39,7 @@ def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
     """
     Resolve a filesystem task pattern into a list of concrete Tasks.
     """
-    return [copy_task_with_source(pattern, source) for source in resolve_filesystem_task_sources(pattern.source)]
-
-
-def resolve_filesystem_task_sources(source: str) -> list[str]:
-    """
-    Resolve a filesystem glob pattern into a list of concrete sources.
-    """
-    return [str(path) for path in glob.glob(os.path.expanduser(source))]
-
-
-def copy_task_with_source(pattern: Task, source: str) -> Task:
-    """
-    Copy a task pattern while replacing its source with a concrete value.
-    """
-    return Task(
-        source=source,
-        transcriber=pattern.transcriber,
-        language=pattern.language,
-        mode=pattern.mode,
-    )
+    return [pattern.model_copy(update={'source': str(path)}) for path in glob.glob(os.path.expanduser(pattern.source))]
 
 
 @app.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
@@ -90,9 +71,9 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
             else:
                 failed_tasks.append(pattern)
         for task in youtube_tasks:
-            queue_task(redis_client, YOUTUBE_QUEUE, task)
+            queue_youtube_task(redis_client, task)
         if transcription_tasks:
-            queue_tasks(redis_client, transcription_tasks)
+            queue_transcription_tasks(redis_client, transcription_tasks)
         return AddTasksResponse(successful=successful_tasks, failed=failed_tasks)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

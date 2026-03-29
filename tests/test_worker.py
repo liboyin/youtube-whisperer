@@ -18,11 +18,13 @@ def test_worker_role_rejects_legacy_local_alias():
 
 def test_process_queue_routes_youtube_work(mocker):
     """Test that the queue entry point dispatches YouTube work to the YouTube processor."""
+    mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='youtube-0')
     mock_worker = mocker.patch.object(testee, 'YouTubeWorker')
 
     testee.process_queue(role=testee.WorkerRole.YOUTUBE, poll_interval_seconds=7)
 
-    mock_worker.assert_called_once_with()
+    mock_slot.assert_called_once_with(None, testee.WorkerRole.YOUTUBE.value)
+    mock_worker.assert_called_once_with('youtube-0')
     mock_worker.return_value.process_queue.assert_called_once_with(poll_interval_seconds=7)
 
 

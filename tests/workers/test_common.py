@@ -1,9 +1,8 @@
 import json
-import os
 from pathlib import Path
 
 import pytest
-from pathlib_extensions import OverwriteMode
+import redis
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.fastapi.models import Task
@@ -20,7 +19,7 @@ def mock_redis(mocker):
 
 
 def test_yield_task(mock_redis, mocker):
-    """Test the task generator for correct yielding, polling, and validation."""
+    """Test the streaming task generator connects properly and resolves messages natively."""
     task_dict = {'source': 'http://example.com', 'language': 'en'}
     task_json = json.dumps(task_dict).encode('utf-8')
     expected_task = Task(
@@ -29,101 +28,79 @@ def test_yield_task(mock_redis, mocker):
         transcriber=TranscriberType.WHISPER,
         mode=TranscriberMode.TRANSCRIBE,
     )
-    mock_sleep = mocker.patch('time.sleep')
-    mock_redis.lrange.side_effect = [
-        [task_json],
-        None,
-        Exception("Test exception"),
+    mocker.patch('time.sleep')
+
+    # > new message scrape yields task.
+    mock_redis.xreadgroup.side_effect = [
+        [], # 0-0 call: empty PEL
+        [[b'stream:name', [[b'1234-0', {b'payload': task_json}]]]], # > call: new msg
+        Exception("Test exception"), # next loop
     ]
 
-    task_generator = testee.yield_task(mock_redis, 'tasks:youtube', poll_interval_seconds=1)
+    task_generator = testee.yield_task(mock_redis, 'stream:name', 'group_name', 'consumer', poll_interval_seconds=1)
 
-    assert next(task_generator) == expected_task
+    msg_id, task = next(task_generator)
+    assert msg_id == b'1234-0'
+    assert task == expected_task
+
     with pytest.raises(Exception):
         next(task_generator)
-    mock_sleep.assert_called_once_with(1)
-    assert mock_redis.lrange.call_args_list == [
-        mocker.call('tasks:youtube', 0, 0),
-        mocker.call('tasks:youtube', 0, 0),
-        mocker.call('tasks:youtube', 0, 0),
+
+    assert mock_redis.xreadgroup.call_args_list == [
+        mocker.call('group_name', 'consumer', {'stream:name': '0-0'}, count=1),
+        mocker.call('group_name', 'consumer', {'stream:name': '>'}, count=1, block=1000),
+        mocker.call('group_name', 'consumer', {'stream:name': '0-0'}, count=1),
     ]
 
 
-def test_yield_active_slot_task_resumes_existing_task(mock_redis):
-    """Test that an active-slot worker resumes the task already assigned to its slot."""
+def test_yield_task_recovers_orphaned_tasks(mock_redis, mocker):
+    """Test that yield_task recovers messages stuck inside PEL before fetching newly queued assignments."""
     task_json = Task(source='/tmp/audio.wav', language='en').model_dump_json().encode('utf-8')
-    mock_redis.lrange.return_value = [task_json]
 
-    task = next(testee.yield_active_slot_task(mock_redis, 'tasks:whisper:pending', 'tasks:whisper:active:gpu-0'))
+    # Return orphaned task on 0-0
+    mock_redis.xreadgroup.side_effect = [
+        [[b'stream:name', [[b'9999-0', {b'payload': task_json}]]]], # 0-0 call finds orphaned msg
+    ]
 
+    task_generator = testee.yield_task(mock_redis, 'stream:name', 'group_name', 'consumer')
+    msg_id, task = next(task_generator)
+
+    assert msg_id == b'9999-0'
     assert task == Task(source='/tmp/audio.wav', language='en')
-    mock_redis.lmove.assert_not_called()
+    mock_redis.xreadgroup.assert_called_once_with('group_name', 'consumer', {'stream:name': '0-0'}, count=1)
 
 
-def test_yield_active_slot_task_claims_pending_task(mock_redis):
-    """Test that an active-slot worker claims a new task when its slot is empty."""
+def test_yield_task_self_heals_after_nogroup_on_pel_read(mock_redis, mocker):
+    """Test that a NOGROUP error on the PEL read path triggers consumer group recreation."""
     task_json = Task(source='/tmp/audio.wav', language='en').model_dump_json().encode('utf-8')
-    mock_redis.lrange.return_value = []
-    mock_redis.lmove.return_value = task_json
+    mock_ensure = mocker.patch.object(testee, 'ensure_consumer_group')
 
-    task = next(testee.yield_active_slot_task(mock_redis, 'tasks:whisper:pending', 'tasks:whisper:active:gpu-0'))
+    mock_redis.xreadgroup.side_effect = [
+        redis.exceptions.ResponseError("NOGROUP No such key 'stream:name'"),   # 0-0: group gone
+        [],                                                                      # 0-0: empty PEL after heal
+        [[b'stream:name', [[b'5555-0', {b'payload': task_json}]]]],             # >: new msg
+    ]
 
-    assert task == Task(source='/tmp/audio.wav', language='en')
-    mock_redis.lmove.assert_called_once_with('tasks:whisper:pending', 'tasks:whisper:active:gpu-0', 'LEFT', 'RIGHT')
+    gen = testee.yield_task(mock_redis, 'stream:name', 'grp', 'c1', poll_interval_seconds=1)
+    msg_id, task = next(gen)
 
-
-def test_resolve_waveform_file_path_for_url(mocker):
-    """Test resolving a task source from a URL."""
-    mock_is_url = mocker.patch.object(testee, 'is_url', return_value=True)
-    mock_download = mocker.patch.object(
-        testee,
-        'download_video_and_transcript_with_default_title',
-        return_value=(Path('/path/to/video.mp4'), False),
-    )
-    task = Task(source='http://example.com', language='en')
-
-    path, transcript_found = testee.resolve_waveform_file_path(task)
-
-    mock_is_url.assert_called_once_with(task.source)
-    mock_download.assert_called_once_with(task.source, task.language, overwrite=OverwriteMode.NEVER)
-    assert path == Path('/path/to/video.mp4')
-    assert transcript_found is False
+    assert msg_id == b'5555-0'
+    assert task.source == '/tmp/audio.wav'
+    assert mock_ensure.call_count == 2  # once at startup + once after NOGROUP
 
 
-def test_resolve_waveform_file_path_for_filesystem_file(mocker):
-    """Test resolving a task source from a filesystem file path."""
-    mock_is_url = mocker.patch.object(testee, 'is_url', return_value=False)
-    mock_download = mocker.patch.object(testee, 'download_video_and_transcript_with_default_title')
-    task = Task(source='/local/path.mp4', language='en')
+def test_yield_task_raises_non_nogroup_errors(mock_redis, mocker):
+    """Test that non-NOGROUP ResponseErrors are propagated instead of swallowed."""
+    mocker.patch.object(testee, 'ensure_consumer_group')
 
-    path, transcript_found = testee.resolve_waveform_file_path(task)
+    mock_redis.xreadgroup.side_effect = redis.exceptions.ResponseError("WRONGTYPE unexpected")
 
-    mock_is_url.assert_called_once_with(task.source)
-    mock_download.assert_not_called()
-    assert path == Path('/local/path.mp4')
-    assert transcript_found is False
+    gen = testee.yield_task(mock_redis, 'stream:name', 'grp', 'c1')
+    with pytest.raises(redis.exceptions.ResponseError, match="WRONGTYPE"):
+        next(gen)
 
 
-def test_create_transcription_task_preserves_task_metadata():
-    """Test that follow-up transcription tasks keep the original task metadata."""
-    task = Task(
-        source='https://example.com/watch?v=1',
-        language='en',
-        transcriber=TranscriberType.AZURE,
-        mode=TranscriberMode.TRANSLATE,
-    )
-
-    result = testee.create_transcription_task(task, Path('/tmp/audio.wav'))
-
-    assert result == Task(
-        source='/tmp/audio.wav',
-        language='en',
-        transcriber=TranscriberType.AZURE,
-        mode=TranscriberMode.TRANSLATE,
-    )
-
-
-def test_copy_task_with_source_preserves_non_source_fields():
+def test_model_copy_preserves_non_source_fields():
     """Test copying a task while only replacing its source."""
     task = Task(
         source='https://example.com/playlist',
@@ -131,9 +108,7 @@ def test_copy_task_with_source_preserves_non_source_fields():
         transcriber=TranscriberType.AZURE,
         mode=TranscriberMode.TRANSLATE,
     )
-
-    result = testee.copy_task_with_source(task, 'https://example.com/video')
-
+    result = task.model_copy(update={'source': 'https://example.com/video'})
     assert result == Task(
         source='https://example.com/video',
         language='en',
@@ -142,38 +117,15 @@ def test_copy_task_with_source_preserves_non_source_fields():
     )
 
 
-def test_resolve_worker_slot_prefers_explicit_slot(mocker):
-    """Test that an explicit slot overrides environment-derived slot names."""
-    mocker.patch.dict(os.environ, {'WORKER_SLOT': 'env-slot', 'HOSTNAME': 'host-slot'})
-
-    assert testee.resolve_worker_slot('explicit-slot', TranscriberType.WHISPER.value) == 'explicit-slot'
-
-
-def test_resolve_worker_slot_falls_back_to_environment(mocker):
-    """Test that the worker slot falls back to `WORKER_SLOT` when not provided explicitly."""
-    mocker.patch.dict(os.environ, {'WORKER_SLOT': 'env-slot', 'HOSTNAME': 'host-slot'})
-
-    assert testee.resolve_worker_slot(None, TranscriberType.WHISPER.value) == 'env-slot'
-
-
-def test_resolve_worker_slot_falls_back_to_hostname_and_role_default(mocker):
-    """Test that slot resolution falls back to `HOSTNAME`, then a role-specific default."""
-    mocker.patch.dict(os.environ, {'HOSTNAME': 'host-slot'}, clear=True)
-    assert testee.resolve_worker_slot(None, TranscriberType.WHISPER.value) == 'host-slot'
-
-    mocker.patch.dict(os.environ, {}, clear=True)
-    assert testee.resolve_worker_slot(None, TranscriberType.AZURE.value) == 'azure-0'
-
-
 class MockWorker(testee.TranscriptionWorker):
     def dispatch_task(self, task: Task, source: Path) -> None:
         pass
 
 
 def test_process_active_slot_queue_full_flow(mocker, mock_redis):
-    """Test successful end-to-end processing of a transcription slot task."""
+    """Test successful end-to-end processing guarantees message acknowledging and deletion."""
     task = Task(source='/tmp/audio.wav', language='en', transcriber=TranscriberType.WHISPER)
-    mocker.patch.object(testee, 'yield_active_slot_task', return_value=iter([task]))
+    mocker.patch.object(testee.TranscriptionWorker, 'yield_tasks', return_value=iter([(b'000-1', task)]))
     mocker.patch.object(testee, 'is_url', return_value=False)
     worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
     dispatch_task = mocker.patch.object(worker, 'dispatch_task')
@@ -183,13 +135,16 @@ def test_process_active_slot_queue_full_flow(mocker, mock_redis):
 
     dispatch_task.assert_called_once_with(task, Path('/tmp/audio.wav'))
     mock_dead_letter.assert_not_called()
-    mock_redis.lpop.assert_called_once_with(testee.get_active_queue_name(TranscriberType.WHISPER, 'gpu-0'))
+    mock_pipe = mock_redis.pipeline.return_value
+    mock_pipe.xack.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'000-1')
+    mock_pipe.xdel.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), b'000-1')
+    mock_pipe.execute.assert_called_once()
 
 
 def test_process_active_slot_queue_dead_letters_failures(mocker, mock_redis):
-    """Test that transcription failures are moved to the dead-letter queue."""
+    """Test that transcription failures fall strictly to dead lettering but still invoke xack logic safely."""
     task = Task(source='/tmp/audio.wav', language='en', transcriber=TranscriberType.WHISPER)
-    mocker.patch.object(testee, 'yield_active_slot_task', return_value=iter([task]))
+    mocker.patch.object(testee.TranscriptionWorker, 'yield_tasks', return_value=iter([(b'999-8', task)]))
     mocker.patch.object(testee, 'is_url', return_value=False)
     worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
     dispatch_task = mocker.patch.object(worker, 'dispatch_task', side_effect=RuntimeError('boom'))
@@ -201,16 +156,18 @@ def test_process_active_slot_queue_dead_letters_failures(mocker, mock_redis):
     mock_dead_letter.assert_called_once_with(
         mock_redis,
         task,
-        testee.get_active_queue_name(TranscriberType.WHISPER, 'gpu-0'),
+        testee.get_stream_name(TranscriberType.WHISPER),
         'boom',
     )
-    mock_redis.lpop.assert_called_once_with(testee.get_active_queue_name(TranscriberType.WHISPER, 'gpu-0'))
+    mock_pipe = mock_redis.pipeline.return_value
+    mock_pipe.xack.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'999-8')
+    mock_pipe.execute.assert_called_once()
 
 
 def test_process_active_slot_queue_dead_letters_url_tasks(mocker, mock_redis):
-    """Test that unexpected URL tasks are rejected by transcription workers."""
+    """Test that unexpected URL tasks identically invoke safe xack pipeline behavior to discard format mismatches."""
     task = Task(source='https://example.com/video', language='en', transcriber=TranscriberType.WHISPER)
-    mocker.patch.object(testee, 'yield_active_slot_task', return_value=iter([task]))
+    mocker.patch.object(testee.TranscriptionWorker, 'yield_tasks', return_value=iter([(b'123-1', task)]))
     mocker.patch.object(testee, 'is_url', return_value=True)
     worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
     dispatch_task = mocker.patch.object(worker, 'dispatch_task')
@@ -220,4 +177,7 @@ def test_process_active_slot_queue_dead_letters_url_tasks(mocker, mock_redis):
 
     dispatch_task.assert_not_called()
     mock_dead_letter.assert_called_once()
-    mock_redis.lpop.assert_called_once_with(testee.get_active_queue_name(TranscriberType.WHISPER, 'gpu-0'))
+    mock_pipe = mock_redis.pipeline.return_value
+    mock_pipe.xack.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'123-1')
+    mock_pipe.xdel.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), b'123-1')
+    mock_pipe.execute.assert_called_once()

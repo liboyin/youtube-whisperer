@@ -87,8 +87,8 @@ def test_dead_letter_model_wraps_task_error_context():
     """Test that dead-letter models retain the failed task, queue, and error."""
     task = testee.Task(source="/tmp/audio.wav", language="en")
 
-    result = testee.DeadLetter(task=task, queue="tasks:whisper:active:gpu-0", error="boom")
+    result = testee.DeadLetter(task=task, queue="stream:whisper", error="boom")
 
     assert result.task == task
-    assert result.queue == "tasks:whisper:active:gpu-0"
+    assert result.queue == "stream:whisper"
     assert result.error == "boom"

@@ -4,8 +4,8 @@ This document is intended for AI agents to document issues and antipatterns foun
 
 ## 1.1 Non-Atomic YouTube Queue Processing (Rejected: intentional single-worker recovery behaviour)
 **File:** `workers/youtube_worker.py` -> `process_queue()`, `workers/common.py` -> `yield_task()`
-* **Issue:** The YouTube worker still uses `lrange(queue_name, 0, 0)` to peek at `tasks:youtube`, processes the task, and then calls `lpop(tasks:youtube)` to remove it.
-* **Design rationale:** Whisper and Azure workers use slot-specific active queues, while the YouTube side is intentionally kept simple and single-threaded. If the YouTube worker container dies mid-download, the task stays at the head of `tasks:youtube` and is retried on restart. See `README.md` for the slot-based queue model and the operational note to run exactly one `youtube_worker`.
+* **Issue:** [RESOLVED] The YouTube worker used to use list peeks for `tasks:youtube`, but it now consumes `stream:youtube` purely using horizontal scaling natively over Redis Consumer Groups.
+* **Design rationale:** Whisper, Azure, and YouTube tasks all use Consumer Groups natively locking messages asynchronously to execution pods (e.g. `gpu-0`).
 
 ## 1.2 Redis Connection Exhaustion (Addressed)
 **File:** `utils.py` -> `get_redis_client()`
@@ -18,7 +18,7 @@ This document is intended for AI agents to document issues and antipatterns foun
 ## 2.1 Blocking I/O in Async Endpoints (Addressed)
 **File:** `fastapi/app.py`
 * **Previous issue:** `add_tasks()` used to expand playlist URLs inside FastAPI, which meant `yt-dlp` network I/O ran in request handlers.
-* **Fix:** URL tasks are now queued directly to `tasks:youtube`, and the dedicated YouTube worker performs playlist expansion, downloads, and transcript fetching. FastAPI still resolves filesystem globs because that work is cheap and does not require network I/O.
+* **Fix:** URL tasks are now queued directly to `stream:youtube`, and the dedicated YouTube worker performs playlist expansion, downloads, and transcript fetching. FastAPI still resolves filesystem globs because that work is cheap and does not require network I/O.
 * **Resolved concern:** `add_assets` previously read the entire file upload into memory before writing it synchronously. Fixed by replacing `await upload.read()` + `f.write(content)` with `shutil.copyfileobj(upload.file, f)`, which streams directly from the upload to disk in fixed-size chunks.
 
 # 3. Worker & Subsystem Antipatterns
@@ -26,7 +26,7 @@ This document is intended for AI agents to document issues and antipatterns foun
 ## 3.1 Azure Task Completion Is Not Durable (Addressed)
 **File:** `workers/azure_worker.py` -> `dispatch_task()`, `workers/common.py` -> `process_active_slot_queue()`
 * **Previous issue:** Azure work used to submit transcription to a background thread and immediately remove the Redis task. Late Azure failures were only printed.
-* **Fix:** Azure workers now claim a task into `tasks:azure:active:<slot>` and call `transcribe_audio_file()` synchronously. The task is removed from Redis only after completion, or dead-lettered on failure.
+* **Fix:** Azure workers now consume a task into their PEL dynamically inside `stream:azure` and call `transcribe_audio_file()` synchronously. The task is removed from Redis only after completion (via `XACK`), or dead-lettered on failure.
 
 ## 3.2 Polling / Busy Waiting (Rejected: design choice)
 * **Issue:** `workers/common.py` -> `yield_task()` and `yield_active_slot_task()` poll Redis using `time.sleep(poll_interval)`.
@@ -37,6 +37,10 @@ This document is intended for AI agents to document issues and antipatterns foun
 * **Issue:** Uses `Path(...).rglob('cookies.sqlite')` on massive home directories like `~/.mozilla/firefox`.
 * **Impact:** This is executed synchronously *every time* `download_video` or `playlist_downloader` is invoked. Traversing the entire Firefox directory structure recursively can be extremely slow and blocking.
 * **Fix:** Added `@functools.lru_cache` to `is_firefox_cookies_available()`. The `rglob` search now runs at most once per process lifetime; subsequent calls return the cached result immediately.
+
+## 3.4 Missing Auto-Scale Down Support (TODO)
+* **Issue:** Redis Streams consumer groups inherently require workers to explicitly clean up their PEL debts. When an orchestration platform implicitly scales the worker fleet *down*, pods are destroyed dynamically. Without a centralized process leveraging `XAUTOCLAIM` (or `XPENDING` -> `XCLAIM`) to periodically sweep tasks historically locked by `consumer_name` bindings that no longer exist, tasks get permanently orphaned inside Redis.
+* **TODO:** Implement an `XAUTOCLAIM` loop (perhaps routinely scheduled inside FastAPI or within individual workers) to gracefully handle scaling down ephemeral GPU/CPU containers without stranding work.
 
 # 4. General Python Best Practices
 
