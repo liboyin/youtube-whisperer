@@ -233,11 +233,27 @@ def test_list_assets_with_files(client, mock_assets_dir):
     assert sorted(response.json()) == [str(mock_assets_dir / "file1.txt"), str(mock_assets_dir / "file2.txt")]
 
 
+def test_list_assets_with_subdirectories(client, mock_assets_dir):
+    """Test that the assets endpoint lists files in subdirectories recursively."""
+    subdir = mock_assets_dir / "subdir"
+    subdir.mkdir()
+    (mock_assets_dir / "file1.txt").touch()
+    (subdir / "file2.txt").touch()
+
+    response = client.get("/assets")
+
+    assert response.status_code == 200
+    paths = response.json()
+    assert str(mock_assets_dir / "file1.txt") in paths
+    assert str(subdir / "file2.txt") in paths
+    assert str(subdir) in paths  # rglob("*") includes directory entries
+
+
 def test_list_assets_raises_http_500_when_directory_listing_fails():
     """Test that asset-listing failures are surfaced as HTTP 500 errors."""
     bad_dir = Path("/definitely/missing")
 
-    with pytest.raises(HTTPException, match="No such file or directory"):
+    with pytest.raises(HTTPException, match="/definitely/missing"):
         asyncio.run(testee.list_assets(dir_path=bad_dir))
 
 
@@ -284,7 +300,47 @@ def test_add_assets_raises_http_500_when_filename_is_missing(mocker, tmp_path):
         asyncio.run(testee.add_assets([mock_upload], dir_path=tmp_path))
 
 
-def test_clean_assets(client, mock_assets_dir):
+def test_map_stem_to_suffixes_maps_stems_to_lowercase_suffixes(tmp_path):
+    """Test that map_stem_to_suffixes collects lowercased suffixes per stem."""
+    (tmp_path / "video.mp4").touch()
+    (tmp_path / "video.SRT").touch()
+    (tmp_path / "audio.WAV").touch()
+
+    result = testee.map_stem_to_suffixes(tmp_path)
+
+    assert result["video"] == {".mp4", ".srt"}
+    assert result["audio"] == {".wav"}
+
+
+def test_map_stem_to_suffixes_recurses_into_subdirectories(tmp_path):
+    """Test that map_stem_to_suffixes descends into subdirectories."""
+    subdir = tmp_path / "sub"
+    subdir.mkdir()
+    (tmp_path / "video.mp4").touch()
+    (subdir / "video.srt").touch()
+
+    result = testee.map_stem_to_suffixes(tmp_path)
+
+    assert result["video"] == {".mp4", ".srt"}
+
+
+def test_map_stem_to_suffixes_excludes_directories(tmp_path):
+    """Test that map_stem_to_suffixes only maps files, not directory entries."""
+    subdir = tmp_path / "video"
+    subdir.mkdir()
+
+    result = testee.map_stem_to_suffixes(tmp_path)
+
+    assert "video" not in result
+
+
+def test_map_stem_to_suffixes_raises_for_missing_directory():
+    """Test that map_stem_to_suffixes raises when the directory does not exist."""
+    with pytest.raises(Exception, match="/definitely/missing"):
+        testee.map_stem_to_suffixes(Path("/definitely/missing"))
+
+
+def test_clean_assets(client, mock_assets_dir, mocker):
     """Test that cleaning assets removes only transient media files."""
     (mock_assets_dir / "video.mp4").touch()
     (mock_assets_dir / "video.srt").touch()
@@ -292,6 +348,10 @@ def test_clean_assets(client, mock_assets_dir):
     (mock_assets_dir / "video.wav").touch()
     (mock_assets_dir / "video.mp3").touch()
     (mock_assets_dir / "another.mp4").touch()
+    mocker.patch.object(testee, 'map_stem_to_suffixes', return_value={
+        'video': {'.mp4', '.srt', '.mkv', '.wav', '.mp3'},
+        'another': {'.mp4'},
+    })
 
     response = client.delete("/assets")
 
@@ -309,9 +369,9 @@ def test_clean_assets(client, mock_assets_dir):
     assert (mock_assets_dir / "another.mp4").exists()
 
 
-def test_clean_assets_raises_http_500_when_directory_listing_fails():
+def test_clean_assets_raises_http_500_when_directory_listing_fails(mocker):
     """Test that asset-cleaning listing failures are surfaced as HTTP 500 errors."""
-    bad_dir = Path("/definitely/missing")
+    mocker.patch.object(testee, 'map_stem_to_suffixes', side_effect=Exception("/definitely/missing"))
 
-    with pytest.raises(HTTPException, match="No such file or directory"):
-        asyncio.run(testee.clean_assets(dir_path=bad_dir))
+    with pytest.raises(HTTPException, match="/definitely/missing"):
+        asyncio.run(testee.clean_assets(dir_path=Path("/definitely/missing")))

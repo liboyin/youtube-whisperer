@@ -6,7 +6,7 @@ import shutil
 from typing import Generator
 
 from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File
-from pathlib_extensions import prepare_output_file
+from pathlib_extensions import prepare_input_dir, prepare_output_file
 from redis import StrictRedis
 
 from youtube_whisperer.fastapi.models import AddAssetsResponse, AddTasksResponse, DeadLetter, Task, TaskQueues
@@ -123,7 +123,7 @@ async def list_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     List all contents of the specified directory.
     """
     try:
-        return sorted(map(str, dir_path.iterdir()))
+        return sorted(map(str, prepare_input_dir(dir_path).rglob("*")))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -159,6 +159,26 @@ async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depen
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def map_stem_to_suffixes(dir_path: Path) -> dict[str, set[str]]:
+    """Recursively maps each file stem to the set of lowercased suffixes under dir_path.
+
+    Args:
+        dir_path: Root directory to scan. Must exist.
+
+    Returns:
+        A dict mapping each stem to the set of lowercased suffixes found across all
+        files under dir_path (e.g. ``{"video": {".mp4", ".srt"}}``).
+
+    Raises:
+        Exception: If dir_path does not exist or is not accessible.
+    """
+    stem2suffixes: dict[str, set[str]] = defaultdict(set)
+    for file_path in prepare_input_dir(dir_path).rglob("*"):
+        if file_path.is_file():
+            stem2suffixes[file_path.stem].add(file_path.suffix.lower())
+    return dict(stem2suffixes)
+
+
 @app.delete("/assets", response_model=list[str])
 async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
@@ -170,12 +190,8 @@ async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
         list[str]: List of removed file paths.
     """
     try:
-        stem2suffixes: dict[str, set[str]] = defaultdict(set)
-        for file_path in dir_path.iterdir():
-            if file_path.is_file():
-                stem2suffixes[file_path.stem].add(file_path.suffix.lower())
         removed_files: list[str] = []
-        for stem, suffixes in stem2suffixes.items():
+        for stem, suffixes in map_stem_to_suffixes(dir_path).items():
             if suffixes >= {'.mp4', '.srt'}:
                 for suffix in ['.mkv', '.wav', '.mp3']:
                     if suffix in suffixes and (file_path := dir_path / f"{stem}{suffix}").is_file():
