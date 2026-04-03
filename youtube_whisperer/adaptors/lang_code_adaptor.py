@@ -80,7 +80,7 @@ class LanguageCode:
             TypeError: If the input value is not a string or LanguageCode instance.
             ValueError: If the input string is not a registered language code.
         """
-        def deserialize(x: str | Self) -> Self:
+        def deserialize(x: str | LanguageCode) -> LanguageCode:
             if isinstance(x, cls):
                 return x
             if isinstance(x, str):

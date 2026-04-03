@@ -4,7 +4,7 @@ from typing import Collection, TypedDict
 from urllib.parse import urlparse, parse_qs
 
 from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars, truncate_filename
-from youtube_transcript_api import FetchedTranscript, NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
+from youtube_transcript_api import FetchedTranscript, NoTranscriptFound, TranscriptsDisabled, TranscriptList, YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
@@ -69,20 +69,19 @@ def get_first_matching_lang_code(candidates: Collection[str], requested: Languag
     return None
 
 
-def list_video_transcripts(url: str):
+def list_video_transcripts(url: str) -> TranscriptList | None:
     """
     Lists available transcripts for a YouTube video.
     """
     video_id = get_video_id(url)
     try:
-        transcripts = YouTubeTranscriptApi().list(video_id)
+        return YouTubeTranscriptApi().list(video_id)
     except TranscriptsDisabled:
         print(f"Transcripts are disabled for {url}")
-        return None
-    return transcripts
+    return None
 
 
-def fetch_matching_transcript(transcripts, language: LanguageCode, url: str) -> FetchedTranscript | None:
+def fetch_matching_transcript(transcripts: TranscriptList, language: LanguageCode, url: str) -> FetchedTranscript | None:
     """
     Fetches the transcript matching the requested language from a transcript list.
     """
@@ -109,11 +108,10 @@ class TranscriptDownloader:
         Returns:
             FetchedTranscript | None: Downloaded transcript, or `None` if no transcript in the requested language is available.
         """
-        transcripts = list_video_transcripts(self.url)
-        if transcripts is None:
-            return None
-        return fetch_matching_transcript(transcripts, self.language, self.url)
-    
+        if (transcripts := list_video_transcripts(self.url)) is not None:
+            return fetch_matching_transcript(transcripts, self.language, self.url)
+        return None
+
     def download_as_srt_text(self) -> str | None:
         """
         Downloads the transcript of a YouTube video and returns it as SRT text.

@@ -16,6 +16,7 @@ After any code change, verify all of the following pass before considering the t
 
 ```
 pytest
+mypy youtube_whisperer
 ruff check .
 ```
 
