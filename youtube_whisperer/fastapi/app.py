@@ -159,15 +159,15 @@ async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depen
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def map_stem_to_suffixes(dir_path: Path) -> dict[str, set[str]]:
-    """Recursively maps each file stem to the set of lowercased suffixes under dir_path.
+def map_path_to_suffixes(dir_path: Path) -> dict[str, set[str]]:
+    """Recursively maps each file path without suffix to the set of lowercased suffixes under dir_path.
 
     Args:
         dir_path: Root directory to scan. Must exist.
 
     Returns:
-        A dict mapping each stem to the set of lowercased suffixes found across all
-        files under dir_path (e.g. ``{"video": {".mp4", ".srt"}}``).
+        A dict mapping each file path without suffix to the set of lowercased suffixes found across all
+        files under dir_path (e.g. ``{"parent/video": {".mp4", ".srt"}}``).
 
     Raises:
         Exception: If dir_path does not exist or is not accessible.
@@ -175,7 +175,7 @@ def map_stem_to_suffixes(dir_path: Path) -> dict[str, set[str]]:
     stem2suffixes: dict[str, set[str]] = defaultdict(set)
     for file_path in prepare_input_dir(dir_path).rglob("*"):
         if file_path.is_file():
-            stem2suffixes[file_path.stem].add(file_path.suffix.lower())
+            stem2suffixes[str(file_path.with_suffix(''))].add(file_path.suffix.lower())
     return dict(stem2suffixes)
 
 
@@ -191,10 +191,10 @@ async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
     try:
         removed_files: list[str] = []
-        for stem, suffixes in map_stem_to_suffixes(dir_path).items():
+        for path_without_suffix, suffixes in map_path_to_suffixes(dir_path).items():
             if suffixes >= {'.mp4', '.srt'}:
-                for suffix in ['.mkv', '.wav', '.mp3']:
-                    if suffix in suffixes and (file_path := dir_path / f"{stem}{suffix}").is_file():
+                for suffix in ('.mkv', '.wav', '.mp3'):
+                    if suffix in suffixes and (file_path := Path(f"{path_without_suffix}{suffix}")).is_file():
                         file_path.unlink()
                         removed_files.append(str(file_path))
         return sorted(removed_files)
