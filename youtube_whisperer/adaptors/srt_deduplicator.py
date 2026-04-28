@@ -118,6 +118,24 @@ def convert_srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
     return '\n'.join(yield_lines_from_srt_blocks(blocks))
 
 
+def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicate: bool = True, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
+    """
+    Write an iterable of SrtBlock objects to an SRT file.
+
+    Args:
+        blocks (Iterable[SrtBlock]): SrtBlock objects to write, typically produced by mapping a transcriber-specific converter over recognition results.
+        file_path (Path): The path to the output SRT file.
+        deduplicate (bool, optional): Whether to merge consecutive blocks with identical content. Defaults to True.
+        overwrite (OverwriteMode, optional): Whether to overwrite an existing file. Defaults to `prompt`.
+    """
+    if file_path.is_file() and not overwrite_existing_path(file_path, overwrite):
+        return
+    file_path = prepare_output_file(file_path)
+    if deduplicate:
+        blocks = yield_deduplicated_srt_blocks(blocks)
+    file_path.write_text(convert_srt_blocks_to_str(blocks))
+
+
 def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
     """
     Deduplicates the contents of an SRT file and writes the deduplicated content to a new file.

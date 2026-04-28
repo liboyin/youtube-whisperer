@@ -96,6 +96,39 @@ def test_convert_srt_blocks_to_str():
     assert testee.convert_srt_blocks_to_str(blocks) == expected
 
 
+def test_save_segments_as_srt_writes_blocks(tmp_path):
+    """Writes a non-deduplicated SRT for the supplied blocks."""
+    blocks = [
+        testee.SrtBlock("00:00:00,000", "00:00:01,240", ["Segment"]),
+        testee.SrtBlock("00:00:01,240", "00:00:04,240", ["to"]),
+        testee.SrtBlock("00:00:04,240", "00:00:06,240", ["SRT"]),
+    ]
+    output_file_path = tmp_path / "output.srt"
+    testee.save_segments_as_srt(iter(blocks), output_file_path, deduplicate=False, overwrite=OverwriteMode.ALWAYS)
+    expected = "1\n00:00:00,000 --> 00:00:01,240\nSegment\n\n2\n00:00:01,240 --> 00:00:04,240\nto\n\n3\n00:00:04,240 --> 00:00:06,240\nSRT\n"
+    assert output_file_path.read_text() == expected
+
+
+def test_save_segments_as_srt_deduplicates_consecutive(tmp_path):
+    """Merges consecutive blocks with identical content when deduplicate is True."""
+    blocks = [
+        testee.SrtBlock("00:00:00,000", "00:00:01,000", ["Same"]),
+        testee.SrtBlock("00:00:01,000", "00:00:02,000", ["Same"]),
+    ]
+    output_file_path = tmp_path / "output.srt"
+    testee.save_segments_as_srt(iter(blocks), output_file_path, deduplicate=True, overwrite=OverwriteMode.ALWAYS)
+    assert output_file_path.read_text().count("Same") == 1
+
+
+def test_save_segments_as_srt_skips_existing_when_overwrite_never(tmp_path):
+    """Leaves an existing SRT untouched when overwrite mode is NEVER."""
+    output_file_path = tmp_path / "output.srt"
+    output_file_path.write_text("original content")
+    blocks = [testee.SrtBlock("00:00:00,000", "00:00:01,000", ["new"])]
+    testee.save_segments_as_srt(iter(blocks), output_file_path, overwrite=OverwriteMode.NEVER)
+    assert output_file_path.read_text() == "original content"
+
+
 def test_deduplicate_srt_file(temp_srt_file: Path):
     assert testee.deduplicate_srt_file(temp_srt_file, overwrite=OverwriteMode.ALWAYS) is temp_srt_file
     expected = dedent("""\

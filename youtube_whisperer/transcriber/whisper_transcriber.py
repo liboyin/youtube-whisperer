@@ -4,15 +4,33 @@ from typing import Iterable
 
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
+from faster_whisper.utils import format_timestamp
 import numpy as np
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.adaptors.whisper_adaptor import WhisperSegmentAdaptor
+from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
 from youtube_whisperer.transcriber.model_parameters import get_default_whisper_model_parameters
 from youtube_whisperer.transcriber.rejection_policy import RejectedTranscriptionError, reject_bad_segments
 from youtube_whisperer.transcriber.waveform_loader import load_whisper_waveform_from_file
 from youtube_whisperer.utils import TranscriberMode
+
+
+def segment_to_srt_block(segment: Segment) -> SrtBlock:
+    """
+    Convert a faster-whisper Segment into an SrtBlock.
+
+    Args:
+        segment (Segment): A Whisper transcription segment with `start`, `end`, and `text` attributes.
+
+    Returns:
+        SrtBlock: The SrtBlock representation of the input segment.
+    """
+    return SrtBlock(
+        format_timestamp(segment.start, always_include_hours=True, decimal_marker=','),
+        format_timestamp(segment.end, always_include_hours=True, decimal_marker=','),
+        segment.text.strip().split('\n'),
+    )
 
 
 def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, mode: TranscriberMode, language: LanguageCode) -> Iterable[Segment]:
@@ -76,7 +94,7 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
         return None
     try:
         segments_generator = reject_bad_segments(transcribe_waveform_with_default_model(waveform, mode, language))
-        WhisperSegmentAdaptor(segments_generator).save_as_srt_file(output_file_path, overwrite=overwrite)
+        save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
         return output_file_path
     except RejectedTranscriptionError as e:
         print(f"Rejected Whisper transcription for {input_file_path}: {e}")

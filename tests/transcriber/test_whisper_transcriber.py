@@ -1,10 +1,12 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+from faster_whisper.transcribe import Segment
 import numpy as np
 from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
+from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock
 from youtube_whisperer.transcriber.rejection_policy import REJECTED_SUBSTRINGS
 import youtube_whisperer.transcriber.whisper_transcriber as testee
 from youtube_whisperer.utils import TranscriberMode
@@ -15,6 +17,16 @@ LANGUAGE = LanguageCode("zh")
 
 def make_segment(text: str) -> SimpleNamespace:
     return SimpleNamespace(text=text)
+
+
+def test_segment_to_srt_block():
+    """Converts a faster-whisper Segment's start/end/text into an SrtBlock."""
+    segment = Segment(id=1, seek=2704, start=0.0, end=1.24, text='Segment', tokens=[50365, 4511], temperature=0.0, avg_logprob=-0.31, compression_ratio=1.28, no_speech_prob=0.72, words=None)
+    srt_block = testee.segment_to_srt_block(segment)
+    assert isinstance(srt_block, SrtBlock)
+    assert srt_block.start_time == '00:00:00,000'
+    assert srt_block.end_time == '00:00:01,240'
+    assert srt_block.content == ['Segment']
 
 
 def test_transcribe_waveform_switches_translate_to_transcribe_for_english(capsys):
@@ -96,8 +108,7 @@ def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     segments = [make_segment("hello")]
-    adaptor = mocker.MagicMock()
-    adaptor_cls = mocker.patch.object(testee, "WhisperSegmentAdaptor", return_value=adaptor)
+    save_mock = mocker.patch.object(testee, "save_segments_as_srt")
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
     mocker.patch.object(testee, "transcribe_waveform_with_default_model", return_value=segments)
 
@@ -110,8 +121,9 @@ def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
     )
 
     assert result == output_path
-    adaptor_cls.assert_called_once()
-    adaptor.save_as_srt_file.assert_called_once_with(output_path, overwrite=OverwriteMode.ALWAYS)
+    save_mock.assert_called_once()
+    assert save_mock.call_args.args[1] == output_path
+    assert save_mock.call_args.kwargs == {"overwrite": OverwriteMode.ALWAYS}
 
 
 def test_transcribe_file_with_default_model_returns_none_on_error(mocker, tmp_path, capsys):

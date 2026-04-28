@@ -81,7 +81,7 @@ Workers run as independent Docker services rather than background tasks within F
 
 ### SRT as the Output Format
 
-SRT was chosen to match an existing library of subtitle files. The conversion logic is isolated in the `adaptors/` layer, making it straightforward to support additional output formats (e.g. WebVTT, JSON) in the future.
+SRT was chosen to match an existing library of subtitle files. SRT serialization and deduplication are isolated in `adaptors/srt_deduplicator.py`; each transcriber owns the small conversion from its native segment type to an `SrtBlock`. Supporting an additional output format (e.g. WebVTT, JSON) would mean adding a sibling serializer next to `save_segments_as_srt`.
 
 ### CLI as a Development Tool
 

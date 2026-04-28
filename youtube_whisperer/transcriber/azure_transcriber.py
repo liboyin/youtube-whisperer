@@ -4,11 +4,13 @@ from pathlib import Path
 from typing import Any
 
 import azure.cognitiveservices.speech as speechsdk
+from azure.cognitiveservices.speech import SpeechRecognitionResult
+from faster_whisper.utils import format_timestamp
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
 import soundfile as sf
 
-from youtube_whisperer.adaptors.azure_adaptor import AzureRecognitionResultAdaptor
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
+from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
 
 AZURE_SPEECH_API_KEY = os.getenv("AZURE_SPEECH_API_KEY")
 AZURE_SERVICE_REGION = os.getenv("AZURE_SERVICE_REGION")
@@ -17,6 +19,25 @@ AZURE_SERVICE_REGION = os.getenv("AZURE_SERVICE_REGION")
 def get_audio_duration_seconds(audio_file: Path) -> float:
     """Get the duration of an audio file in seconds."""
     return sf.info(str(audio_file)).duration
+
+
+def recognition_result_to_srt_block(segment: SpeechRecognitionResult) -> SrtBlock:
+    """
+    Convert an Azure SpeechRecognitionResult into an SrtBlock.
+
+    Args:
+        segment (SpeechRecognitionResult): An Azure recognition result whose `offset` and `duration` are expressed in 100-nanosecond ticks.
+
+    Returns:
+        SrtBlock: The SrtBlock representation of the input recognition result.
+    """
+    start_seconds = segment.offset / 10_000_000
+    end_seconds = (segment.offset + segment.duration) / 10_000_000
+    return SrtBlock(
+        format_timestamp(start_seconds, always_include_hours=True, decimal_marker=','),
+        format_timestamp(end_seconds, always_include_hours=True, decimal_marker=','),
+        segment.text.strip().split('\n'),
+    )
 
 
 def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
@@ -43,7 +64,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     speech_config.speech_recognition_language = language.get_source_as_BCP()
     audio_config = speechsdk.audio.AudioConfig(filename=str(input_file_path))
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-    result_adaptor = AzureRecognitionResultAdaptor()
+    recognition_results: list[SpeechRecognitionResult] = []
     done = threading.Event()
     transcription_error: Exception | None = None
 
@@ -54,7 +75,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     def recognized_cb(evt: Any) -> None:
         print(f'UPDATE: {evt}')
         if evt.result.text:  # sometimes there is an empty update at the end of the recognition
-            result_adaptor.append(evt.result)
+            recognition_results.append(evt.result)
 
     def canceled_cb(evt: Any) -> None:
         nonlocal transcription_error
@@ -80,7 +101,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     if transcription_error is not None:
         raise transcription_error
 
-    result_adaptor.save_as_srt_file(output_file_path, deduplicate=True)
+    save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True)
     return output_file_path
 
 
