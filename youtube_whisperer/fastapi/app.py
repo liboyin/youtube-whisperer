@@ -1,11 +1,13 @@
 from collections import defaultdict
 import glob
+import logging
 import os
 from pathlib import Path
 import shutil
 from typing import Generator
 
-from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, File
+from fastapi import Depends, FastAPI, Request, status, UploadFile, File
+from fastapi.responses import JSONResponse
 from pathlib_extensions import prepare_input_dir, prepare_output_file
 from redis import StrictRedis
 
@@ -13,7 +15,15 @@ from youtube_whisperer.fastapi.models import AddAssetsResponse, AddTasksResponse
 from youtube_whisperer.queueing import DEAD_LETTER_QUEUE, clear_task_queues, list_dead_letters, list_task_queues, queue_transcription_tasks, queue_youtube_task
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR, REDIS_CLIENT, is_url
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="YouTube Whisperer")
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception in %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 def get_assets_dir() -> Path:
@@ -29,10 +39,7 @@ async def get_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> Ta
     """
     Retrieve all pending and active tasks from the Redis queues.
     """
-    try:
-        return list_task_queues(redis_client)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return list_task_queues(redis_client)
 
 
 def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
@@ -60,23 +67,20 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
     failed_tasks: list[Task] = []
     youtube_tasks: list[Task] = []
     transcription_tasks: list[Task] = []
-    try:
-        for pattern in patterns:
-            if is_url(pattern.source):
-                successful_tasks.append(pattern)
-                youtube_tasks.append(pattern)
-            elif resolved_tasks := resolve_filesystem_tasks(pattern):
-                successful_tasks.extend(resolved_tasks)
-                transcription_tasks.extend(resolved_tasks)
-            else:
-                failed_tasks.append(pattern)
-        for task in youtube_tasks:
-            queue_youtube_task(redis_client, task)
-        if transcription_tasks:
-            queue_transcription_tasks(redis_client, transcription_tasks)
-        return AddTasksResponse(successful=successful_tasks, failed=failed_tasks)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    for pattern in patterns:
+        if is_url(pattern.source):
+            successful_tasks.append(pattern)
+            youtube_tasks.append(pattern)
+        elif resolved_tasks := resolve_filesystem_tasks(pattern):
+            successful_tasks.extend(resolved_tasks)
+            transcription_tasks.extend(resolved_tasks)
+        else:
+            failed_tasks.append(pattern)
+    for task in youtube_tasks:
+        queue_youtube_task(redis_client, task)
+    if transcription_tasks:
+        queue_transcription_tasks(redis_client, transcription_tasks)
+    return AddTasksResponse(successful=successful_tasks, failed=failed_tasks)
 
 
 @app.delete("/tasks", response_model=TaskQueues)
@@ -87,10 +91,7 @@ async def clear_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> 
     Returns:
         TaskQueues: Snapshot of the deleted tasks.
     """
-    try:
-        return clear_task_queues(redis_client)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return clear_task_queues(redis_client)
 
 
 @app.get("/dead-letters", response_model=list[DeadLetter])
@@ -98,10 +99,7 @@ async def get_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)
     """
     Retrieve failed tasks from the dead-letter queue.
     """
-    try:
-        return list_dead_letters(redis_client)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return list_dead_letters(redis_client)
 
 
 @app.delete("/dead-letters", response_model=list[DeadLetter])
@@ -109,12 +107,9 @@ async def clear_dead_letters(redis_client: StrictRedis = Depends(get_redis_clien
     """
     Clear the dead-letter queue.
     """
-    try:
-        dead_letters = list_dead_letters(redis_client)
-        redis_client.delete(DEAD_LETTER_QUEUE)
-        return dead_letters
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    dead_letters = list_dead_letters(redis_client)
+    redis_client.delete(DEAD_LETTER_QUEUE)
+    return dead_letters
 
 
 @app.get("/assets", response_model=list[str])
@@ -122,10 +117,7 @@ async def list_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
     List all contents of the specified directory.
     """
-    try:
-        return sorted(map(str, prepare_input_dir(dir_path).rglob("*")))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return sorted(map(str, prepare_input_dir(dir_path).rglob("*")))
 
 
 @app.post("/assets", response_model=AddAssetsResponse, status_code=status.HTTP_201_CREATED)
@@ -144,19 +136,16 @@ async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depen
     """
     saved_files: list[str] = []
     failed_files: list[str] = []
-    try:
-        for upload in files:
-            assert upload.filename
-            target_path = prepare_output_file(dir_path / upload.filename)
-            try:
-                with target_path.open("wb") as f:
-                    shutil.copyfileobj(upload.file, f)
-                saved_files.append(str(target_path))
-            except Exception:
-                failed_files.append(upload.filename)
-        return AddAssetsResponse(successful=saved_files, failed=failed_files)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    for upload in files:
+        assert upload.filename
+        target_path = prepare_output_file(dir_path / upload.filename)
+        try:
+            with target_path.open("wb") as f:
+                shutil.copyfileobj(upload.file, f)
+            saved_files.append(str(target_path))
+        except Exception:
+            failed_files.append(upload.filename)
+    return AddAssetsResponse(successful=saved_files, failed=failed_files)
 
 
 def map_path_to_suffixes(dir_path: Path) -> dict[str, set[str]]:
@@ -189,14 +178,11 @@ async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     Returns:
         list[str]: List of removed file paths.
     """
-    try:
-        removed_files: list[str] = []
-        for path_without_suffix, suffixes in map_path_to_suffixes(dir_path).items():
-            if suffixes >= {'.mp4', '.srt'}:
-                for suffix in ('.mkv', '.wav', '.mp3'):
-                    if suffix in suffixes and (file_path := Path(f"{path_without_suffix}{suffix}")).is_file():
-                        file_path.unlink()
-                        removed_files.append(str(file_path))
-        return sorted(removed_files)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    removed_files: list[str] = []
+    for path_without_suffix, suffixes in map_path_to_suffixes(dir_path).items():
+        if suffixes >= {'.mp4', '.srt'}:
+            for suffix in ('.mkv', '.wav', '.mp3'):
+                if suffix in suffixes and (file_path := Path(f"{path_without_suffix}{suffix}")).is_file():
+                    file_path.unlink()
+                    removed_files.append(str(file_path))
+    return sorted(removed_files)

@@ -3,7 +3,6 @@ from pathlib import Path
 from unittest.mock import ANY, MagicMock
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from redis import StrictRedis
 
@@ -62,12 +61,12 @@ def test_get_tasks_returns_queue_snapshot(client, mocker):
     mock_list.assert_called_once()
 
 
-def test_get_tasks_raises_http_500_when_queue_lookup_fails(mocker):
-    """Test that task lookup failures are surfaced as HTTP 500 errors."""
+def test_get_tasks_propagates_queue_lookup_failure(mocker):
+    """Test that queue lookup failures propagate so the global handler can convert them to 500."""
     redis_client = mocker.MagicMock()
     mocker.patch.object(testee, 'list_task_queues', side_effect=RuntimeError("redis down"))
 
-    with pytest.raises(HTTPException, match="redis down"):
+    with pytest.raises(RuntimeError, match="redis down"):
         asyncio.run(testee.get_tasks(redis_client=redis_client))
 
 
@@ -138,15 +137,15 @@ def test_add_tasks_failed_resolution(client, mocker):
     mock_queue_transcription_tasks.assert_not_called()
 
 
-def test_add_tasks_raises_http_500_when_queueing_fails(mocker):
-    """Test that queueing failures in add_tasks are surfaced as HTTP 500 errors."""
+def test_add_tasks_propagates_queueing_failure(mocker):
+    """Test that queueing failures in add_tasks propagate so the global handler can convert them to 500."""
     redis_client = mocker.MagicMock()
     task = Task(source="/tmp/audio.wav", language="en")
     mocker.patch.object(testee, 'is_url', return_value=False)
     mocker.patch.object(testee, 'resolve_filesystem_tasks', return_value=[task])
     mocker.patch.object(testee, 'queue_transcription_tasks', side_effect=RuntimeError("redis down"))
 
-    with pytest.raises(HTTPException, match="redis down"):
+    with pytest.raises(RuntimeError, match="redis down"):
         asyncio.run(testee.add_tasks([task], redis_client=redis_client))
 
 
@@ -162,12 +161,12 @@ def test_clear_tasks_returns_deleted_queue_snapshot(client, mocker):
     mock_clear.assert_called_once()
 
 
-def test_clear_tasks_raises_http_500_when_queue_clearing_fails(mocker):
-    """Test that task-clearing failures are surfaced as HTTP 500 errors."""
+def test_clear_tasks_propagates_queue_clearing_failure(mocker):
+    """Test that task-clearing failures propagate so the global handler can convert them to 500."""
     redis_client = mocker.MagicMock()
     mocker.patch.object(testee, 'clear_task_queues', side_effect=RuntimeError("redis down"))
 
-    with pytest.raises(HTTPException, match="redis down"):
+    with pytest.raises(RuntimeError, match="redis down"):
         asyncio.run(testee.clear_tasks(redis_client=redis_client))
 
 
@@ -183,12 +182,12 @@ def test_get_dead_letters_returns_queue_contents(client, mocker):
     mock_list.assert_called_once()
 
 
-def test_get_dead_letters_raises_http_500_when_lookup_fails(mocker):
-    """Test that dead-letter lookup failures are surfaced as HTTP 500 errors."""
+def test_get_dead_letters_propagates_lookup_failure(mocker):
+    """Test that dead-letter lookup failures propagate so the global handler can convert them to 500."""
     redis_client = mocker.MagicMock()
     mocker.patch.object(testee, 'list_dead_letters', side_effect=RuntimeError("redis down"))
 
-    with pytest.raises(HTTPException, match="redis down"):
+    with pytest.raises(RuntimeError, match="redis down"):
         asyncio.run(testee.get_dead_letters(redis_client=redis_client))
 
 
@@ -205,12 +204,12 @@ def test_clear_dead_letters_returns_deleted_items(client, mocker, mock_redis_cli
     mock_redis_client.delete.assert_called_once_with(testee.DEAD_LETTER_QUEUE)
 
 
-def test_clear_dead_letters_raises_http_500_when_delete_fails(mocker):
-    """Test that dead-letter clearing failures are surfaced as HTTP 500 errors."""
+def test_clear_dead_letters_propagates_delete_failure(mocker):
+    """Test that dead-letter clearing failures propagate so the global handler can convert them to 500."""
     redis_client = mocker.MagicMock()
     mocker.patch.object(testee, 'list_dead_letters', side_effect=RuntimeError("redis down"))
 
-    with pytest.raises(HTTPException, match="redis down"):
+    with pytest.raises(RuntimeError, match="redis down"):
         asyncio.run(testee.clear_dead_letters(redis_client=redis_client))
 
 
@@ -249,11 +248,11 @@ def test_list_assets_with_subdirectories(client, mock_assets_dir):
     assert str(subdir) in paths  # rglob("*") includes directory entries
 
 
-def test_list_assets_raises_http_500_when_directory_listing_fails():
-    """Test that asset-listing failures are surfaced as HTTP 500 errors."""
+def test_list_assets_propagates_directory_listing_failure():
+    """Test that asset-listing failures propagate so the global handler can convert them to 500."""
     bad_dir = Path("/definitely/missing")
 
-    with pytest.raises(HTTPException, match="/definitely/missing"):
+    with pytest.raises(Exception, match="/definitely/missing"):
         asyncio.run(testee.list_assets(dir_path=bad_dir))
 
 
@@ -291,12 +290,12 @@ def test_add_assets_catches_individual_file_write_failure(mocker, tmp_path):
     assert result.successful == []
 
 
-def test_add_assets_raises_http_500_when_filename_is_missing(mocker, tmp_path):
-    """Test that uploads without filenames raise an HTTP 500 error."""
+def test_add_assets_rejects_missing_filename(mocker, tmp_path):
+    """Test that uploads without filenames raise so the global handler can convert them to 500."""
     mock_upload = mocker.MagicMock()
     mock_upload.filename = None
 
-    with pytest.raises(HTTPException):
+    with pytest.raises(AssertionError):
         asyncio.run(testee.add_assets([mock_upload], dir_path=tmp_path))
 
 
@@ -370,9 +369,21 @@ def test_clean_assets(client, mock_assets_dir, mocker):
     assert (mock_assets_dir / "another.mp4").exists()
 
 
-def test_clean_assets_raises_http_500_when_directory_listing_fails(mocker):
-    """Test that asset-cleaning listing failures are surfaced as HTTP 500 errors."""
+def test_clean_assets_propagates_directory_listing_failure(mocker):
+    """Test that asset-cleaning listing failures propagate so the global handler can convert them to 500."""
     mocker.patch.object(testee, 'map_path_to_suffixes', side_effect=Exception("/definitely/missing"))
 
-    with pytest.raises(HTTPException, match="/definitely/missing"):
+    with pytest.raises(Exception, match="/definitely/missing"):
         asyncio.run(testee.clean_assets(dir_path=Path("/definitely/missing")))
+
+
+def test_unhandled_exception_returns_sanitized_500(mocker):
+    """The global exception handler must return 500 with a generic detail and not leak the original message."""
+    mocker.patch.object(testee, 'list_task_queues', side_effect=RuntimeError("internal connection string secret=hunter2"))
+    swallowing_client = TestClient(testee.app, raise_server_exceptions=False)
+
+    response = swallowing_client.get("/tasks")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Internal server error"}
+    assert "hunter2" not in response.text
