@@ -32,7 +32,7 @@ def load_whisper_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAM
     )
     print('ffmpeg args:', stream.get_args())
     try:
-        out, err = stream.run(input=data, capture_stdout=True, capture_stderr=True)
+        out, _ = stream.run(input=data, capture_stdout=True, capture_stderr=True)
     except ffmpeg.Error as e:
         print(e.stderr.decode())
         raise
@@ -42,8 +42,22 @@ def load_whisper_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAM
 def load_whisper_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
     """
     Load Whisper-style waveform from a file and return it as a NumPy array.
+
+    ffmpeg streams the file directly so the raw bytes never reside in Python memory.
     """
-    return load_whisper_waveform_from_bytes(prepare_input_file(path).read_bytes(), sample_rate)
+    input_path = prepare_input_file(path)
+    stream = (
+        ffmpeg
+        .input(str(input_path), threads=0)
+        .output("pipe:", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
+    )
+    print('ffmpeg args:', stream.get_args())
+    try:
+        out, _ = stream.run(capture_stdout=True, capture_stderr=True)
+    except ffmpeg.Error as e:
+        print(e.stderr.decode())
+        raise
+    return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768
 
 
 def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:

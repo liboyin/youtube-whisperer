@@ -66,17 +66,37 @@ def test_load_whisper_waveform_from_bytes_reraises_ffmpeg_error(mocker, capsys):
     assert "decoder failed" in capsys.readouterr().out
 
 
-def test_load_whisper_waveform_from_file_reads_bytes_from_prepared_path(mocker, tmp_path):
+def test_load_whisper_waveform_from_file_streams_path_through_ffmpeg(mocker, tmp_path):
     input_path = tmp_path / "audio.raw"
-    input_path.write_bytes(b"prepared-audio")
+    pcm = np.array([0, 16384, -16384], dtype=np.int16).tobytes()
+    stream = FakeStream(stdout=pcm)
     mock_prepare = mocker.patch.object(testee, "prepare_input_file", return_value=input_path)
-    mock_load = mocker.patch.object(testee, "load_whisper_waveform_from_bytes", return_value=np.array([1.0], dtype=np.float32))
+    mock_input = mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
 
-    result = testee.load_whisper_waveform_from_file(Path("ignored.raw"), sample_rate=8000)
+    waveform = testee.load_whisper_waveform_from_file(Path("ignored.raw"), sample_rate=8000)
 
-    assert result.tolist() == [1.0]
+    np.testing.assert_allclose(waveform, np.array([0.0, 0.5, -0.5], dtype=np.float32))
     mock_prepare.assert_called_once_with(Path("ignored.raw"))
-    mock_load.assert_called_once_with(b"prepared-audio", 8000)
+    mock_input.assert_called_once_with(str(input_path), threads=0)
+    assert stream.output_kwargs == {
+        "format": "s16le",
+        "acodec": "pcm_s16le",
+        "ac": 1,
+        "ar": 8000,
+    }
+    assert stream.run_calls == [{"capture_stdout": True, "capture_stderr": True}]
+
+
+def test_load_whisper_waveform_from_file_reraises_ffmpeg_error(mocker, tmp_path, capsys):
+    input_path = tmp_path / "audio.raw"
+    stream = FakeStream(error=FakeFFmpegError(b"decoder failed"))
+    mocker.patch.object(testee, "prepare_input_file", return_value=input_path)
+    mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
+
+    with pytest.raises(FakeFFmpegError):
+        testee.load_whisper_waveform_from_file(Path("ignored.raw"))
+
+    assert "decoder failed" in capsys.readouterr().out
 
 
 def test_save_as_wav_file_returns_none_when_overwrite_denied(mocker, tmp_path):
