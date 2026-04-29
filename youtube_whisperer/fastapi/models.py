@@ -33,20 +33,6 @@ class Task(BaseModel):
             raise ValueError('Source cannot be empty')
         return x
 
-    @field_validator('transcriber')
-    def validate_transcriber(cls, x: str | TranscriberType) -> TranscriberType:
-        try:
-            return TranscriberType(x)
-        except ValueError:
-            raise TypeError(f'Unexpected transcriber {x} of type {type(x)}')
-
-    @field_validator('mode')
-    def validate_mode(cls, x: str | TranscriberMode) -> TranscriberMode:
-        try:
-            return TranscriberMode(x)
-        except ValueError:
-            raise TypeError(f'Unexpected mode {x} of type {type(x)}')
-
 
 class AddTasksResponse(BaseModel):
     successful: list[Task]
