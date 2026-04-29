@@ -1,8 +1,8 @@
 import argparse
 from enum import Enum
-import os
 import socket
 
+from youtube_whisperer.config import Settings
 from youtube_whisperer.workers.azure_worker import AzureWorker
 from youtube_whisperer.workers.whisper_worker import WhisperWorker
 from youtube_whisperer.workers.youtube_worker import YouTubeWorker
@@ -37,7 +37,7 @@ def resolve_worker_slot(slot: str | None, role_name: str) -> str:
     """
     if slot:
         return slot
-    slot_id = os.getenv('WORKER_SLOT_ID')
+    slot_id = Settings().worker_slot_id
     if slot_id is not None:
         return f'{role_name}-{slot_id}'
     return socket.gethostname()
@@ -90,7 +90,7 @@ def main() -> None:
         None. The selected worker loop runs until the process is stopped.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('role', nargs='?', choices=WorkerRole.values(), default=os.getenv('WORKER_ROLE', WorkerRole.WHISPER.value))
+    parser.add_argument('role', nargs='?', choices=WorkerRole.values(), default=Settings().worker_role)
     parser.add_argument('--slot', default=None, help="Active-slot identifier for whisper/Azure workers. Defaults to WORKER_SLOT_ID, then machine hostname.")
     parser.add_argument('--poll-interval-seconds', type=int, default=5)
     args = parser.parse_args()

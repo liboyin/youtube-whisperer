@@ -1,12 +1,13 @@
 from enum import Enum
-import os
-from pathlib import Path
 import re
 
 import redis
 
-WHISPER_ASSETS_DIR = Path(os.getenv("WHISPER_ASSETS_DIR", Path(__file__).parents[1] / "assets"))
-WHISPER_MODELS_DIR = Path(os.getenv("WHISPER_MODELS_DIR", Path.home() / ".whisper"))
+from youtube_whisperer.config import Settings
+
+_settings = Settings()
+WHISPER_ASSETS_DIR = _settings.whisper_assets_dir
+WHISPER_MODELS_DIR = _settings.whisper_models_dir
 
 REDIS_POOL = redis.ConnectionPool(host='redis', socket_connect_timeout=5, health_check_interval=60)
 REDIS_CLIENT = redis.StrictRedis(connection_pool=REDIS_POOL)
@@ -28,25 +29,6 @@ class TranscriberMode(str, Enum):
     @classmethod
     def values(cls) -> tuple[str, ...]:
         return tuple(mode.value for mode in cls)
-
-
-def strtobool(val: str) -> bool:
-    """
-    Converts a string representation of truth (case insensitive) to boolean type.
-
-    Replaces distutils.util.strtobool, which is no longer included in the standard library since Python 3.10.
-
-    True values are 'y', 'yes', 't', 'true', 'on', and '1'.
-    False values are 'n', 'no', 'f', 'false', 'off', and '0'.
-    Raises ValueError if 'val' is anything else.
-    """
-    match val.lower():
-        case 'y' | 'yes' | 't' | 'true' | 'on' | '1':
-            return True
-        case 'n' | 'no' | 'f' | 'false' | 'off' | '0':
-            return False
-        case _:
-            raise ValueError(f"invalid truth value '{val}' of type {type(val)}")
 
 
 def is_url(text: str) -> bool:

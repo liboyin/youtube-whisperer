@@ -1,4 +1,3 @@
-import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -11,9 +10,7 @@ import soundfile as sf
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
-
-AZURE_SPEECH_API_KEY = os.getenv("AZURE_SPEECH_API_KEY")
-AZURE_SERVICE_REGION = os.getenv("AZURE_SERVICE_REGION")
+from youtube_whisperer.config import Settings
 
 
 def get_audio_duration_seconds(audio_file: Path) -> float:
@@ -60,7 +57,8 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return output_file_path
-    speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_API_KEY, region=AZURE_SERVICE_REGION)
+    settings = Settings()
+    speech_config = speechsdk.SpeechConfig(subscription=settings.azure_speech_api_key, region=settings.azure_service_region)
     speech_config.speech_recognition_language = language.get_source_as_BCP()
     audio_config = speechsdk.audio.AudioConfig(filename=str(input_file_path))
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)

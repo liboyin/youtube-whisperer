@@ -20,44 +20,6 @@ def test_transcriber_mode_values():
 
 
 @pytest.mark.parametrize("input_text, expected", [
-    ("y", True),
-    ("yes", True),
-    ("t", True),
-    ("true", True),
-    ("on", True),
-    ("1", True),
-])
-def test_strtobool_true(input_text, expected):
-    """Test that truthy string inputs are converted to True."""
-    assert testee.strtobool(input_text) is expected
-
-
-@pytest.mark.parametrize("input_text, expected", [
-    ("n", False),
-    ("no", False),
-    ("f", False),
-    ("false", False),
-    ("off", False),
-    ("0", False),
-])
-def test_strtobool_false(input_text, expected):
-    """Test that falsy string inputs are converted to False."""
-    assert testee.strtobool(input_text) is expected
-
-
-@pytest.mark.parametrize("input_text", [
-    "invalid",
-    "maybe",
-    "2",
-    "yesno",
-])
-def test_strtobool_invalid(input_text):
-    """Test that invalid boolean-like strings raise ValueError."""
-    with pytest.raises(ValueError):
-        testee.strtobool(input_text)
-
-
-@pytest.mark.parametrize("input_text, expected", [
     ("http://example.com", True),
     ("https://example.com", True),
     ("http://www.example.com", True),
