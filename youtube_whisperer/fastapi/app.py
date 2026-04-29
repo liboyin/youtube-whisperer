@@ -22,6 +22,19 @@ app = FastAPI(title="YouTube Whisperer")
 
 @app.exception_handler(Exception)
 async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
+    """Convert any uncaught exception into a sanitized 500 response.
+
+    The full traceback is logged via `logger.exception` so operators can debug; the response
+    body intentionally omits the original exception message to avoid leaking internal details
+    (connection strings, file paths, secrets) to clients.
+
+    Args:
+        request: The incoming request that triggered the exception.
+        exc: The unhandled exception raised inside the endpoint.
+
+    Returns:
+        A 500 `JSONResponse` with a generic error detail.
+    """
     logger.exception("Unhandled exception in %s %s", request.method, request.url.path)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
