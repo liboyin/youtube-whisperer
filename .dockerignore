@@ -1,22 +1,10 @@
-# Version control and local agent docs
-.git/
+# Version control
+.git
 .gitignore
-.dockerignore
-AGENTS.md
-CLAUDE.md
-GEMINI.md
-ISSUES.md
 
-# Local environment and editor files
-.env
-.env.*
-!.env.example
-.claude/
-.devcontainer/
-.idea/
-.vscode/
-*.swp
-*.swo
+# IDE files
+.vscode
+.devcontainer
 
 # OS files
 .DS_Store
@@ -42,7 +30,27 @@ pip-wheel-metadata/
 *.egg
 *.egg-info/
 
-# Files not needed in the runtime image
+# AI agent files
+.claude
+AGENTS.md
+CLAUDE.md
+
+# Documentations
+ISSUES.md
+README.md
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Secret files
+.env
+
+# Scripts
+extract_subtitle_text.sh
+ls_mp4_without_srt.sh
+
+# Misc.
 assets/
 tests/
-docker-compose*.yaml
