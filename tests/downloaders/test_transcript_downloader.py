@@ -8,6 +8,7 @@ import youtube_whisperer.downloaders.transcript_downloader as testee
 
 
 def test_get_video_id():
+    """Test that video IDs are extracted from short, watch, and live URLs, rejecting others."""
     assert testee.get_video_id('https://youtu.be/n9xhJrPXop4?si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
     assert testee.get_video_id('https://www.youtube.com/watch?v=n9xhJrPXop4&si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
     assert testee.get_video_id('https://www.youtube.com/live/3TufaG29B7w?si=b5DQpvYgzcKJjJ0L') == '3TufaG29B7w'
@@ -16,6 +17,7 @@ def test_get_video_id():
 
 
 def test_get_first_matching_lang_code():
+    """Test that the first candidate matching the requested BCP/ISO code is chosen."""
     assert testee.get_first_matching_lang_code([], LanguageCode('en')) is None
     assert testee.get_first_matching_lang_code(['en-US', 'en'], LanguageCode('zh')) is None
     assert testee.get_first_matching_lang_code(['en-US', 'en'], LanguageCode('en')) == 'en-US'
@@ -28,6 +30,7 @@ def downloader():
 
 
 def test_list_video_transcripts_returns_transcripts(mocker):
+    """Test that the transcript list is returned for a resolvable video."""
     mock_video_id = 'test_video_id'
     mock_transcript_list = MagicMock()
     mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
@@ -44,6 +47,7 @@ def test_list_video_transcripts_returns_transcripts(mocker):
 
 
 def test_list_video_transcripts_returns_none_when_transcripts_are_disabled(mocker):
+    """Test that disabled transcripts yield None instead of raising."""
     mock_video_id = 'test_video_id'
     mocker.patch.object(testee, 'get_video_id', return_value=mock_video_id)
     mock_yt_api_class = mocker.patch.object(testee, 'YouTubeTranscriptApi')
@@ -57,6 +61,7 @@ def test_list_video_transcripts_returns_none_when_transcripts_are_disabled(mocke
 
 
 def test_fetch_matching_transcript_returns_transcript_for_matching_language(mocker):
+    """Test that a transcript in the matching language is fetched."""
     expected_transcript = [{'text': 'hello', 'start': 0.0, 'duration': 1.0}]
     mock_transcript_list = MagicMock()
     mock_transcript_metadata_en = MagicMock()
@@ -74,6 +79,7 @@ def test_fetch_matching_transcript_returns_transcript_for_matching_language(mock
 
 
 def test_fetch_matching_transcript_returns_none_when_no_matching_language(mocker):
+    """Test that no matching language yields None without attempting a fetch."""
     mock_transcript_list = MagicMock()
     mock_transcript_metadata_fr = MagicMock()
     mock_transcript_metadata_fr.language_code = 'fr'
@@ -87,6 +93,7 @@ def test_fetch_matching_transcript_returns_none_when_no_matching_language(mocker
 
 
 def test_fetch_matching_transcript_returns_none_when_transcript_lookup_fails(mocker):
+    """Test that a failed transcript lookup yields None."""
     mock_video_id = 'test_video_id'
     mock_transcript_list = MagicMock()
     mock_transcript_metadata_en = MagicMock()
@@ -102,6 +109,7 @@ def test_fetch_matching_transcript_returns_none_when_transcript_lookup_fails(moc
 
 
 def test_download_delegates_to_listing_and_matching_helpers(mocker, downloader):
+    """Test that download composes the listing and matching helpers."""
     transcripts = MagicMock()
     expected_transcript = [{'text': 'hello', 'start': 0.0, 'duration': 1.0}]
     mock_list_video_transcripts = mocker.patch.object(testee, 'list_video_transcripts', return_value=transcripts)
@@ -165,6 +173,7 @@ def test_download_as_srt_file_no_transcript(mocker, tmp_path, downloader):
 
 
 def test_download_as_srt_file_returns_true_when_file_exists_and_no_overwrite(tmp_path, downloader):
+    """Test that an existing SRT is preserved and reported as success when overwrite is denied."""
     output_path = tmp_path / "output.srt"
     output_path.write_text("existing content")
     result = downloader.download_as_srt_file(output_path, OverwriteMode.NEVER)
@@ -215,6 +224,7 @@ def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, 
 
 
 def test_main_downloads_given_urls(mocker):
+    """Test that the CLI downloads a default-titled SRT for each provided URL."""
     from types import SimpleNamespace
     args = SimpleNamespace(
         urls=["https://www.youtube.com/watch?v=test"],

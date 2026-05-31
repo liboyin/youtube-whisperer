@@ -46,6 +46,7 @@ class FakeYoutubeDL:
 
 
 def test_get_video_title_uses_yt_dlp_and_optional_firefox_cookies(mocker):
+    """Test that the title is extracted via yt-dlp using Firefox cookies when available."""
     created = {}
 
     def fake_factory(options):
@@ -64,6 +65,7 @@ def test_get_video_title_uses_yt_dlp_and_optional_firefox_cookies(mocker):
 
 
 def test_is_firefox_cookies_available_detects_cookie_file(monkeypatch, tmp_path, capsys):
+    """Test that a cookies.sqlite under the Firefox profile is detected."""
     monkeypatch.setenv("HOME", str(tmp_path))
     cookies = tmp_path / ".mozilla" / "firefox" / "profile" / "cookies.sqlite"
     cookies.parent.mkdir(parents=True)
@@ -74,6 +76,7 @@ def test_is_firefox_cookies_available_detects_cookie_file(monkeypatch, tmp_path,
 
 
 def test_is_firefox_cookies_available_returns_false_when_missing(monkeypatch, tmp_path, capsys):
+    """Test that a missing cookies file reports cookies as unavailable."""
     monkeypatch.setenv("HOME", str(tmp_path))
 
     assert utils_testee.is_firefox_cookies_available() is False
@@ -84,6 +87,7 @@ def test_is_firefox_cookies_available_returns_false_when_missing(monkeypatch, tm
 
 
 def test_download_video_and_transcript_with_default_title_delegates(mocker):
+    """Test that video and transcript downloads are delegated and their results combined."""
     video_path = Path("/tmp/video.mp4")
     mock_download_video = mocker.patch.object(
         downloaders_testee,
@@ -122,6 +126,7 @@ def test_download_video_and_transcript_with_default_title_delegates(mocker):
 
 
 def test_yield_video_urls_from_playlist_includes_firefox_cookies_when_available(mocker):
+    """Test that playlist entries are expanded to watch URLs using Firefox cookies when available."""
     created = {}
 
     def fake_factory(options):
@@ -145,6 +150,7 @@ def test_yield_video_urls_from_playlist_includes_firefox_cookies_when_available(
 
 
 def test_yield_flattened_video_urls(mocker):
+    """Test that playlist URLs are expanded inline while direct video URLs pass through."""
     mock_yield_playlist = mocker.patch.object(
         playlist_testee,
         'yield_video_urls_from_playlist',
@@ -161,6 +167,7 @@ def test_yield_flattened_video_urls(mocker):
 
 
 def test_download_playlist_with_default_titles_downloads_each_url(mocker):
+    """Test that every expanded playlist URL is downloaded with default titles."""
     mocker.patch.object(
         playlist_testee,
         "yield_video_urls_from_playlist",
@@ -186,6 +193,7 @@ def test_download_playlist_with_default_titles_downloads_each_url(mocker):
 
 
 def test_playlist_main_parses_urls_and_forwards_overwrite(mocker):
+    """Test that the CLI downloads each provided playlist with the parsed overwrite mode."""
     args = SimpleNamespace(
         urls=["playlist-1", "playlist-2"],
         overwrite=OverwriteMode.ALWAYS,

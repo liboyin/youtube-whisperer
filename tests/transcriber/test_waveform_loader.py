@@ -36,6 +36,7 @@ class FakeStream:
 
 
 def test_load_whisper_waveform_from_bytes_decodes_pcm_stream(mocker):
+    """Test that PCM bytes are decoded and normalized to a float32 waveform."""
     pcm = np.array([0, 16384, -16384], dtype=np.int16).tobytes()
     stream = FakeStream(stdout=pcm)
     mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
@@ -57,6 +58,7 @@ def test_load_whisper_waveform_from_bytes_decodes_pcm_stream(mocker):
 
 
 def test_load_whisper_waveform_from_bytes_reraises_ffmpeg_error(mocker, capsys):
+    """Test that ffmpeg decode errors on bytes input are logged and re-raised."""
     stream = FakeStream(error=FakeFFmpegError(b"decoder failed"))
     mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
 
@@ -67,6 +69,7 @@ def test_load_whisper_waveform_from_bytes_reraises_ffmpeg_error(mocker, capsys):
 
 
 def test_load_whisper_waveform_from_file_streams_path_through_ffmpeg(mocker, tmp_path):
+    """Test that a file path is streamed through ffmpeg without buffering bytes in Python."""
     input_path = tmp_path / "audio.raw"
     pcm = np.array([0, 16384, -16384], dtype=np.int16).tobytes()
     stream = FakeStream(stdout=pcm)
@@ -88,6 +91,7 @@ def test_load_whisper_waveform_from_file_streams_path_through_ffmpeg(mocker, tmp
 
 
 def test_load_whisper_waveform_from_file_reraises_ffmpeg_error(mocker, tmp_path, capsys):
+    """Test that ffmpeg decode errors on file input are logged and re-raised."""
     input_path = tmp_path / "audio.raw"
     stream = FakeStream(error=FakeFFmpegError(b"decoder failed"))
     mocker.patch.object(testee, "prepare_input_file", return_value=input_path)
@@ -100,6 +104,7 @@ def test_load_whisper_waveform_from_file_reraises_ffmpeg_error(mocker, tmp_path,
 
 
 def test_save_as_wav_file_returns_none_when_overwrite_denied(mocker, tmp_path):
+    """Test that conversion is skipped when an existing WAV must not be overwritten."""
     input_path = tmp_path / "input.mp3"
     output_path = tmp_path / "output.wav"
     output_path.write_text("existing")
@@ -117,6 +122,7 @@ def test_save_as_wav_file_returns_none_when_overwrite_denied(mocker, tmp_path):
 
 
 def test_save_as_wav_file_runs_ffmpeg_and_returns_output_path(mocker, tmp_path):
+    """Test that a mono 16-bit PCM WAV is produced and its path returned."""
     input_path = tmp_path / "input.mp3"
     output_path = tmp_path / "output.wav"
     stream = FakeStream()
@@ -141,6 +147,7 @@ def test_save_as_wav_file_runs_ffmpeg_and_returns_output_path(mocker, tmp_path):
 
 
 def test_save_as_wav_file_reraises_ffmpeg_error(mocker, tmp_path, capsys):
+    """Test that ffmpeg conversion errors are logged and re-raised."""
     input_path = tmp_path / "input.mp3"
     output_path = tmp_path / "output.wav"
     stream = FakeStream(error=FakeFFmpegError(b"conversion failed"))

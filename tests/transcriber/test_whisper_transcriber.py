@@ -30,6 +30,7 @@ def test_segment_to_srt_block():
 
 
 def test_transcribe_waveform_switches_translate_to_transcribe_for_english(capsys):
+    """Test that translate mode is downgraded to transcribe when the source is English."""
     model = SimpleNamespace(
         transcribe=lambda waveform, lang_code, task: (
             iter(["segment"]),
@@ -45,6 +46,7 @@ def test_transcribe_waveform_switches_translate_to_transcribe_for_english(capsys
 
 
 def test_transcribe_waveform_with_default_model_builds_model_from_default_parameters(mocker):
+    """Test that the default model is built from resolved parameters before transcribing."""
     waveform = np.array([1.0], dtype=np.float32)
     model = mocker.MagicMock()
     mocker.patch.object(testee, "get_default_whisper_model_parameters", return_value={"device": "cpu"})
@@ -59,6 +61,7 @@ def test_transcribe_waveform_with_default_model_builds_model_from_default_parame
 
 
 def test_transcribe_file_with_default_model_returns_existing_output_when_overwrite_denied(mocker, tmp_path):
+    """Test that an existing SRT is returned without reloading audio when overwrite is denied."""
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     output_path.write_text("existing")
@@ -78,6 +81,7 @@ def test_transcribe_file_with_default_model_returns_existing_output_when_overwri
 
 
 def test_transcribe_file_with_default_model_skips_empty_waveform(mocker, tmp_path, capsys):
+    """Test that an empty waveform is skipped instead of transcribed."""
     input_path = tmp_path / "audio.wav"
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([]))
 
@@ -88,6 +92,7 @@ def test_transcribe_file_with_default_model_skips_empty_waveform(mocker, tmp_pat
 
 
 def test_transcribe_file_with_default_model_returns_none_on_rejected_transcription(mocker, tmp_path, capsys):
+    """Test that a rejected transcription writes no SRT and returns None."""
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
@@ -105,6 +110,7 @@ def test_transcribe_file_with_default_model_returns_none_on_rejected_transcripti
 
 
 def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
+    """Test that successful segments are saved as SRT with the requested overwrite mode."""
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     segments = [make_segment("hello")]
@@ -127,6 +133,7 @@ def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
 
 
 def test_transcribe_file_with_default_model_returns_none_on_error(mocker, tmp_path, capsys):
+    """Test that transcription errors are caught and reported as a None result."""
     input_path = tmp_path / "audio.wav"
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
     mocker.patch.object(testee, "transcribe_waveform_with_default_model", side_effect=RuntimeError("boom"))
@@ -138,6 +145,7 @@ def test_transcribe_file_with_default_model_returns_none_on_error(mocker, tmp_pa
 
 
 def test_whisper_main_parses_arguments_and_transcribes_each_path(mocker):
+    """Test that the CLI transcribes each provided path with the parsed options."""
     args = SimpleNamespace(
         paths=[Path("/tmp/a.wav"), Path("/tmp/b.wav")],
         language=LANGUAGE,

@@ -120,6 +120,7 @@ class FakeSpeechSDKSync:
 
 
 def test_get_audio_duration_seconds_reads_soundfile_info(mocker):
+    """Test that audio duration is read from soundfile metadata."""
     mocker.patch.object(testee.sf, "info", return_value=SimpleNamespace(duration=12.5))
 
     assert testee.get_audio_duration_seconds(Path("audio.wav")) == 12.5
@@ -133,6 +134,7 @@ def test_recognition_result_to_srt_block():
 
 
 def test_transcribe_audio_file_returns_existing_output_when_overwrite_denied(mocker, tmp_path):
+    """Test that an existing SRT is returned without contacting Azure when overwrite is denied."""
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     output_path.write_text("existing")
@@ -152,6 +154,7 @@ def test_transcribe_audio_file_returns_existing_output_when_overwrite_denied(moc
 
 
 def test_transcribe_audio_file_successfully_saves_srt(mocker):
+    """Test that recognized non-empty results are saved as a deduplicated SRT."""
     def on_start(recognizer: FakeSpeechRecognizerSync) -> None:
         recognizer.recognized.emit(SimpleNamespace(result=SimpleNamespace(text="hello")))
         recognizer.recognized.emit(SimpleNamespace(result=SimpleNamespace(text="")))
@@ -179,6 +182,7 @@ def test_transcribe_audio_file_successfully_saves_srt(mocker):
 
 
 def test_transcribe_audio_file_times_out_and_stops_recognition():
+    """Test that recognition stops and raises when it exceeds the duration-based timeout."""
     fake_speechsdk = FakeSpeechSDKSync(lambda recognizer: None)
     language = mock.Mock(get_source_as_BCP=mock.Mock(return_value="en-US"))
 
@@ -191,6 +195,7 @@ def test_transcribe_audio_file_times_out_and_stops_recognition():
 
 
 def test_transcribe_audio_file_surfaces_azure_cancellation_error_without_timing_out():
+    """Test that an Azure cancellation error is surfaced instead of timing out."""
     error_details = "bad credentials"
 
     def on_start(recognizer: FakeSpeechRecognizer) -> None:

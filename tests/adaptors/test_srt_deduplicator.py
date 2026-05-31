@@ -29,12 +29,14 @@ def temp_srt_file(tmp_path_factory):
 
 
 def test_srtblock_to_lines():
+    """Test that an SrtBlock renders to numbered SRT lines with a trailing blank."""
     block = testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["Line."])
     expected = ["1", "00:00:01,000 --> 00:00:02,000", "Line.", ""]
     assert block.to_lines(1) == expected
 
 
 def test_yield_srt_blocks_from_lines():
+    """Test that blank-line-separated SRT lines are parsed into blocks."""
     input_lines = [
         "1", "00:00:01,000 --> 00:00:02,000", "First line.", "",
         "2", "00:00:02,000 --> 00:00:03,000", "Second line.", "",
@@ -48,6 +50,7 @@ def test_yield_srt_blocks_from_lines():
 
 
 def test_yield_deduplicated_srt_blocks_duplicate_on_head():
+    """Test that a leading duplicate pair is merged by extending the end time."""
     input_blocks = [
         testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
         testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
@@ -59,6 +62,7 @@ def test_yield_deduplicated_srt_blocks_duplicate_on_head():
 
 
 def test_yield_deduplicated_srt_blocks_duplicate_on_tail():
+    """Test that a trailing duplicate pair is merged by extending the end time."""
     input_blocks = [
         testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
         testee.SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
@@ -70,6 +74,7 @@ def test_yield_deduplicated_srt_blocks_duplicate_on_tail():
 
 
 def test_yield_lines_from_srt_blocks():
+    """Test that blocks are renumbered sequentially when rendered back to lines."""
     blocks = [
         testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
         testee.SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
@@ -88,6 +93,7 @@ def test_yield_lines_from_srt_blocks():
 
 
 def test_convert_srt_blocks_to_str():
+    """Test that blocks are joined into a single SRT string."""
     blocks = [
         testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["First line."]),
         testee.SrtBlock(start_time="00:00:02,000", end_time="00:00:03,000", content=["Second line."]),
@@ -130,6 +136,7 @@ def test_save_segments_as_srt_skips_existing_when_overwrite_never(tmp_path):
 
 
 def test_deduplicate_srt_file(temp_srt_file: Path):
+    """Test that duplicate blocks in a file are merged and written back in place."""
     assert testee.deduplicate_srt_file(temp_srt_file, overwrite=OverwriteMode.ALWAYS) is temp_srt_file
     expected = dedent("""\
         1
@@ -144,6 +151,7 @@ def test_deduplicate_srt_file(temp_srt_file: Path):
 
 
 def test_deduplicate_srt_file_returns_early_when_overwrite_never(tmp_path):
+    """Test that an existing file is left untouched when overwrite mode is NEVER."""
     srt_file = tmp_path / "test.srt"
     srt_file.write_text("1\n00:00:01,000 --> 00:00:02,000\nOriginal\n\n")
     original_content = srt_file.read_text()
@@ -153,6 +161,7 @@ def test_deduplicate_srt_file_returns_early_when_overwrite_never(tmp_path):
 
 
 def test_main_deduplicates_given_paths(mocker, tmp_path):
+    """Test that the CLI deduplicates each provided path with the parsed overwrite mode."""
     srt_file = tmp_path / "test.srt"
     args = SimpleNamespace(paths=[srt_file], overwrite=OverwriteMode.ALWAYS)
     mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)

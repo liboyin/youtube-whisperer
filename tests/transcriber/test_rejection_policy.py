@@ -10,16 +10,19 @@ def make_segment(text: str) -> SimpleNamespace:
 
 
 def test_get_rejected_substring_returns_none_for_safe_text():
+    """Test that safe text reports no rejected substring."""
     assert testee.get_rejected_substring("hello world") is None
 
 
 def test_get_rejected_substring_returns_match_for_rejected_substring():
+    """Test that a known bad substring is reported as the match."""
     rejected_substring = testee.REJECTED_SUBSTRINGS[0]
 
     assert testee.get_rejected_substring(rejected_substring) == rejected_substring
 
 
 def test_reject_bad_segments_yields_safe_segments():
+    """Test that segments without rejected substrings pass through unchanged."""
     segments = [make_segment("hello"), make_segment("world")]
 
     result = list(testee.reject_bad_segments(segments))
@@ -28,6 +31,7 @@ def test_reject_bad_segments_yields_safe_segments():
 
 
 def test_reject_bad_segments_raises_for_segment_containing_rejected_substring():
+    """Test that a segment containing a rejected substring aborts the whole run."""
     rejected_substring = testee.REJECTED_SUBSTRINGS[0]
     segments = [make_segment(f"prefix {rejected_substring} suffix")]
 
