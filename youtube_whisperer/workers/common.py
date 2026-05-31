@@ -140,6 +140,12 @@ class BaseWorker(ABC):
     def process_queue(self, poll_interval_seconds: int = 5) -> None:
         """Poll the queue indefinitely and process tasks.
 
+        A message is acknowledged and deleted only after the task succeeds or is
+        durably dead-lettered. If processing is aborted by a BaseException (e.g.
+        KeyboardInterrupt) or the dead-letter write itself fails, the acknowledgement
+        is skipped so the message stays in the consumer's pending list and a restarted
+        worker can recover it via its PEL.
+
         Args:
             poll_interval_seconds: Number of seconds to wait before checking again when the queue is empty.
         """
@@ -150,12 +156,14 @@ class BaseWorker(ABC):
             except Exception as e:
                 print(f"An error occurred while processing task {task}: {e}")
                 queue_dead_letter(self.client, task, stream_name, str(e))
-            finally:
-                pipe = self.client.pipeline()
-                pipe.xack(stream_name, WORKERS_GROUP, msg_id)
-                pipe.xdel(stream_name, msg_id)
-                pipe.execute()
-                print(f"Acknowledged and deleted task from {stream_name}: {task}")
+            # Reached only on success or after a durable dead-letter; a BaseException
+            # or a failed dead-letter skips the acknowledgement and leaves the message
+            # pending for recovery.
+            pipe = self.client.pipeline()
+            pipe.xack(stream_name, WORKERS_GROUP, msg_id)
+            pipe.xdel(stream_name, msg_id)
+            pipe.execute()
+            print(f"Acknowledged and deleted task from {stream_name}: {task}")
 
 
 class TranscriptionWorker(BaseWorker):

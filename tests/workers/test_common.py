@@ -184,3 +184,34 @@ def test_process_active_slot_queue_dead_letters_url_tasks(mocker, mock_redis):
     mock_pipe.xack.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'123-1')
     mock_pipe.xdel.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), b'123-1')
     mock_pipe.execute.assert_called_once()
+
+
+def test_process_queue_leaves_task_pending_on_base_exception(mocker, mock_redis):
+    """Test that a BaseException mid-task leaves the message un-acked so a restart can recover it."""
+    task = Task(source='/tmp/audio.wav', language='en', transcriber=TranscriberType.WHISPER)
+    mocker.patch.object(testee.TranscriptionWorker, 'yield_tasks', return_value=iter([(b'777-7', task)]))
+    mocker.patch.object(testee, 'is_url', return_value=False)
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0', client=mock_redis)
+    mocker.patch.object(worker, 'dispatch_task', side_effect=KeyboardInterrupt)
+    mock_dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
+
+    with pytest.raises(KeyboardInterrupt):
+        worker.process_queue()
+
+    mock_dead_letter.assert_not_called()
+    mock_redis.pipeline.assert_not_called()
+
+
+def test_process_queue_leaves_task_pending_when_dead_letter_fails(mocker, mock_redis):
+    """Test that a failed dead-letter write leaves the message un-acked instead of dropping it."""
+    task = Task(source='/tmp/audio.wav', language='en', transcriber=TranscriberType.WHISPER)
+    mocker.patch.object(testee.TranscriptionWorker, 'yield_tasks', return_value=iter([(b'888-8', task)]))
+    mocker.patch.object(testee, 'is_url', return_value=False)
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0', client=mock_redis)
+    mocker.patch.object(worker, 'dispatch_task', side_effect=RuntimeError('boom'))
+    mocker.patch.object(testee, 'queue_dead_letter', side_effect=RuntimeError('redis down'))
+
+    with pytest.raises(RuntimeError, match='redis down'):
+        worker.process_queue()
+
+    mock_redis.pipeline.assert_not_called()
