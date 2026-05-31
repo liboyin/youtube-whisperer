@@ -27,6 +27,7 @@ cat "$PIP_CONF_PATH"
 if [ -s "requirements.txt" ]; then
     pip install -r requirements.txt
 fi
+# Editable install here because the project will be installed in editable mode again in the devcontainer
 pip install -e .
 
 # Remove pip cache
