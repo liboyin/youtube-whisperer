@@ -19,6 +19,11 @@ class TranscriberType(str, Enum):
 
     @classmethod
     def values(cls) -> tuple[str, ...]:
+        """Return the string value of every transcriber type.
+
+        Returns:
+            tuple[str, ...]: The value of each member, e.g. for argparse choices.
+        """
         return tuple(transcriber.value for transcriber in cls)
 
 
@@ -28,6 +33,11 @@ class TranscriberMode(str, Enum):
 
     @classmethod
     def values(cls) -> tuple[str, ...]:
+        """Return the string value of every transcriber mode.
+
+        Returns:
+            tuple[str, ...]: The value of each member, e.g. for argparse choices.
+        """
         return tuple(mode.value for mode in cls)
 
 

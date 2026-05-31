@@ -18,6 +18,12 @@ class RejectedTranscriptionError(RuntimeError):
 def get_rejected_substring(text: str) -> str | None:
     """
     Returns the matched rejected substring, if any.
+
+    Args:
+        text (str): The segment text to inspect.
+
+    Returns:
+        str | None: The first rejected substring contained in `text`, or `None` if none is present.
     """
     for rejected_substring in REJECTED_SUBSTRINGS:
         if rejected_substring in text:
@@ -27,7 +33,16 @@ def get_rejected_substring(text: str) -> str | None:
 
 def reject_bad_segments(segments_generator: Iterable[Segment]) -> Generator[Segment, None, None]:
     """
-    Raises RejectedTranscriptionError when Whisper emits a known bad segment.
+    Re-yield Whisper segments, rejecting the whole run if a known bad output is seen.
+
+    Args:
+        segments_generator (Iterable[Segment]): Lazily produced Whisper segments.
+
+    Yields:
+        Segment: Each input segment that does not contain a rejected substring.
+
+    Raises:
+        RejectedTranscriptionError: When a segment contains a known bad output substring.
     """
     for segment in segments_generator:
         print(segment)

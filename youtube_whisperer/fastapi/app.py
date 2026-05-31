@@ -40,10 +40,20 @@ async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONR
 
 
 def get_assets_dir() -> Path:
+    """FastAPI dependency that supplies the configured asset directory.
+
+    Returns:
+        Path: The root directory used as the media library.
+    """
     return WHISPER_ASSETS_DIR
 
 
 def get_redis_client() -> Generator[StrictRedis, None, None]:
+    """FastAPI dependency that supplies the shared, pooled Redis client.
+
+    Yields:
+        StrictRedis: The process-wide Redis client backed by a connection pool.
+    """
     yield REDIS_CLIENT
 
 
@@ -51,6 +61,9 @@ def get_redis_client() -> Generator[StrictRedis, None, None]:
 async def get_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> TaskQueues:
     """
     Retrieve all pending and active tasks from the Redis queues.
+
+    Returns:
+        TaskQueues: A snapshot of every routing stream partitioned into pending and active tasks.
     """
     return list_task_queues(redis_client)
 
@@ -58,6 +71,12 @@ async def get_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> Ta
 def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
     """
     Resolve a filesystem task pattern into a list of concrete Tasks.
+
+    Args:
+        pattern (Task): A task whose `source` is a glob pattern over the local filesystem.
+
+    Returns:
+        list[Task]: One copy of `pattern` per matched file, with `source` set to that file path.
     """
     return [pattern.model_copy(update={'source': str(path)}) for path in glob.glob(os.path.expanduser(pattern.source))]
 
@@ -111,6 +130,9 @@ async def clear_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> 
 async def get_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)) -> list[DeadLetter]:
     """
     Retrieve failed tasks from the dead-letter queue.
+
+    Returns:
+        list[DeadLetter]: Every dead-lettered task in insertion order.
     """
     return list_dead_letters(redis_client)
 
@@ -119,6 +141,9 @@ async def get_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)
 async def clear_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)) -> list[DeadLetter]:
     """
     Clear the dead-letter queue.
+
+    Returns:
+        list[DeadLetter]: The dead-lettered tasks that were removed.
     """
     dead_letters = list_dead_letters(redis_client)
     redis_client.delete(DEAD_LETTER_QUEUE)
@@ -129,6 +154,9 @@ async def clear_dead_letters(redis_client: StrictRedis = Depends(get_redis_clien
 async def list_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
     List all contents of the specified directory.
+
+    Returns:
+        list[str]: Sorted paths of every entry found recursively under the asset directory.
     """
     return sorted(map(str, prepare_input_dir(dir_path).rglob("*")))
 

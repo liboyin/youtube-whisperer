@@ -27,8 +27,8 @@ def get_video_id(url: str) -> str:
         https://youtu.be/n9xhJrPXop4?si=sXdajbZPk7Bn2OjD&t=30
         https://www.youtube.com/watch?v=n9xhJrPXop4&si=sXdajbZPk7Bn2OjD&t=30
         https://www.youtube.com/live/3TufaG29B7w?si=b5DQpvYgzcKJjJ0L
-    
-    Parameters:
+
+    Args:
         url (str): The YouTube video URL.
     
     Returns:
@@ -72,6 +72,12 @@ def get_first_matching_lang_code(candidates: Collection[str], requested: Languag
 def list_video_transcripts(url: str) -> TranscriptList | None:
     """
     Lists available transcripts for a YouTube video.
+
+    Args:
+        url (str): The YouTube video URL.
+
+    Returns:
+        TranscriptList | None: The available transcripts, or `None` if transcripts are disabled for the video.
     """
     video_id = get_video_id(url)
     try:
@@ -84,6 +90,14 @@ def list_video_transcripts(url: str) -> TranscriptList | None:
 def fetch_matching_transcript(transcripts: TranscriptList, language: LanguageCode, url: str) -> FetchedTranscript | None:
     """
     Fetches the transcript matching the requested language from a transcript list.
+
+    Args:
+        transcripts (TranscriptList): Transcripts available for the video.
+        language (LanguageCode): The requested transcript language.
+        url (str): The YouTube video URL, used only for logging.
+
+    Returns:
+        FetchedTranscript | None: The fetched transcript in the requested language, or `None` if no matching transcript is found.
     """
     lang_code = get_first_matching_lang_code([x.language_code for x in transcripts], language)
     if lang_code is None:
@@ -98,6 +112,12 @@ def fetch_matching_transcript(transcripts: TranscriptList, language: LanguageCod
 
 class TranscriptDownloader:
     def __init__(self, url: str, language: LanguageCode) -> None:
+        """Bind a transcript downloader to a single video URL and target language.
+
+        Args:
+            url (str): The YouTube video URL whose transcript should be downloaded.
+            language (LanguageCode): The requested transcript language.
+        """
         self.url = url
         self.language = language
 

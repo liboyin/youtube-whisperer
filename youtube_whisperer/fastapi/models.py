@@ -28,6 +28,17 @@ class Task(BaseModel):
 
     @field_validator('source')
     def validate_source(cls, x: str) -> str:
+        """Strip surrounding whitespace from a task source and reject empty values.
+
+        Args:
+            x (str): The raw `source` value supplied for the task.
+
+        Returns:
+            str: The stripped source value.
+
+        Raises:
+            ValueError: If the source is empty after stripping.
+        """
         x = x.strip()
         if not x:
             raise ValueError('Source cannot be empty')

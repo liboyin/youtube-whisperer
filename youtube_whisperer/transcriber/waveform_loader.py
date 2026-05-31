@@ -11,6 +11,16 @@ def load_whisper_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAM
     """
     Load Whisper-style waveform from a bytes object and return it as a NumPy array.
 
+    Args:
+        data (bytes): Raw audio/video bytes to decode through ffmpeg.
+        sample_rate (int, optional): Target sample rate in Hz. Defaults to `DEFAULT_SAMPLE_RATE`.
+
+    Returns:
+        np.ndarray: Mono float32 waveform normalized to the range [-1, 1).
+
+    Raises:
+        ffmpeg.Error: If ffmpeg fails to decode the input bytes.
+
     Simplified from https://github.com/openai/whisper/blob/main/whisper/audio.py
 
     cmd = [
@@ -44,6 +54,16 @@ def load_whisper_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPL
     Load Whisper-style waveform from a file and return it as a NumPy array.
 
     ffmpeg streams the file directly so the raw bytes never reside in Python memory.
+
+    Args:
+        path (Path): Path to the audio/video file to decode.
+        sample_rate (int, optional): Target sample rate in Hz. Defaults to `DEFAULT_SAMPLE_RATE`.
+
+    Returns:
+        np.ndarray: Mono float32 waveform normalized to the range [-1, 1).
+
+    Raises:
+        ffmpeg.Error: If ffmpeg fails to decode the input file.
     """
     input_path = prepare_input_file(path)
     stream = (

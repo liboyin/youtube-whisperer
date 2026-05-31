@@ -26,6 +26,13 @@ class SrtBlock:
     def from_lines(cls, lines: list[str]) -> 'SrtBlock':
         """
         Creates an SrtBlock instance from a list of strings.
+
+        Args:
+            lines (list[str]): The lines of a single SRT block: a sequence number, a
+                `start --> end` timing line, and one or more content lines.
+
+        Returns:
+            SrtBlock: The parsed subtitle block.
         """
         assert len(lines) >= 3, lines
         start_time, end_time = list(map(str.strip, lines[1].split(ARROW)))
@@ -34,6 +41,12 @@ class SrtBlock:
     def to_lines(self, line_number: int) -> list[str]:
         """
         Converts the SrtBlock instance back into a list of strings suitable for writing to an SRT file.
+
+        Args:
+            line_number (int): The 1-based sequence number to assign to this block.
+
+        Returns:
+            list[str]: The block rendered as SRT lines, terminated by an empty line.
         """
         result = [
             str(line_number),

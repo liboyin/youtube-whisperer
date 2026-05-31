@@ -26,6 +26,13 @@ def yield_task(
     First, it automatically resumes any orphaned tasks assigned to this consumer in the PEL.
     Then, it blocks for new messages to arrive in the stream.
 
+    Args:
+        client (StrictRedis): The Redis client to read from.
+        stream_name (str): The stream to consume tasks from.
+        group_name (str): The consumer group shared by all workers of this type.
+        consumer_name (str): This worker's consumer identity, used to recover its own PEL.
+        poll_interval_seconds (int): How long each blocking read waits for new messages.
+
     Yields:
         A tuple of (Message ID bytes, Validated Task model).
     """

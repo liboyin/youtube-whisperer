@@ -14,7 +14,14 @@ from youtube_whisperer.config import Settings
 
 
 def get_audio_duration_seconds(audio_file: Path) -> float:
-    """Get the duration of an audio file in seconds."""
+    """Get the duration of an audio file in seconds.
+
+    Args:
+        audio_file (Path): Path to the audio file to inspect.
+
+    Returns:
+        float: The duration of the audio file in seconds.
+    """
     return sf.info(str(audio_file)).duration
 
 
@@ -67,15 +74,18 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     transcription_error: Exception | None = None
 
     def stop_cb(evt: Any) -> None:
+        """Signal completion when Azure stops the recognition session."""
         print(f'CLOSED: {evt}')
         done.set()
 
     def recognized_cb(evt: Any) -> None:
+        """Collect each non-empty recognition result emitted by Azure."""
         print(f'UPDATE: {evt}')
         if evt.result.text:  # sometimes there is an empty update at the end of the recognition
             recognition_results.append(evt.result)
 
     def canceled_cb(evt: Any) -> None:
+        """Record any Azure cancellation error and signal completion."""
         nonlocal transcription_error
         print(f'CANCELED: {evt}')
         if evt.cancellation_details.reason == speechsdk.CancellationReason.Error:

@@ -12,7 +12,11 @@ from youtube_whisperer.workers.common import BaseWorker
 class YouTubeWorker(BaseWorker):
     """The YouTube worker expands playlists or channels and dispatches transcription tasks."""
     def __init__(self, slot: str) -> None:
-        """Initialize the YouTube worker binding the slot to the consumer identity."""
+        """Initialize the YouTube worker binding the slot to the consumer identity.
+
+        Args:
+            slot: The consumer identity this worker uses to claim and recover tasks.
+        """
         self.slot = slot
 
     def get_stream_name(self) -> str:
