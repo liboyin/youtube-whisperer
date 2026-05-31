@@ -4,11 +4,11 @@ import youtube_whisperer.adaptors.lang_code_adaptor as testee
 
 
 def test_init():
-    """Test that a LanguageCode defaults target to None and accepts BCP/ISO sources."""
+    """Test that a LanguageCode defaults target to None and stores explicit source/target codes."""
     assert testee.LanguageCode(source='en') == testee.LanguageCode(source='en', target=None)
     assert testee.LanguageCode(source='en-us') == testee.LanguageCode(source='en-us', target=None)
-    assert testee.LanguageCode(source='en', target='zh') is not None
-    assert testee.LanguageCode(source='en', target='zh-cn') is not None
+    assert testee.LanguageCode(source='en', target='zh').target == 'zh'
+    assert testee.LanguageCode(source='en', target='zh-cn').target == 'zh-cn'
 
 
 def test_init_invalid():

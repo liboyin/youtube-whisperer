@@ -62,10 +62,11 @@ def test_task_language_rejects_non_string_value():
         testee.Task(language=123)
 
 
-def test_task_model_json_schema_includes_language_field():
-    """Test that the task schema exposes the language field."""
-    schema = testee.Task.model_json_schema()
-    assert "language" in schema.get("properties", {})
+def test_task_model_json_schema_exposes_language_as_documented_string():
+    """Test that the language field is published as a string with example codes for the docs UI."""
+    language_schema = testee.Task.model_json_schema()["properties"]["language"]
+    assert language_schema["type"] == "string"
+    assert language_schema["examples"] == ["en", "en-us", "en-us->zh-cn"]
 
 
 def test_task_queues_model_accepts_grouped_tasks():

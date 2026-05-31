@@ -176,7 +176,12 @@ def test_process_active_slot_queue_dead_letters_url_tasks(mocker, mock_redis):
     worker.process_queue()
 
     dispatch_task.assert_not_called()
-    mock_dead_letter.assert_called_once()
+    mock_dead_letter.assert_called_once_with(
+        mock_redis,
+        task,
+        testee.get_stream_name(TranscriberType.WHISPER),
+        f"Transcription worker received URL task: {task.source}",
+    )
     mock_pipe = mock_redis.pipeline.return_value
     mock_pipe.xack.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'123-1')
     mock_pipe.xdel.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), b'123-1')
