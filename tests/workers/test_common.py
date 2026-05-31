@@ -12,10 +12,8 @@ import youtube_whisperer.workers.common as testee
 
 @pytest.fixture
 def mock_redis(mocker):
-    """Fixture to mock the Redis client and connection context manager."""
-    mock_redis_client = mocker.MagicMock()
-    mocker.patch.object(testee, 'REDIS_CLIENT', mock_redis_client)
-    return mock_redis_client
+    """Fixture providing a mock Redis client to inject into workers and queue helpers."""
+    return mocker.MagicMock()
 
 
 def test_yield_task(mock_redis, mocker):
@@ -127,7 +125,7 @@ def test_process_active_slot_queue_full_flow(mocker, mock_redis):
     task = Task(source='/tmp/audio.wav', language='en', transcriber=TranscriberType.WHISPER)
     mocker.patch.object(testee.TranscriptionWorker, 'yield_tasks', return_value=iter([(b'000-1', task)]))
     mocker.patch.object(testee, 'is_url', return_value=False)
-    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0', client=mock_redis)
     dispatch_task = mocker.patch.object(worker, 'dispatch_task')
     mock_dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
 
@@ -146,7 +144,7 @@ def test_process_active_slot_queue_dead_letters_failures(mocker, mock_redis):
     task = Task(source='/tmp/audio.wav', language='en', transcriber=TranscriberType.WHISPER)
     mocker.patch.object(testee.TranscriptionWorker, 'yield_tasks', return_value=iter([(b'999-8', task)]))
     mocker.patch.object(testee, 'is_url', return_value=False)
-    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0', client=mock_redis)
     dispatch_task = mocker.patch.object(worker, 'dispatch_task', side_effect=RuntimeError('boom'))
     mock_dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
 
@@ -169,7 +167,7 @@ def test_process_active_slot_queue_dead_letters_url_tasks(mocker, mock_redis):
     task = Task(source='https://example.com/video', language='en', transcriber=TranscriberType.WHISPER)
     mocker.patch.object(testee.TranscriptionWorker, 'yield_tasks', return_value=iter([(b'123-1', task)]))
     mocker.patch.object(testee, 'is_url', return_value=True)
-    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0')
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0', client=mock_redis)
     dispatch_task = mocker.patch.object(worker, 'dispatch_task')
     mock_dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
 

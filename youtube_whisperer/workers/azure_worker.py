@@ -1,23 +1,25 @@
 from pathlib import Path
 
 from pathlib_extensions import OverwriteMode
+from redis import StrictRedis
 
 from youtube_whisperer.fastapi.models import Task
 from youtube_whisperer.transcriber.azure_transcriber import transcribe_audio_file
 from youtube_whisperer.transcriber.waveform_loader import save_as_wav_file
-from youtube_whisperer.utils import TranscriberType
+from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType
 from youtube_whisperer.workers.common import TranscriptionWorker
 
 
 class AzureWorker(TranscriptionWorker):
 
-    def __init__(self, slot: str) -> None:
+    def __init__(self, slot: str, client: StrictRedis = REDIS_CLIENT) -> None:
         """Initialize the Azure transcription worker.
 
         Args:
             slot: The worker slot identifier determining which active queue to run under.
+            client: Redis client used for stream operations. Defaults to the shared pooled client.
         """
-        super().__init__(TranscriberType.AZURE, slot)
+        super().__init__(TranscriberType.AZURE, slot, client)
 
     def dispatch_task(self, task: Task, source: Path) -> None:
         """Run Azure Speech transcription for a resolved filesystem source.

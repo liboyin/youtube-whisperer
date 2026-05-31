@@ -3,11 +3,12 @@ import sys
 from pathlib import Path
 
 from pathlib_extensions import OverwriteMode
+from redis import StrictRedis
 
 from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.fastapi.models import Task
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
-from youtube_whisperer.utils import TranscriberType
+from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType
 from youtube_whisperer.workers.common import TranscriptionWorker
 
 
@@ -46,13 +47,14 @@ def validate_gpu_health_or_exit() -> None:
 
 class WhisperWorker(TranscriptionWorker):
 
-    def __init__(self, slot: str) -> None:
+    def __init__(self, slot: str, client: StrictRedis = REDIS_CLIENT) -> None:
         """Initialize the Whisper transcription worker.
 
         Args:
             slot: The worker slot identifier determining which active queue to run under.
+            client: Redis client used for stream operations. Defaults to the shared pooled client.
         """
-        super().__init__(TranscriberType.WHISPER, slot)
+        super().__init__(TranscriberType.WHISPER, slot, client)
 
     def dispatch_task(self, task: Task, source: Path) -> None:
         """Run Whisper transcription for a resolved filesystem source.

@@ -85,6 +85,15 @@ def yield_task(
 class BaseWorker(ABC):
     """Abstract base worker providing a robust task-processing loop via Redis Streams."""
 
+    def __init__(self, client: StrictRedis = REDIS_CLIENT) -> None:
+        """Bind the worker to the Redis client it consumes and acknowledges tasks on.
+
+        Args:
+            client: Redis client used for stream reads, acknowledgements, and dead-lettering.
+                Defaults to the shared pooled client; tests can inject a substitute.
+        """
+        self.client = client
+
     @abstractmethod
     def get_stream_name(self) -> str:
         """Return the active stream name for the worker.
@@ -112,7 +121,7 @@ class BaseWorker(ABC):
         consumer_name = self.get_consumer_name()
         print(f"Worker for {stream_name} started utilizing consumer identity: {consumer_name}")
         return yield_task(
-            client=REDIS_CLIENT,
+            client=self.client,
             stream_name=stream_name,
             group_name=WORKERS_GROUP,
             consumer_name=consumer_name,
@@ -140,9 +149,9 @@ class BaseWorker(ABC):
                 self.process_task(task)
             except Exception as e:
                 print(f"An error occurred while processing task {task}: {e}")
-                queue_dead_letter(REDIS_CLIENT, task, stream_name, str(e))
+                queue_dead_letter(self.client, task, stream_name, str(e))
             finally:
-                pipe = REDIS_CLIENT.pipeline()
+                pipe = self.client.pipeline()
                 pipe.xack(stream_name, WORKERS_GROUP, msg_id)
                 pipe.xdel(stream_name, msg_id)
                 pipe.execute()
@@ -152,13 +161,15 @@ class BaseWorker(ABC):
 class TranscriptionWorker(BaseWorker):
     """Base class for transcriber workers utilizing Native Streams."""
 
-    def __init__(self, transcriber: TranscriberType, slot: str) -> None:
+    def __init__(self, transcriber: TranscriberType, slot: str, client: StrictRedis = REDIS_CLIENT) -> None:
         """Initialize the transcription worker.
 
         Args:
             transcriber: Transcriber whose pending stream should be processed.
             slot: Bound consumer identity orchestrating message safety.
+            client: Redis client used for stream operations. Defaults to the shared pooled client.
         """
+        super().__init__(client)
         self.transcriber = transcriber
         self.slot = slot
         self.stream_name = get_stream_name(self.transcriber)

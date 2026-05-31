@@ -1,5 +1,6 @@
 
 from pathlib_extensions import OverwriteMode
+from redis import StrictRedis
 
 from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
@@ -11,12 +12,14 @@ from youtube_whisperer.workers.common import BaseWorker
 
 class YouTubeWorker(BaseWorker):
     """The YouTube worker expands playlists or channels and dispatches transcription tasks."""
-    def __init__(self, slot: str) -> None:
+    def __init__(self, slot: str, client: StrictRedis = REDIS_CLIENT) -> None:
         """Initialize the YouTube worker binding the slot to the consumer identity.
 
         Args:
             slot: The consumer identity this worker uses to claim and recover tasks.
+            client: Redis client used for queueing follow-up tasks. Defaults to the shared pooled client.
         """
+        super().__init__(client)
         self.slot = slot
 
     def get_stream_name(self) -> str:
@@ -56,4 +59,4 @@ class YouTubeWorker(BaseWorker):
                     'source': str(waveform_file_path),
                 }))
         if follow_up_tasks:
-            queue_transcription_tasks(REDIS_CLIENT, follow_up_tasks)
+            queue_transcription_tasks(self.client, follow_up_tasks)
