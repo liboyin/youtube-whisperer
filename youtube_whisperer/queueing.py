@@ -64,7 +64,7 @@ def list_stream_tasks(redis_client: StrictRedis, stream_name: str, group_name: s
         return [], []
     try:
         pending_info = redis_client.xpending_range(stream_name, group_name, '-', '+', 100000)
-        active_ids = {p['message_id'] for p in pending_info}  # type: ignore[union-attr]
+        active_ids = {p['message_id'] for p in pending_info}
     except redis.exceptions.ResponseError:
         active_ids = set()
     pending_tasks: list[Task] = []
@@ -82,7 +82,7 @@ def list_dead_letters(redis_client: StrictRedis) -> list[DeadLetter]:
     """
     Load and deserialize every entry in the dead-letter queue.
     """
-    items = cast(list[str | bytes], redis_client.lrange(DEAD_LETTER_QUEUE, 0, -1))
+    items = redis_client.lrange(DEAD_LETTER_QUEUE, 0, -1)
     return [DeadLetter.model_validate_json(decode_redis_value(item)) for item in items]
 
 

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Generator
+from typing import Callable, Generator, cast
 
 import redis
 from redis import StrictRedis
@@ -10,6 +10,7 @@ from youtube_whisperer.queueing import decode_redis_value, get_stream_name, queu
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType, is_url
 
 TaskDispatcher = Callable[[Task, Path], None]
+StreamReadResponse = list[tuple[bytes, list[tuple[bytes, dict[bytes, bytes]]]]]
 
 
 def yield_task(
@@ -32,9 +33,12 @@ def yield_task(
 
     while True:
         try:
-            pending_messages = client.xreadgroup(group_name, consumer_name, {stream_name: '0-0'}, count=1)
+            pending_messages = cast(
+                StreamReadResponse,
+                client.xreadgroup(group_name, consumer_name, {stream_name: '0-0'}, count=1),
+            )
             if pending_messages:
-                stream, messages = pending_messages[0]  # type: ignore[index]
+                _stream, messages = pending_messages[0]
                 if messages:
                     msg_id, fields = messages[0]
                     task_payload = fields[b'payload']
@@ -47,15 +51,18 @@ def yield_task(
                 continue
             raise
         try:
-            new_messages = client.xreadgroup(
-                group_name,
-                consumer_name,
-                {stream_name: '>'},
-                count=1,
-                block=poll_interval_seconds * 1000
+            new_messages = cast(
+                StreamReadResponse,
+                client.xreadgroup(
+                    group_name,
+                    consumer_name,
+                    {stream_name: '>'},
+                    count=1,
+                    block=poll_interval_seconds * 1000
+                ),
             )
             if new_messages:
-                stream, messages = new_messages[0]  # type: ignore[index]
+                _stream, messages = new_messages[0]
                 if messages:
                     msg_id, fields = messages[0]
                     task_payload = fields[b'payload']
