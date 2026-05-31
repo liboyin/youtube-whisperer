@@ -209,6 +209,27 @@ def map_path_to_suffixes(dir_path: Path) -> dict[str, set[str]]:
     return dict(stem2suffixes)
 
 
+def redundant_media_paths(stem_to_suffixes: dict[str, set[str]]) -> list[Path]:
+    """Select transient media files made redundant by a finished MP4 + SRT pair.
+
+    A path stem is treated as complete only when both an ``.mp4`` and an ``.srt``
+    file exist for it; its source ``.mkv``/``.wav``/``.mp3`` siblings are then
+    redundant. The MP4 and SRT themselves are never selected.
+
+    Args:
+        stem_to_suffixes: Mapping of each path without suffix to the set of
+            lowercased suffixes present for it (see ``map_path_to_suffixes``).
+
+    Returns:
+        list[Path]: Paths of redundant media files, in arbitrary order.
+    """
+    redundant: list[Path] = []
+    for stem, suffixes in stem_to_suffixes.items():
+        if suffixes >= {'.mp4', '.srt'}:
+            redundant.extend(Path(f"{stem}{suffix}") for suffix in ('.mkv', '.wav', '.mp3') if suffix in suffixes)
+    return redundant
+
+
 @app.delete("/assets", response_model=list[str])
 async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     """
@@ -220,10 +241,8 @@ async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
         list[str]: List of removed file paths.
     """
     removed_files: list[str] = []
-    for path_without_suffix, suffixes in map_path_to_suffixes(dir_path).items():
-        if suffixes >= {'.mp4', '.srt'}:
-            for suffix in ('.mkv', '.wav', '.mp3'):
-                if suffix in suffixes and (file_path := Path(f"{path_without_suffix}{suffix}")).is_file():
-                    file_path.unlink()
-                    removed_files.append(str(file_path))
+    for file_path in redundant_media_paths(map_path_to_suffixes(dir_path)):
+        if file_path.is_file():
+            file_path.unlink()
+            removed_files.append(str(file_path))
     return sorted(removed_files)

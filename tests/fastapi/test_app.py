@@ -340,6 +340,30 @@ def test_map_path_to_suffixes_raises_for_missing_directory():
         testee.map_path_to_suffixes(Path("/definitely/missing"))
 
 
+def test_redundant_media_paths_selects_transient_siblings_of_completed_stems():
+    """Test that only the present mkv/wav/mp3 siblings of a complete mp4+srt stem are selected."""
+    result = testee.redundant_media_paths({'/assets/video': {'.mp4', '.srt', '.mkv', '.wav', '.mp3'}})
+
+    assert sorted(result) == [Path('/assets/video.mkv'), Path('/assets/video.mp3'), Path('/assets/video.wav')]
+
+
+def test_redundant_media_paths_ignores_incomplete_stems():
+    """Test that a stem missing either the mp4 or the srt keeps its transient files."""
+    result = testee.redundant_media_paths({
+        '/assets/no_srt': {'.mp4', '.mkv'},
+        '/assets/no_mp4': {'.srt', '.wav'},
+    })
+
+    assert result == []
+
+
+def test_redundant_media_paths_never_selects_mp4_or_srt():
+    """Test that the source mp4 and srt of a completed stem are never marked redundant."""
+    result = testee.redundant_media_paths({'/assets/video': {'.mp4', '.srt'}})
+
+    assert result == []
+
+
 def test_clean_assets(client, mock_assets_dir, mocker):
     """Test that cleaning assets removes only transient media files."""
     (mock_assets_dir / "video.mp4").touch()
