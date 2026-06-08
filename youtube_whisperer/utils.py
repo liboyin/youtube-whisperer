@@ -9,7 +9,11 @@ _settings = Settings()
 WHISPER_ASSETS_DIR = _settings.whisper_assets_dir
 WHISPER_MODELS_DIR = _settings.whisper_models_dir
 
-REDIS_POOL = redis.ConnectionPool(host='redis', socket_connect_timeout=5, health_check_interval=60)
+# socket_timeout must stay None: workers issue blocking XREADGROUP ... BLOCK reads that
+# legitimately keep the socket idle for the whole poll window. redis-py 8.0 changed the
+# default from None to 5s, which would race the BLOCK timeout and raise spurious
+# TimeoutError. health_check_interval still detects dead connections.
+REDIS_POOL = redis.ConnectionPool(host='redis', socket_timeout=None, socket_connect_timeout=5, health_check_interval=60)
 REDIS_CLIENT = redis.StrictRedis(connection_pool=REDIS_POOL)
 
 
