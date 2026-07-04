@@ -161,6 +161,30 @@ async def list_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
     return sorted(map(str, prepare_input_dir(dir_path).rglob("*")))
 
 
+def resolve_safe_asset_path(dir_path: Path, filename: str | None) -> Path | None:
+    """Resolve an upload filename to a safe target path inside the assets directory.
+
+    A client-controlled filename is untrusted input. This rejects any filename that
+    is missing, carries path components (e.g. ``../../etc/passwd`` or ``sub/f.txt``),
+    or whose resolved target would escape ``dir_path``, so an upload can never be
+    written outside the media library.
+
+    Args:
+        dir_path (Path): The assets directory that uploads must land inside.
+        filename (str | None): The client-supplied filename, which may be missing.
+
+    Returns:
+        Path | None: The sanitized target path within ``dir_path``, or ``None`` when the
+        filename is missing or would escape ``dir_path``.
+    """
+    if not filename or Path(filename).name != filename:
+        return None
+    target_path = dir_path / filename
+    if not target_path.resolve().is_relative_to(dir_path.resolve()):
+        return None
+    return target_path
+
+
 @app.post("/assets", response_model=AddAssetsResponse, status_code=status.HTTP_201_CREATED)
 async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depends(get_assets_dir)) -> AddAssetsResponse:
     """
@@ -172,20 +196,23 @@ async def add_assets(files: list[UploadFile] = File(...), dir_path: Path = Depen
     Returns:
         AddAssetsResponse: {
             successful: Saved file paths on the server
-            failed: Client-side file paths that failed to upload
+            failed: Client-side file paths that failed to upload (including rejected traversal filenames)
         }
     """
     saved_files: list[str] = []
     failed_files: list[str] = []
     for upload in files:
-        assert upload.filename
-        target_path = prepare_output_file(dir_path / upload.filename)
+        safe_path = resolve_safe_asset_path(dir_path, upload.filename)
+        if safe_path is None:
+            failed_files.append(upload.filename or "")
+            continue
         try:
+            target_path = prepare_output_file(safe_path)
             with target_path.open("wb") as f:
                 shutil.copyfileobj(upload.file, f)
             saved_files.append(str(target_path))
         except Exception:
-            failed_files.append(upload.filename)
+            failed_files.append(upload.filename or "")
     return AddAssetsResponse(successful=saved_files, failed=failed_files)
 
 

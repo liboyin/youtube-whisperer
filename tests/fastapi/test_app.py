@@ -290,13 +290,42 @@ def test_add_assets_catches_individual_file_write_failure(mocker, tmp_path):
     assert result.successful == []
 
 
+def test_resolve_safe_asset_path_accepts_plain_filename(tmp_path):
+    """Test that a plain filename resolves to a target directly inside the assets directory."""
+    assert testee.resolve_safe_asset_path(tmp_path, "clip.mp4") == tmp_path / "clip.mp4"
+
+
+@pytest.mark.parametrize("filename", [None, "", "..", "../../etc/passwd", "sub/clip.mp4", "/etc/passwd"])
+def test_resolve_safe_asset_path_rejects_unsafe_filenames(tmp_path, filename):
+    """Test that missing, empty, or path-bearing filenames are rejected to prevent escaping the assets dir."""
+    assert testee.resolve_safe_asset_path(tmp_path, filename) is None
+
+
 def test_add_assets_rejects_missing_filename(mocker, tmp_path):
-    """Test that uploads without filenames raise so the global handler can convert them to 500."""
+    """Test that uploads without filenames are reported as failed instead of crashing the request."""
     mock_upload = mocker.MagicMock()
     mock_upload.filename = None
 
-    with pytest.raises(AssertionError):
-        asyncio.run(testee.add_assets([mock_upload], dir_path=tmp_path))
+    result = asyncio.run(testee.add_assets([mock_upload], dir_path=tmp_path))
+
+    assert result.successful == []
+    assert result.failed == [""]
+
+
+def test_add_assets_rejects_path_traversal_and_writes_nothing(mocker, tmp_path):
+    """Test that a traversal filename lands in failed and no file is written outside the assets dir."""
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    mock_upload = mocker.MagicMock()
+    mock_upload.filename = "../../escaped.txt"
+    spy_prepare = mocker.patch.object(testee, "prepare_output_file")
+
+    result = asyncio.run(testee.add_assets([mock_upload], dir_path=assets_dir))
+
+    assert result.successful == []
+    assert result.failed == ["../../escaped.txt"]
+    spy_prepare.assert_not_called()
+    assert not (tmp_path / "escaped.txt").exists()
 
 
 def test_map_path_to_suffixes_maps_paths_to_lowercase_suffixes(tmp_path):
