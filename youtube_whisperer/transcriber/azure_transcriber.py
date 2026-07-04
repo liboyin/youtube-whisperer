@@ -12,6 +12,11 @@ from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
 from youtube_whisperer.config import Settings
 
+# Floor for the recognition timeout: `duration * 1.5` is too tight for short clips once Azure
+# session startup is included (and a 0-second/undetectable duration would time out immediately),
+# so the timeout is never allowed below this many seconds.
+MIN_AZURE_TIMEOUT_SECONDS = 60.0
+
 
 def get_audio_duration_seconds(audio_file: Path) -> float:
     """Get the duration of an audio file in seconds.
@@ -99,7 +104,8 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     print("Starting transcription on Azure...")
     speech_recognizer.start_continuous_recognition()
 
-    timeout_seconds = get_audio_duration_seconds(input_file_path) * 1.5  # time out after 1.5x audio duration
+    # Time out after 1.5x audio duration, but never below the floor so short clips still allow startup.
+    timeout_seconds = max(MIN_AZURE_TIMEOUT_SECONDS, get_audio_duration_seconds(input_file_path) * 1.5)
     try:
         if not done.wait(timeout_seconds):
             raise TimeoutError(f"Transcription timed out after {timeout_seconds} seconds")

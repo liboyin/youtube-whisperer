@@ -181,10 +181,12 @@ def test_transcribe_audio_file_successfully_saves_srt(mocker):
     assert fake_speechsdk.created_recognizer.stop_calls == 1
 
 
-def test_transcribe_audio_file_times_out_and_stops_recognition():
-    """Test that recognition stops and raises when it exceeds the duration-based timeout."""
+def test_transcribe_audio_file_times_out_and_stops_recognition(mocker):
+    """Test that recognition stops and raises when it exceeds the timeout."""
     fake_speechsdk = FakeSpeechSDKSync(lambda recognizer: None)
     language = mock.Mock(get_source_as_BCP=mock.Mock(return_value="en-US"))
+    # Shrink the floor so the timeout path fires immediately instead of blocking for the real floor.
+    mocker.patch.object(testee, "MIN_AZURE_TIMEOUT_SECONDS", 0.01)
 
     with mock.patch.object(testee, "speechsdk", fake_speechsdk), \
          mock.patch.object(testee, "get_audio_duration_seconds", return_value=0):
@@ -192,6 +194,31 @@ def test_transcribe_audio_file_times_out_and_stops_recognition():
             testee.transcribe_audio_file(Path("audio.wav"), language)
 
     assert fake_speechsdk.created_recognizer.stop_calls == 1
+
+
+@pytest.mark.parametrize("duration, expected_timeout", [(0, 60.0), (10, 60.0), (1000, 1500.0)])
+def test_transcribe_audio_file_applies_timeout_floor(mocker, duration, expected_timeout):
+    """Test that the timeout is floored so short/zero-duration clips still allow Azure session startup."""
+    recorded = {}
+
+    class FakeEvent:
+        def wait(self, timeout):
+            recorded["timeout"] = timeout
+            return True  # pretend Azure completed so the call returns without blocking
+
+        def set(self):
+            pass
+
+    fake_speechsdk = FakeSpeechSDKSync(lambda recognizer: None)
+    language = mock.Mock(get_source_as_BCP=mock.Mock(return_value="en-US"))
+    mocker.patch.object(testee.threading, "Event", return_value=FakeEvent())
+    mocker.patch.object(testee, "get_audio_duration_seconds", return_value=duration)
+    mocker.patch.object(testee, "save_segments_as_srt")
+
+    with mock.patch.object(testee, "speechsdk", fake_speechsdk):
+        testee.transcribe_audio_file(Path("audio.wav"), language)
+
+    assert recorded["timeout"] == expected_timeout
 
 
 def test_transcribe_audio_file_surfaces_azure_cancellation_error_without_timing_out():
