@@ -28,6 +28,21 @@ def temp_srt_file(tmp_path_factory):
     file_path.unlink()
 
 
+def test_srtblock_from_lines_parses_timing_and_content():
+    """Test that from_lines parses the timing line and keeps the remaining content lines."""
+    block = testee.SrtBlock.from_lines(["1", "00:00:01,000 --> 00:00:02,000", "First", "line"])
+
+    assert block.start_time == "00:00:01,000"
+    assert block.end_time == "00:00:02,000"
+    assert block.content == ["First", "line"]
+
+
+def test_srtblock_from_lines_raises_value_error_on_malformed_block():
+    """Test that a too-short block from a downloaded SRT raises a clean ValueError, not an assert."""
+    with pytest.raises(ValueError, match="Malformed SRT block"):
+        testee.SrtBlock.from_lines(["1", "00:00:01,000 --> 00:00:02,000"])
+
+
 def test_srtblock_to_lines():
     """Test that an SrtBlock renders to numbered SRT lines with a trailing blank."""
     block = testee.SrtBlock(start_time="00:00:01,000", end_time="00:00:02,000", content=["Line."])

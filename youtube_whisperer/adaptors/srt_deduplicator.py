@@ -33,8 +33,14 @@ class SrtBlock:
 
         Returns:
             SrtBlock: The parsed subtitle block.
+
+        Raises:
+            ValueError: If `lines` has fewer than the three required lines (sequence number,
+                timing line, and at least one content line). These lines come from downloaded
+                SRT files, so a clean error is raised instead of an assert that vanishes under `python -O`.
         """
-        assert len(lines) >= 3, lines
+        if len(lines) < 3:
+            raise ValueError(f"Malformed SRT block, expected at least 3 lines: {lines}")
         start_time, end_time = list(map(str.strip, lines[1].split(ARROW)))
         return cls(start_time, end_time, lines[2:])
 
