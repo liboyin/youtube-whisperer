@@ -1,11 +1,16 @@
 x-build-args: &build-args
-  APT_PROXY: http://192.168.0.4:3142
-  PYPI_PROXY: http://192.168.0.4:3141/root/pypi/+simple/
+  # Optional caching proxies. Default to empty (direct internet); set in .env to use a proxy.
+  APT_PROXY: ${APT_PROXY:-}
+  PYPI_PROXY: ${PYPI_PROXY:-}
 
 x-volumes: &volumes
-  - ~/.whisper:/home/ubuntu/.whisper
-  - /media/libo-smallfiles/Transcode:/workspaces/youtube-whisperer/assets
-  - ~/snap/firefox/common/.mozilla/firefox:/home/ubuntu/snap/firefox/common/.mozilla/firefox
+  # Whisper model cache; defaults to a named volume so models persist across rebuilds.
+  - ${WHISPER_MODELS_DIR:-whisper_models}:/home/ubuntu/.whisper
+  # Media library; defaults to the repo's ./assets directory. Override with a host path in .env.
+  - ${ASSETS_DIR:-./assets}:/workspaces/youtube-whisperer/assets
+  # Firefox profile for yt-dlp cookies; defaults to an empty named volume (no cookies).
+  # Set FIREFOX_PROFILE_DIR to a host profile directory to download private/age-gated videos.
+  - ${FIREFOX_PROFILE_DIR:-firefox_profile}:/home/ubuntu/snap/firefox/common/.mozilla/firefox
 
 services:
   app:
@@ -21,7 +26,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     ports:
       - "8001:8001"
     # uvicorn youtube_whisperer.api.app:app --host 0.0.0.0 --port 8001 --log-level debug
@@ -39,7 +45,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     entrypoint: ["python", "-m", "youtube_whisperer.workers", "youtube"]
 
   whisper_worker:
@@ -54,7 +61,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     entrypoint: ["python", "-m", "youtube_whisperer.workers", "whisper"]
 
   azure_worker:
@@ -69,16 +77,23 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     entrypoint: ["python", "-m", "youtube_whisperer.workers", "azure"]
 
   redis:
-    image: redis:latest
-    pull_policy: always
+    image: redis:7
     container_name: youtube-whisperer-redis
     restart: unless-stopped
     volumes:
       - redis_vol:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   redis_vol:
+  whisper_models:
+  firefox_profile:

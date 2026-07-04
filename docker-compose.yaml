@@ -32,3 +32,5 @@ services:
 
 volumes:
   redis_vol:
+  whisper_models:
+  firefox_profile:

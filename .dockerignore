@@ -42,7 +42,7 @@ README.md
 # Docker files
 Dockerfile
 .dockerignore
-docker-compose*.yml
+docker-compose*.yaml
 
 # Secret files
 .env

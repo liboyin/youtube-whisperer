@@ -8,10 +8,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1
 
-COPY --chown=ubuntu . /workspaces/youtube-whisperer
 WORKDIR /workspaces/youtube-whisperer
 
+# Install OS packages and pinned Python dependencies first, so editing source does not
+# invalidate these layers and force a full dependency reinstall on every rebuild.
+COPY --chown=ubuntu docker_apt_install.sh docker_pip_install.sh requirements.txt ./
 RUN ./docker_apt_install.sh
 RUN ./docker_pip_install.sh
+
+# Copy the rest of the source and install the project itself in editable mode.
+COPY --chown=ubuntu . .
+RUN pip install -e .
 
 USER ubuntu
