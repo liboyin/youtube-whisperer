@@ -51,5 +51,5 @@ addopts = "--cov=youtube_whisperer --cov-report=term-missing --cov-fail-under=80
 [tool.coverage.run]
 branch = true
 
-[tool.setuptools.packages]
-find = {where = ["."]}
+[tool.setuptools.packages.find]
+include = ["youtube_whisperer*"]
