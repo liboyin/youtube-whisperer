@@ -46,18 +46,31 @@ def test_transcribe_waveform_switches_translate_to_transcribe_for_english(capsys
     assert "{'lang': 'en', 'task': 'transcribe'}" in capsys.readouterr().out
 
 
-def test_transcribe_waveform_with_default_model_builds_model_from_default_parameters(mocker):
-    """Test that the default model is built from resolved parameters before transcribing."""
-    waveform = np.array([1.0], dtype=np.float32)
+def test_get_default_whisper_model_builds_once_and_caches(mocker):
+    """Test that the default model is built from resolved parameters once and served from cache thereafter."""
+    testee.get_default_whisper_model.cache_clear()
     model = mocker.MagicMock()
     mocker.patch.object(testee, "get_default_whisper_model_parameters", return_value={"device": "cpu"})
     mock_model_cls = mocker.patch.object(testee, "WhisperModel", return_value=model)
+
+    first = testee.get_default_whisper_model()
+    second = testee.get_default_whisper_model()
+
+    assert first is model and second is model
+    mock_model_cls.assert_called_once_with(device="cpu")  # built once, kept resident across calls
+    testee.get_default_whisper_model.cache_clear()
+
+
+def test_transcribe_waveform_with_default_model_uses_cached_model(mocker):
+    """Test that waveform transcription reuses the cached default model instead of rebuilding it."""
+    waveform = np.array([1.0], dtype=np.float32)
+    model = mocker.MagicMock()
+    mocker.patch.object(testee, "get_default_whisper_model", return_value=model)
     mock_transcribe = mocker.patch.object(testee, "transcribe_waveform", return_value=["segment"])
 
     result = testee.transcribe_waveform_with_default_model(waveform, TranscriberMode.TRANSCRIBE, LANGUAGE)
 
     assert result == ["segment"]
-    mock_model_cls.assert_called_once_with(device="cpu")
     mock_transcribe.assert_called_once_with(model, waveform, TranscriberMode.TRANSCRIBE, LANGUAGE)
 
 

@@ -1,4 +1,5 @@
 import argparse
+import functools
 from pathlib import Path
 from typing import Iterable
 
@@ -55,9 +56,23 @@ def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, mode: Transcr
     return segments_generator
 
 
+@functools.lru_cache(maxsize=1)
+def get_default_whisper_model() -> WhisperModel:
+    """Build the default WhisperModel once per process and cache it.
+
+    The model can be several GB (e.g. `large-v3`); on a dedicated GPU worker it is loaded once
+    and kept resident across tasks instead of being rebuilt for every queued file. The cache is
+    keyed on nothing, so the model is shared for the process lifetime.
+
+    Returns:
+        WhisperModel: The process-wide default model built from resolved parameters.
+    """
+    return WhisperModel(**get_default_whisper_model_parameters())
+
+
 def transcribe_waveform_with_default_model(waveform: np.ndarray, mode: TranscriberMode, language: LanguageCode) -> Iterable[Segment]:
     """
-    Transcribe the given waveform using the default WhisperModel.
+    Transcribe the given waveform using the cached default WhisperModel.
 
     Args:
         waveform (np.ndarray): The waveform to transcribe/translate.
@@ -67,8 +82,7 @@ def transcribe_waveform_with_default_model(waveform: np.ndarray, mode: Transcrib
     Returns:
         Iterable[Segment]: An iterable of lazy-evaluated Segments.
     """
-    model = WhisperModel(**get_default_whisper_model_parameters())
-    return transcribe_waveform(model, waveform, mode, language)
+    return transcribe_waveform(get_default_whisper_model(), waveform, mode, language)
 
 
 def transcribe_file_with_default_model(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, mode: TranscriberMode = TranscriberMode.TRANSCRIBE) -> Path | None:
