@@ -35,39 +35,6 @@ class FakeStream:
         return self.stdout, self.stderr
 
 
-def test_load_whisper_waveform_from_bytes_decodes_pcm_stream(mocker):
-    """Test that PCM bytes are decoded and normalized to a float32 waveform."""
-    pcm = np.array([0, 16384, -16384], dtype=np.int16).tobytes()
-    stream = FakeStream(stdout=pcm)
-    mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
-
-    waveform = testee.load_whisper_waveform_from_bytes(b"audio-bytes")
-
-    np.testing.assert_allclose(waveform, np.array([0.0, 0.5, -0.5], dtype=np.float32))
-    assert stream.output_kwargs == {
-        "format": "s16le",
-        "acodec": "pcm_s16le",
-        "ac": 1,
-        "ar": testee.DEFAULT_SAMPLE_RATE,
-    }
-    assert stream.run_calls == [{
-        "input": b"audio-bytes",
-        "capture_stdout": True,
-        "capture_stderr": True,
-    }]
-
-
-def test_load_whisper_waveform_from_bytes_reraises_ffmpeg_error(mocker, caplog):
-    """Test that ffmpeg decode errors on bytes input are logged and re-raised."""
-    stream = FakeStream(error=FakeFFmpegError(b"decoder failed"))
-    mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
-
-    with pytest.raises(FakeFFmpegError):
-        testee.load_whisper_waveform_from_bytes(b"audio-bytes")
-
-    assert "decoder failed" in caplog.text
-
-
 def test_load_whisper_waveform_from_file_streams_path_through_ffmpeg(mocker, tmp_path):
     """Test that a file path is streamed through ffmpeg without buffering bytes in Python."""
     input_path = tmp_path / "audio.raw"

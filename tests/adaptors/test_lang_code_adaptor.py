@@ -46,29 +46,6 @@ def test_from_str():
     with pytest.raises(testee.UnregisteredLanguageCode):
         testee.LanguageCode.from_str('en->xx')
 
-def test_from_repr():
-    """Tests the from_repr classmethod."""
-    # Test with target
-    repr_str = "LanguageCode(source='en', target='zh')"
-    lang_code = testee.LanguageCode.from_repr(repr_str)
-    assert lang_code == testee.LanguageCode('en', 'zh')
-    # Test without target
-    repr_str = "LanguageCode(source='en-us', target=None)"
-    lang_code = testee.LanguageCode.from_repr(repr_str)
-    assert lang_code == testee.LanguageCode('en-us')
-    # Test with BCP codes
-    repr_str = "LanguageCode(source='en-us', target='zh-cn')"
-    lang_code = testee.LanguageCode.from_repr(repr_str)
-    assert lang_code == testee.LanguageCode('en-us', 'zh-cn')
-    # Test invalid format
-    with pytest.raises(ValueError):
-        testee.LanguageCode.from_repr("Invalid(source='en')")
-    with pytest.raises(ValueError):
-        testee.LanguageCode.from_repr("LanguageCode(source='en', target='zh', extra='oops')")
-    # Test invalid language code
-    with pytest.raises(testee.UnregisteredLanguageCode):
-        testee.LanguageCode.from_repr("LanguageCode(source='xx', target='yy')")
-
 
 def test_is_source_bcp():
     """Test that BCP-47 sources are distinguished from ISO 639-1 sources."""

@@ -55,12 +55,6 @@ def test_task_mode_validator():
         testee.Task(source="/tmp/audio.wav", mode="unknown")
 
 
-def test_task_language_accepts_repr_string():
-    """Test that task languages can be parsed from a LanguageCode repr string."""
-    task = testee.Task(source="/tmp/audio.wav", language="LanguageCode(source='en-us', target=None)")
-    assert task.language == LanguageCode("en-us")
-
-
 def test_task_language_rejects_non_string_value():
     """Test that non-string language values raise a direct TypeError."""
     # Pydantic v2 does not wrap TypeError from plain validators, so it propagates directly

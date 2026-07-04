@@ -1,7 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Collection, TypedDict
+from typing import Collection
 from urllib.parse import urlparse, parse_qs
 
 from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars, truncate_filename
@@ -13,12 +13,6 @@ from youtube_whisperer.downloaders.utils import get_video_title
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 logger = logging.getLogger(__name__)
-
-
-class TranscriptBlock(TypedDict):
-    text: str
-    start: float
-    end: float
 
 
 def get_video_id(url: str) -> str:

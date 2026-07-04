@@ -71,29 +71,6 @@ class LanguageCode:
         return cls(source=source, target=target)
 
     @classmethod
-    def from_repr(cls, text: str) -> Self:
-        """
-        Creates an instance of the class from the output of `cls.__repr__`.
-
-        Args:
-            text (str): A string in the form produced by the dataclass `__repr__`.
-
-        Returns:
-            Self: The parsed language code.
-
-        Raises:
-            ValueError: If the input does not match the output format of `cls.__repr__`.
-        """
-        pattern = cls.__name__ + r"\(source='([^']+)'(?:, target=(?:'([^']*)'|None))?\)"
-        match = re.fullmatch(pattern, text.strip())
-        if not match:
-            raise ValueError(f"Unexpected input: {text}")
-        source = match.group(1).lower()
-        # target is None <==> group 2 does not exist
-        target = match.group(2).lower() if match.group(2) else None
-        return cls(source=source, target=target)
-
-    @classmethod
     def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: GetCoreSchemaHandler) -> CoreSchema:
         """
         Returns a Pydantic CoreSchema that defines how to validate and serialize a LanguageCode.
@@ -113,7 +90,7 @@ class LanguageCode:
             """Validate an incoming value into a LanguageCode instance.
 
             Args:
-                x (str | LanguageCode): An existing instance, a `__str__` form, or a `__repr__` form.
+                x (str | LanguageCode): An existing instance or a `__str__` form.
 
             Returns:
                 LanguageCode: The validated language code.
@@ -126,8 +103,6 @@ class LanguageCode:
                 return x
             if isinstance(x, str):
                 try:
-                    if x.startswith(cls.__name__):
-                        return cls.from_repr(x)
                     return cls.from_str(x)
                 except UnregisteredLanguageCode as e:
                     raise ValueError(f"Unregistered language code: '{e.args[0]}'") from e
