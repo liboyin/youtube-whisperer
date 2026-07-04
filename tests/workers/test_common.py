@@ -13,7 +13,9 @@ import youtube_whisperer.workers.common as testee
 @pytest.fixture
 def mock_redis(mocker):
     """Fixture providing a mock Redis client to inject into workers and queue helpers."""
-    return mocker.MagicMock()
+    client = mocker.MagicMock()
+    client.xautoclaim.return_value = (b'0-0', [], [])  # no stranded tasks to claim by default
+    return client
 
 
 def test_yield_task(mock_redis, mocker):
@@ -65,6 +67,38 @@ def test_yield_task_recovers_orphaned_tasks(mock_redis, mocker):
     assert msg_id == b'9999-0'
     assert task == Task(source='/tmp/audio.wav', language='en')
     mock_redis.xreadgroup.assert_called_once_with('group_name', 'consumer', {'stream:name': '0-0'}, count=1)
+
+
+def test_yield_task_claims_stranded_tasks_from_dead_consumers(mock_redis, mocker):
+    """Test that yield_task claims PEL entries stranded by a dead consumer identity past the idle threshold."""
+    task_json = Task(source='/tmp/audio.wav', language='en').model_dump_json().encode('utf-8')
+    mock_redis.xreadgroup.return_value = []  # this consumer's own PEL is empty
+    mock_redis.xautoclaim.return_value = (b'0-0', [(b'4242-0', {b'payload': task_json})], [])
+
+    gen = testee.yield_task(mock_redis, 'stream:name', 'grp', 'c1', poll_interval_seconds=1, claim_min_idle_seconds=120)
+    msg_id, task = next(gen)
+
+    assert msg_id == b'4242-0'
+    assert task == Task(source='/tmp/audio.wav', language='en')
+    # The configured idle threshold (seconds) is passed to XAUTOCLAIM in milliseconds so live in-flight tasks are not stolen.
+    mock_redis.xautoclaim.assert_called_once_with('stream:name', 'grp', 'c1', min_idle_time=120_000, count=1)
+
+
+def test_yield_task_self_heals_after_nogroup_on_claim(mock_redis, mocker):
+    """Test that a NOGROUP error on the XAUTOCLAIM path also recreates the consumer group."""
+    task_json = Task(source='/tmp/audio.wav', language='en').model_dump_json().encode('utf-8')
+    mock_ensure = mocker.patch.object(testee, 'ensure_consumer_group')
+    mock_redis.xreadgroup.return_value = []  # PEL always empty so the claim step is reached
+    mock_redis.xautoclaim.side_effect = [
+        redis.exceptions.ResponseError("NOGROUP No such key 'stream:name'"),  # group gone during claim
+        (b'0-0', [(b'5555-0', {b'payload': task_json})], []),                  # claim succeeds after heal
+    ]
+
+    gen = testee.yield_task(mock_redis, 'stream:name', 'grp', 'c1', poll_interval_seconds=1)
+    msg_id, task = next(gen)
+
+    assert msg_id == b'5555-0'
+    assert mock_ensure.call_count == 2  # once at startup + once after NOGROUP on claim
 
 
 def test_yield_task_self_heals_after_nogroup_on_pel_read(mock_redis, mocker):

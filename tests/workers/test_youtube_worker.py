@@ -2,6 +2,7 @@ from pathlib import Path
 
 from pathlib_extensions import OverwriteMode
 
+from youtube_whisperer.config import Settings
 from youtube_whisperer.models import Task
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 import youtube_whisperer.workers.youtube_worker as testee
@@ -21,7 +22,8 @@ def test_youtube_worker_stream_bindings(mocker):
         stream_name=testee.YOUTUBE_STREAM,
         group_name=WORKERS_GROUP,
         consumer_name='test-slot',
-        poll_interval_seconds=10
+        poll_interval_seconds=10,
+        claim_min_idle_seconds=Settings().worker_claim_min_idle_seconds,
     )
 
 

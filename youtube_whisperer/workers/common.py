@@ -6,6 +6,7 @@ from typing import Callable, Generator, cast
 import redis
 from redis import StrictRedis
 
+from youtube_whisperer.config import Settings
 from youtube_whisperer.models import Task
 from youtube_whisperer.queueing import decode_redis_value, get_stream_name, queue_dead_letter, WORKERS_GROUP, ensure_consumer_group
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType, is_url
@@ -14,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 TaskDispatcher = Callable[[Task, Path], None]
 StreamReadResponse = list[tuple[bytes, list[tuple[bytes, dict[bytes, bytes]]]]]
+# XAUTOCLAIM returns (next_cursor, [(message_id, fields), ...], [deleted_ids]); only the messages are needed.
+XAutoClaimResponse = tuple[bytes, list[tuple[bytes, dict[bytes, bytes]]], list[bytes]]
+
+DEFAULT_CLAIM_MIN_IDLE_SECONDS = 21600  # 6 hours; see Settings.worker_claim_min_idle_seconds
 
 
 def yield_task(
@@ -21,13 +26,18 @@ def yield_task(
     stream_name: str,
     group_name: str,
     consumer_name: str,
-    poll_interval_seconds: int = 5
+    poll_interval_seconds: int = 5,
+    claim_min_idle_seconds: int = DEFAULT_CLAIM_MIN_IDLE_SECONDS,
 ) -> Generator[tuple[bytes, Task], None, None]:
     """
     Poll a Redis Stream and yield tasks assigned to this consumer group.
 
-    First, it automatically resumes any orphaned tasks assigned to this consumer in the PEL.
-    Then, it blocks for new messages to arrive in the stream.
+    Each loop iteration: (1) resumes this consumer's own orphaned PEL entries (crash recovery),
+    (2) claims PEL entries stranded by other (likely dead) consumer identities that have been idle
+    longer than ``claim_min_idle_seconds`` via XAUTOCLAIM, then (3) blocks for newly queued tasks.
+    The claim step keeps tasks abandoned by a vanished consumer name from being pinned "active"
+    forever; the idle threshold must exceed the longest plausible processing time so a task
+    in-flight on a live worker is never stolen.
 
     Args:
         client (StrictRedis): The Redis client to read from.
@@ -35,11 +45,14 @@ def yield_task(
         group_name (str): The consumer group shared by all workers of this type.
         consumer_name (str): This worker's consumer identity, used to recover its own PEL.
         poll_interval_seconds (int): How long each blocking read waits for new messages.
+        claim_min_idle_seconds (int): Minimum idle time before a PEL entry owned by another
+            consumer is claimed by this worker.
 
     Yields:
         A tuple of (Message ID bytes, Validated Task model).
     """
     ensure_consumer_group(client, stream_name, group_name)
+    claim_min_idle_ms = claim_min_idle_seconds * 1000
 
     while True:
         try:
@@ -55,6 +68,22 @@ def yield_task(
                     logger.info("Resuming orphaned task from %s: %s", stream_name, decode_redis_value(task_payload))
                     yield msg_id, Task.model_validate_json(decode_redis_value(task_payload))
                     continue
+        except redis.exceptions.ResponseError as e:
+            if "NOGROUP" in str(e):
+                ensure_consumer_group(client, stream_name, group_name)
+                continue
+            raise
+        try:
+            _cursor, claimed_messages, *_deleted = cast(
+                XAutoClaimResponse,
+                client.xautoclaim(stream_name, group_name, consumer_name, min_idle_time=claim_min_idle_ms, count=1),
+            )
+            if claimed_messages:
+                msg_id, fields = claimed_messages[0]
+                task_payload = fields[b'payload']
+                logger.info("Claimed stranded task from %s: %s", stream_name, decode_redis_value(task_payload))
+                yield msg_id, Task.model_validate_json(decode_redis_value(task_payload))
+                continue
         except redis.exceptions.ResponseError as e:
             if "NOGROUP" in str(e):
                 ensure_consumer_group(client, stream_name, group_name)
@@ -128,7 +157,8 @@ class BaseWorker(ABC):
             stream_name=stream_name,
             group_name=WORKERS_GROUP,
             consumer_name=consumer_name,
-            poll_interval_seconds=poll_interval_seconds
+            poll_interval_seconds=poll_interval_seconds,
+            claim_min_idle_seconds=Settings().worker_claim_min_idle_seconds,
         )
 
     @abstractmethod

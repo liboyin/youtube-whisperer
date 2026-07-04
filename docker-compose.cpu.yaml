@@ -36,7 +36,6 @@ services:
     volumes: *volumes
     environment:
       WHISPER_USE_CUDA: '0'
-      WORKER_SLOT_ID: '1'
     env_file:
       - .env
     depends_on:
@@ -52,7 +51,6 @@ services:
     volumes: *volumes
     environment:
       WHISPER_USE_CUDA: '0'
-      WORKER_SLOT_ID: '1'
     env_file:
       - .env
     depends_on:
@@ -68,7 +66,6 @@ services:
     volumes: *volumes
     environment:
       WHISPER_USE_CUDA: '0'
-      WORKER_SLOT_ID: '1'
     env_file:
       - .env
     depends_on:
