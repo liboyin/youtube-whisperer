@@ -11,7 +11,7 @@ from pathlib_extensions import OverwriteMode, overwrite_existing_path
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
 from youtube_whisperer.transcriber.model_parameters import get_default_whisper_model_parameters
-from youtube_whisperer.transcriber.rejection_policy import RejectedTranscriptionError, reject_bad_segments
+from youtube_whisperer.transcriber.rejection_policy import reject_bad_segments
 from youtube_whisperer.transcriber.waveform_loader import load_whisper_waveform_from_file
 from youtube_whisperer.utils import TranscriberMode
 
@@ -83,7 +83,12 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
         mode (TranscriberMode, optional): Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.
 
     Returns:
-        Path | None: Output SRT file path, or `None` if transcription failed.
+        Path | None: Output SRT file path, or `None` if the input decodes to an empty waveform.
+
+    Raises:
+        RejectedTranscriptionError: If Whisper emits a known bad output substring.
+        Exception: If loading the waveform or transcription otherwise fails; the error propagates
+            so callers (e.g. the worker loop) can dead-letter the task instead of silently dropping it.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
@@ -92,16 +97,9 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
     if len(waveform) == 0:
         print(f'Skipping {input_file_path} because empty waveform is loaded')
         return None
-    try:
-        segments_generator = reject_bad_segments(transcribe_waveform_with_default_model(waveform, mode, language))
-        save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
-        return output_file_path
-    except RejectedTranscriptionError as e:
-        print(f"Rejected Whisper transcription for {input_file_path}: {e}")
-        return None
-    except Exception as e:
-        print(f"An error occurred while transcribing {input_file_path}: {e}")
-        return None
+    segments_generator = reject_bad_segments(transcribe_waveform_with_default_model(waveform, mode, language))
+    save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
+    return output_file_path
 
 
 def main() -> None:

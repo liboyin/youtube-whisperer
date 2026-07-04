@@ -101,6 +101,25 @@ def test_transcribe_to_srt_files_prints_failure_on_none_result(mocker, capsys):
     assert "Failed to transcribe file: /tmp/whisper.wav" in capsys.readouterr().out
 
 
+def test_transcribe_to_srt_files_reports_failure_and_continues_on_exception(mocker, capsys):
+    """Test that a transcriber exception is reported and does not abort the remaining files."""
+    mocker.patch.object(
+        testee,
+        "transcribe_file_with_default_model",
+        side_effect=[RuntimeError("boom"), Path("/tmp/second.srt")],
+    )
+
+    testee.transcribe_to_srt_files(
+        [Path("/tmp/first.wav"), Path("/tmp/second.wav")],
+        LANGUAGE,
+        transcriber=TranscriberType.WHISPER,
+    )
+
+    out = capsys.readouterr().out
+    assert "Failed to transcribe file: /tmp/first.wav (boom)" in out
+    assert "Saved SRT file: /tmp/second.srt" in out
+
+
 def test_transcribe_to_srt_files_rejects_unsupported_transcriber():
     """Test that unsupported transcriber names raise a clear error."""
     with pytest.raises(ValueError, match="Unsupported transcriber type"):

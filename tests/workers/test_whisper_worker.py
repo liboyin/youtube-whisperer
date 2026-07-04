@@ -2,8 +2,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from pathlib_extensions import OverwriteMode
+import pytest
 
 from youtube_whisperer.fastapi.models import Task
+from youtube_whisperer.transcriber.rejection_policy import RejectedTranscriptionError
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 import youtube_whisperer.workers.whisper_worker as testee
 
@@ -59,14 +61,24 @@ def test_validate_gpu_health_or_exit_no_cuda(mocker):
 def test_dispatch_task_for_whisper_transcriber(mocker):
     """Test dispatching to the Whisper transcriber."""
     mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
-    mock_transcribe = mocker.patch.object(testee, 'transcribe_to_srt_files')
+    mock_transcribe = mocker.patch.object(testee, 'transcribe_file_with_default_model')
     task = Task(source='/path.mp4', transcriber=TranscriberType.WHISPER, mode=TranscriberMode.TRANSCRIBE)
     source_path = Path('/path.mp4')
 
     testee.WhisperWorker('gpu-0').dispatch_task(task, source_path)
 
     mock_validate_gpu.assert_called_once()
-    mock_transcribe.assert_called_once_with([source_path], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+    mock_transcribe.assert_called_once_with(source_path, task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+
+
+def test_dispatch_task_propagates_transcription_failure(mocker):
+    """Test that a Whisper transcription failure propagates so the worker loop can dead-letter the task."""
+    mocker.patch.object(testee, 'validate_gpu_health_or_exit')
+    mocker.patch.object(testee, 'transcribe_file_with_default_model', side_effect=RejectedTranscriptionError('bad output'))
+    task = Task(source='/path.mp4', transcriber=TranscriberType.WHISPER)
+
+    with pytest.raises(RejectedTranscriptionError, match='bad output'):
+        testee.WhisperWorker('gpu-0').dispatch_task(task, Path('/path.mp4'))
 
 
 

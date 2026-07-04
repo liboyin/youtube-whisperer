@@ -50,13 +50,17 @@ def transcribe_to_srt_files(input_file_paths: Iterable[Path], language: Language
     except ValueError as exc:
         raise ValueError(f'Unsupported transcriber type: {transcriber}') from exc
     for input_file_path in input_file_paths:
-        match transcriber:
-            case TranscriberType.AZURE:
-                srt_file_path = transcribe_audio_file(input_file_path, language, overwrite=overwrite)
-            case TranscriberType.WHISPER:
-                srt_file_path = transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite)
-            case _:
-                raise ValueError(f'Unsupported transcriber type: {transcriber}')
+        try:
+            match transcriber:
+                case TranscriberType.AZURE:
+                    srt_file_path = transcribe_audio_file(input_file_path, language, overwrite=overwrite)
+                case TranscriberType.WHISPER:
+                    srt_file_path = transcribe_file_with_default_model(input_file_path, language=language, mode=mode, overwrite=overwrite)
+        except Exception as e:
+            # The CLI keeps processing the remaining files when one fails; the worker loop, by
+            # contrast, lets the underlying transcriber raise so failures reach the dead-letter queue.
+            print('Failed to transcribe file:', input_file_path, f'({e})')
+            continue
         if srt_file_path:
             print('Saved SRT file:', srt_file_path)
         else:

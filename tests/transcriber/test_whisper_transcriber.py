@@ -4,10 +4,11 @@ from types import SimpleNamespace
 from faster_whisper.transcribe import Segment
 import numpy as np
 from pathlib_extensions import OverwriteMode
+import pytest
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock
-from youtube_whisperer.transcriber.rejection_policy import REJECTED_SUBSTRINGS
+from youtube_whisperer.transcriber.rejection_policy import REJECTED_SUBSTRINGS, RejectedTranscriptionError
 import youtube_whisperer.transcriber.whisper_transcriber as testee
 from youtube_whisperer.utils import TranscriberMode
 
@@ -91,8 +92,8 @@ def test_transcribe_file_with_default_model_skips_empty_waveform(mocker, tmp_pat
     assert f"Skipping {input_path} because empty waveform is loaded" in capsys.readouterr().out
 
 
-def test_transcribe_file_with_default_model_returns_none_on_rejected_transcription(mocker, tmp_path, capsys):
-    """Test that a rejected transcription writes no SRT and returns None."""
+def test_transcribe_file_with_default_model_raises_on_rejected_transcription(mocker, tmp_path):
+    """Test that a rejected transcription writes no SRT and propagates so the caller can dead-letter it."""
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
@@ -102,11 +103,10 @@ def test_transcribe_file_with_default_model_returns_none_on_rejected_transcripti
         return_value=[make_segment(f"prefix {REJECTED_SUBSTRINGS[0]} suffix")],
     )
 
-    result = testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output_path)
+    with pytest.raises(RejectedTranscriptionError):
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output_path)
 
-    assert result is None
     assert not output_path.exists()
-    assert f"Rejected Whisper transcription for {input_path}" in capsys.readouterr().out
 
 
 def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
@@ -132,16 +132,14 @@ def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
     assert save_mock.call_args.kwargs == {"overwrite": OverwriteMode.ALWAYS}
 
 
-def test_transcribe_file_with_default_model_returns_none_on_error(mocker, tmp_path, capsys):
-    """Test that transcription errors are caught and reported as a None result."""
+def test_transcribe_file_with_default_model_propagates_error(mocker, tmp_path):
+    """Test that transcription errors propagate so the worker loop can dead-letter the task."""
     input_path = tmp_path / "audio.wav"
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
     mocker.patch.object(testee, "transcribe_waveform_with_default_model", side_effect=RuntimeError("boom"))
 
-    result = testee.transcribe_file_with_default_model(input_path, LANGUAGE)
-
-    assert result is None
-    assert f"An error occurred while transcribing {input_path}: boom" in capsys.readouterr().out
+    with pytest.raises(RuntimeError, match="boom"):
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE)
 
 
 def test_whisper_main_parses_arguments_and_transcribes_each_path(mocker):

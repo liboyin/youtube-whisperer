@@ -5,9 +5,9 @@ from pathlib import Path
 from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
-from youtube_whisperer.__main__ import transcribe_to_srt_files
 from youtube_whisperer.fastapi.models import Task
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
+from youtube_whisperer.transcriber.whisper_transcriber import transcribe_file_with_default_model
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType
 from youtube_whisperer.workers.common import TranscriptionWorker
 
@@ -60,8 +60,9 @@ class WhisperWorker(TranscriptionWorker):
         """Run Whisper transcription for a resolved filesystem source.
 
         The worker validates GPU availability when CUDA is enabled and then invokes
-        the standard transcription entrypoint to write subtitle files for the media
-        source represented by the queued task.
+        the Whisper transcriber directly to write subtitle files for the media source
+        represented by the queued task. Any transcription failure propagates so the
+        worker loop dead-letters the task instead of silently dropping it.
 
         Args:
             task: The transcription task that provides language and mode settings
@@ -71,6 +72,10 @@ class WhisperWorker(TranscriptionWorker):
 
         Returns:
             None. Subtitle files are written to disk as a side effect.
+
+        Raises:
+            Exception: If Whisper transcription fails; the error propagates to the worker
+                loop so the task is dead-lettered.
         """
         validate_gpu_health_or_exit()
-        transcribe_to_srt_files([source], task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+        transcribe_file_with_default_model(source, task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
