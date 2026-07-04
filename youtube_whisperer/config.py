@@ -12,5 +12,7 @@ class Settings(BaseSettings):
     whisper_model: str = "large-v3"
     azure_speech_api_key: str | None = None
     azure_service_region: str | None = None
+    redis_host: str = "redis"
+    redis_port: int = 6379
     worker_slot_id: str | None = None
     worker_role: str = "whisper"
