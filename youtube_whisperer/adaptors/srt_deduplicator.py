@@ -1,9 +1,12 @@
 import argparse
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 from typing import Iterable, Iterator
 
 from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
+
+logger = logging.getLogger(__name__)
 
 ARROW = '-->'
 
@@ -167,7 +170,7 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
     Returns:
         Path: The path to the output file.
     """
-    print("Deduplicating SRT file:", input_file_path)
+    logger.info("Deduplicating SRT file: %s", input_file_path)
     output_file_path = output_file_path or input_file_path
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return output_file_path

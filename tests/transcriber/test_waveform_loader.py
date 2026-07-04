@@ -57,7 +57,7 @@ def test_load_whisper_waveform_from_bytes_decodes_pcm_stream(mocker):
     }]
 
 
-def test_load_whisper_waveform_from_bytes_reraises_ffmpeg_error(mocker, capsys):
+def test_load_whisper_waveform_from_bytes_reraises_ffmpeg_error(mocker, caplog):
     """Test that ffmpeg decode errors on bytes input are logged and re-raised."""
     stream = FakeStream(error=FakeFFmpegError(b"decoder failed"))
     mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
@@ -65,7 +65,7 @@ def test_load_whisper_waveform_from_bytes_reraises_ffmpeg_error(mocker, capsys):
     with pytest.raises(FakeFFmpegError):
         testee.load_whisper_waveform_from_bytes(b"audio-bytes")
 
-    assert "decoder failed" in capsys.readouterr().out
+    assert "decoder failed" in caplog.text
 
 
 def test_load_whisper_waveform_from_file_streams_path_through_ffmpeg(mocker, tmp_path):
@@ -90,7 +90,7 @@ def test_load_whisper_waveform_from_file_streams_path_through_ffmpeg(mocker, tmp
     assert stream.run_calls == [{"capture_stdout": True, "capture_stderr": True}]
 
 
-def test_load_whisper_waveform_from_file_reraises_ffmpeg_error(mocker, tmp_path, capsys):
+def test_load_whisper_waveform_from_file_reraises_ffmpeg_error(mocker, tmp_path, caplog):
     """Test that ffmpeg decode errors on file input are logged and re-raised."""
     input_path = tmp_path / "audio.raw"
     stream = FakeStream(error=FakeFFmpegError(b"decoder failed"))
@@ -100,7 +100,7 @@ def test_load_whisper_waveform_from_file_reraises_ffmpeg_error(mocker, tmp_path,
     with pytest.raises(FakeFFmpegError):
         testee.load_whisper_waveform_from_file(Path("ignored.raw"))
 
-    assert "decoder failed" in capsys.readouterr().out
+    assert "decoder failed" in caplog.text
 
 
 def test_save_as_wav_file_returns_none_when_overwrite_denied(mocker, tmp_path):
@@ -146,7 +146,7 @@ def test_save_as_wav_file_runs_ffmpeg_and_returns_output_path(mocker, tmp_path):
     }]
 
 
-def test_save_as_wav_file_reraises_ffmpeg_error(mocker, tmp_path, capsys):
+def test_save_as_wav_file_reraises_ffmpeg_error(mocker, tmp_path, caplog):
     """Test that ffmpeg conversion errors are logged and re-raised."""
     input_path = tmp_path / "input.mp3"
     output_path = tmp_path / "output.wav"
@@ -158,4 +158,4 @@ def test_save_as_wav_file_reraises_ffmpeg_error(mocker, tmp_path, capsys):
     with pytest.raises(FakeFFmpegError):
         testee.save_as_wav_file(input_path, output_file_path=output_path, overwrite=OverwriteMode.ALWAYS)
 
-    assert "conversion failed" in capsys.readouterr().out
+    assert "conversion failed" in caplog.text

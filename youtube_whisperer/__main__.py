@@ -1,5 +1,6 @@
 import argparse
 import itertools
+import logging
 from pathlib import Path
 from typing import Iterable
 
@@ -71,6 +72,7 @@ def main() -> None:
     """
     CLI entry point to download videos with transcripts or transcribe/translate waveform files to SRT files.
     """
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser()
     parser.add_argument("sources", nargs='+', metavar='source', help="Waveform file paths to transcribe/translate, or video/playlist URLs to download and transcribe/translate.")
     parser.add_argument("-l", "--language", type=LanguageCode.from_str, help="Language code for transcript download and transcription/translation.")

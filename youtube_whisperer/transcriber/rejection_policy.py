@@ -1,7 +1,9 @@
+import logging
 from typing import Generator, Iterable
 
 from faster_whisper.transcribe import Segment
 
+logger = logging.getLogger(__name__)
 
 REJECTED_SUBSTRINGS: tuple[str, ...] = (
     '明镜与点点',
@@ -45,7 +47,7 @@ def reject_bad_segments(segments_generator: Iterable[Segment]) -> Generator[Segm
         RejectedTranscriptionError: When a segment contains a known bad output substring.
     """
     for segment in segments_generator:
-        print(segment)
+        logger.debug("%s", segment)
         if rejected_substring := get_rejected_substring(segment.text):
             raise RejectedTranscriptionError(
                 f"Segment contains rejected substring: {rejected_substring!r}"

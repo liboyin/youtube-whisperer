@@ -1,4 +1,5 @@
 import argparse
+import logging
 from pathlib import Path
 from typing import Collection, TypedDict
 from urllib.parse import urlparse, parse_qs
@@ -10,6 +11,8 @@ from youtube_transcript_api.formatters import SRTFormatter
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.downloaders.utils import get_video_title
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
+
+logger = logging.getLogger(__name__)
 
 
 class TranscriptBlock(TypedDict):
@@ -63,9 +66,9 @@ def get_first_matching_lang_code(candidates: Collection[str], requested: Languag
         r = r.lower()
         for c in candidates:
             if c.lower().startswith(r):
-                print("Matched language code:", c)
+                logger.info("Matched language code: %s", c)
                 return c
-    print("No matching language code found")
+    logger.info("No matching language code found")
     return None
 
 
@@ -83,7 +86,7 @@ def list_video_transcripts(url: str) -> TranscriptList | None:
     try:
         return YouTubeTranscriptApi().list(video_id)
     except TranscriptsDisabled:
-        print(f"Transcripts are disabled for {url}")
+        logger.info("Transcripts are disabled for %s", url)
     return None
 
 
@@ -104,7 +107,7 @@ def fetch_matching_transcript(transcripts: TranscriptList, language: LanguageCod
         return None
     try:
         result = transcripts.find_transcript([lang_code]).fetch()
-        print(f"Successfully downloaded transcript with {len(result)} blocks for {url}")
+        logger.info("Successfully downloaded transcript with %d blocks for %s", len(result), url)
         return result
     except NoTranscriptFound:
         return None
@@ -160,7 +163,7 @@ class TranscriptDownloader:
         srt_text = self.download_as_srt_text()
         if srt_text is None:
             return False
-        print("About to write to SRT file:", output_file_path)
+        logger.info("About to write to SRT file: %s", output_file_path)
         prepare_output_file(output_file_path).write_text(srt_text)
         return True
     

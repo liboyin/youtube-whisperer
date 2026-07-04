@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 from pathlib import Path
 from typing import Callable, Generator, cast
 
@@ -8,6 +9,8 @@ from redis import StrictRedis
 from youtube_whisperer.models import Task
 from youtube_whisperer.queueing import decode_redis_value, get_stream_name, queue_dead_letter, WORKERS_GROUP, ensure_consumer_group
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType, is_url
+
+logger = logging.getLogger(__name__)
 
 TaskDispatcher = Callable[[Task, Path], None]
 StreamReadResponse = list[tuple[bytes, list[tuple[bytes, dict[bytes, bytes]]]]]
@@ -49,7 +52,7 @@ def yield_task(
                 if messages:
                     msg_id, fields = messages[0]
                     task_payload = fields[b'payload']
-                    print(f"Resuming orphaned task from {stream_name}: {decode_redis_value(task_payload)}")
+                    logger.info("Resuming orphaned task from %s: %s", stream_name, decode_redis_value(task_payload))
                     yield msg_id, Task.model_validate_json(decode_redis_value(task_payload))
                     continue
         except redis.exceptions.ResponseError as e:
@@ -73,7 +76,7 @@ def yield_task(
                 if messages:
                     msg_id, fields = messages[0]
                     task_payload = fields[b'payload']
-                    print(f"Claimed new task from {stream_name}: {decode_redis_value(task_payload)}")
+                    logger.info("Claimed new task from %s: %s", stream_name, decode_redis_value(task_payload))
                     yield msg_id, Task.model_validate_json(decode_redis_value(task_payload))
         except redis.exceptions.ResponseError as e:
             if "NOGROUP" in str(e):
@@ -119,7 +122,7 @@ class BaseWorker(ABC):
         """
         stream_name = self.get_stream_name()
         consumer_name = self.get_consumer_name()
-        print(f"Worker for {stream_name} started utilizing consumer identity: {consumer_name}")
+        logger.info("Worker for %s started with consumer identity: %s", stream_name, consumer_name)
         return yield_task(
             client=self.client,
             stream_name=stream_name,
@@ -154,7 +157,7 @@ class BaseWorker(ABC):
             try:
                 self.process_task(task)
             except Exception as e:
-                print(f"An error occurred while processing task {task}: {e}")
+                logger.exception("Error processing task %s", task)
                 queue_dead_letter(self.client, task, stream_name, str(e))
             # Reached only on success or after a durable dead-letter; a BaseException
             # or a failed dead-letter skips the acknowledgement and leaves the message
@@ -163,7 +166,7 @@ class BaseWorker(ABC):
             pipe.xack(stream_name, WORKERS_GROUP, msg_id)
             pipe.xdel(stream_name, msg_id)
             pipe.execute()
-            print(f"Acknowledged and deleted task from {stream_name}: {task}")
+            logger.info("Acknowledged and deleted task from %s: %s", stream_name, task)
 
 
 class TranscriptionWorker(BaseWorker):

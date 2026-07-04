@@ -1,5 +1,6 @@
 import argparse
 import functools
+import logging
 from pathlib import Path
 from typing import Iterable
 
@@ -15,6 +16,8 @@ from youtube_whisperer.transcriber.model_parameters import get_default_whisper_m
 from youtube_whisperer.transcriber.rejection_policy import reject_bad_segments
 from youtube_whisperer.transcriber.waveform_loader import load_whisper_waveform_from_file
 from youtube_whisperer.utils import TranscriberMode
+
+logger = logging.getLogger(__name__)
 
 
 def segment_to_srt_block(segment: Segment) -> SrtBlock:
@@ -52,7 +55,7 @@ def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, mode: Transcr
     if lang_code == 'en' and mode == TranscriberMode.TRANSLATE:
         mode = TranscriberMode.TRANSCRIBE
     segments_generator, info = model.transcribe(waveform, lang_code, mode.value)
-    print(info)
+    logger.info("%s", info)
     return segments_generator
 
 
@@ -109,7 +112,7 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
         return output_file_path
     waveform = load_whisper_waveform_from_file(input_file_path)
     if len(waveform) == 0:
-        print(f'Skipping {input_file_path} because empty waveform is loaded')
+        logger.warning("Skipping %s because empty waveform is loaded", input_file_path)
         return None
     segments_generator = reject_bad_segments(transcribe_waveform_with_default_model(waveform, mode, language))
     save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)

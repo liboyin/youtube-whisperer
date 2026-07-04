@@ -1,8 +1,11 @@
+import logging
 from pathlib import Path
 
 import ffmpeg
 import numpy as np
 from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SAMPLE_RATE = 16000
 
@@ -40,11 +43,11 @@ def load_whisper_waveform_from_bytes(data: bytes, sample_rate: int = DEFAULT_SAM
         .input("pipe:", threads=0)
         .output("pipe:", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
     )
-    print('ffmpeg args:', stream.get_args())
+    logger.debug("ffmpeg args: %s", stream.get_args())
     try:
         out, _ = stream.run(input=data, capture_stdout=True, capture_stderr=True)
     except ffmpeg.Error as e:
-        print(e.stderr.decode())
+        logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768
 
@@ -71,11 +74,11 @@ def load_whisper_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPL
         .input(str(input_path), threads=0)
         .output("pipe:", format="s16le", acodec="pcm_s16le", ac=1, ar=sample_rate)
     )
-    print('ffmpeg args:', stream.get_args())
+    logger.debug("ffmpeg args: %s", stream.get_args())
     try:
         out, _ = stream.run(capture_stdout=True, capture_stderr=True)
     except ffmpeg.Error as e:
-        print(e.stderr.decode())
+        logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768
 
@@ -106,6 +109,6 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
         # The overwrite logic is handled by overwrite_existing_path, so we can always overwrite here.
         stream.run(overwrite_output=True, capture_stdout=True, capture_stderr=True)
     except ffmpeg.Error as e:
-        print(e.stderr.decode())
+        logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise
     return output_file_path

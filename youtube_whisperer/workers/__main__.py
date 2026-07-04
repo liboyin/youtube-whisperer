@@ -1,5 +1,6 @@
 import argparse
 from enum import Enum
+import logging
 import socket
 
 from youtube_whisperer.config import Settings
@@ -89,6 +90,7 @@ def main() -> None:
     Returns:
         None. The selected worker loop runs until the process is stopped.
     """
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser()
     parser.add_argument('role', nargs='?', choices=WorkerRole.values(), default=Settings().worker_role)
     parser.add_argument('--slot', default=None, help="Active-slot identifier for whisper/Azure workers. Defaults to WORKER_SLOT_ID, then machine hostname.")

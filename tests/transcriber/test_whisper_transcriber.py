@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,7 +31,7 @@ def test_segment_to_srt_block():
     assert srt_block.content == ['Segment']
 
 
-def test_transcribe_waveform_switches_translate_to_transcribe_for_english(capsys):
+def test_transcribe_waveform_switches_translate_to_transcribe_for_english(caplog):
     """Test that translate mode is downgraded to transcribe when the source is English."""
     model = SimpleNamespace(
         transcribe=lambda waveform, lang_code, task: (
@@ -40,10 +41,11 @@ def test_transcribe_waveform_switches_translate_to_transcribe_for_english(capsys
     )
     language = LanguageCode("en")
 
-    result = list(testee.transcribe_waveform(model, np.array([1.0]), TranscriberMode.TRANSLATE, language))
+    with caplog.at_level(logging.INFO):
+        result = list(testee.transcribe_waveform(model, np.array([1.0]), TranscriberMode.TRANSLATE, language))
 
     assert result == ["segment"]
-    assert "{'lang': 'en', 'task': 'transcribe'}" in capsys.readouterr().out
+    assert "{'lang': 'en', 'task': 'transcribe'}" in caplog.text
 
 
 def test_get_default_whisper_model_builds_once_and_caches(mocker):
@@ -94,15 +96,16 @@ def test_transcribe_file_with_default_model_returns_existing_output_when_overwri
     mock_load.assert_not_called()
 
 
-def test_transcribe_file_with_default_model_skips_empty_waveform(mocker, tmp_path, capsys):
+def test_transcribe_file_with_default_model_skips_empty_waveform(mocker, tmp_path, caplog):
     """Test that an empty waveform is skipped instead of transcribed."""
     input_path = tmp_path / "audio.wav"
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([]))
 
-    result = testee.transcribe_file_with_default_model(input_path, LANGUAGE)
+    with caplog.at_level(logging.WARNING):
+        result = testee.transcribe_file_with_default_model(input_path, LANGUAGE)
 
     assert result is None
-    assert f"Skipping {input_path} because empty waveform is loaded" in capsys.readouterr().out
+    assert f"Skipping {input_path} because empty waveform is loaded" in caplog.text
 
 
 def test_transcribe_file_with_default_model_raises_on_rejected_transcription(mocker, tmp_path):

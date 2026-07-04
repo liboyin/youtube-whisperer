@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,8 @@ from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag
 from youtube_whisperer.transcriber.whisper_transcriber import transcribe_file_with_default_model
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType
 from youtube_whisperer.workers.common import TranscriptionWorker
+
+logger = logging.getLogger(__name__)
 
 
 def is_gpu_healthy() -> bool:
@@ -41,7 +44,7 @@ def validate_gpu_health_or_exit() -> None:
         when CUDA is enabled and the GPU health probe fails.
     """
     if use_cuda() and not is_gpu_healthy():
-        print("GPU health check failed. Restarting...")
+        logger.error("GPU health check failed. Restarting...")
         sys.exit(2)
 
 

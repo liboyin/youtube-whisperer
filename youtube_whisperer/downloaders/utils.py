@@ -1,7 +1,10 @@
 from functools import lru_cache
+import logging
 from pathlib import Path
 
 import yt_dlp
+
+logger = logging.getLogger(__name__)
 
 
 def get_video_title(url: str) -> str:
@@ -37,7 +40,7 @@ def is_firefox_cookies_available() -> bool:
     ]:
         for cookies_file_path in Path(search_dir_path).expanduser().rglob('cookies.sqlite'):
             if cookies_file_path.is_file():
-                print('Found Firefox cookies:', cookies_file_path)
+                logger.info("Found Firefox cookies: %s", cookies_file_path)
                 return True
-    print('No Firefox cookies found')
+    logger.info("No Firefox cookies found")
     return False

@@ -1,3 +1,4 @@
+import logging
 import threading
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,8 @@ import soundfile as sf
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
 from youtube_whisperer.config import Settings
+
+logger = logging.getLogger(__name__)
 
 # Floor for the recognition timeout: `duration * 1.5` is too tight for short clips once Azure
 # session startup is included (and a 0-second/undetectable duration would time out immediately),
@@ -80,19 +83,19 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
 
     def stop_cb(evt: Any) -> None:
         """Signal completion when Azure stops the recognition session."""
-        print(f'CLOSED: {evt}')
+        logger.debug("CLOSED: %s", evt)
         done.set()
 
     def recognized_cb(evt: Any) -> None:
         """Collect each non-empty recognition result emitted by Azure."""
-        print(f'UPDATE: {evt}')
+        logger.debug("UPDATE: %s", evt)
         if evt.result.text:  # sometimes there is an empty update at the end of the recognition
             recognition_results.append(evt.result)
 
     def canceled_cb(evt: Any) -> None:
         """Record any Azure cancellation error and signal completion."""
         nonlocal transcription_error
-        print(f'CANCELED: {evt}')
+        logger.debug("CANCELED: %s", evt)
         if evt.cancellation_details.reason == speechsdk.CancellationReason.Error:
             transcription_error = RuntimeError(evt.cancellation_details.error_details)
         done.set()
@@ -101,7 +104,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     speech_recognizer.canceled.connect(canceled_cb)
     speech_recognizer.session_stopped.connect(stop_cb)
 
-    print("Starting transcription on Azure...")
+    logger.info("Starting transcription on Azure...")
     speech_recognizer.start_continuous_recognition()
 
     # Time out after 1.5x audio duration, but never below the floor so short clips still allow startup.
