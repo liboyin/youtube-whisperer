@@ -125,19 +125,70 @@ def test_download_video_and_transcript_with_default_title_delegates(mocker):
 # playlist_downloader.py
 
 
-def test_yield_video_urls_from_playlist_includes_firefox_cookies_when_available(mocker):
-    """Test that playlist entries are expanded to watch URLs using Firefox cookies when available."""
+def test_extract_flat_info_includes_firefox_cookies_when_available(mocker):
+    """Test that flat extraction requests Firefox cookies and flat mode when cookies are available."""
     created = {}
 
     def fake_factory(options):
-        created["ydl"] = FakeYoutubeDL(
-            options,
-            {"entries": [{"id": "abc"}, {"id": "xyz"}]},
-        )
+        created["ydl"] = FakeYoutubeDL(options, {"entries": [{"id": "abc"}]})
         return created["ydl"]
 
     mocker.patch.object(playlist_testee, "is_firefox_cookies_available", return_value=True)
     mocker.patch.object(playlist_testee.yt_dlp, "YoutubeDL", side_effect=fake_factory)
+
+    result = playlist_testee.extract_flat_info("https://example.com/playlist")
+
+    assert result == {"entries": [{"id": "abc"}]}
+    assert created["ydl"].options["extract_flat"] is True
+    assert created["ydl"].options["cookiesfrombrowser"] == ("firefox",)
+    assert created["ydl"].extract_info_call == ("https://example.com/playlist", False)
+
+
+def test_extract_flat_info_omits_cookies_when_unavailable(mocker):
+    """Test that flat extraction omits Firefox cookies when none are available."""
+    created = {}
+
+    def fake_factory(options):
+        created["ydl"] = FakeYoutubeDL(options, {"id": "solo"})
+        return created["ydl"]
+
+    mocker.patch.object(playlist_testee, "is_firefox_cookies_available", return_value=False)
+    mocker.patch.object(playlist_testee.yt_dlp, "YoutubeDL", side_effect=fake_factory)
+
+    result = playlist_testee.extract_flat_info("https://example.com/watch?v=solo")
+
+    assert result == {"id": "solo"}
+    assert "cookiesfrombrowser" not in created["ydl"].options
+
+
+def test_yield_video_urls_from_info_passes_through_single_video():
+    """Test that a single-video info dict (no entries) yields the original URL unchanged."""
+    result = list(playlist_testee.yield_video_urls_from_info({"id": "solo"}, "https://youtu.be/solo"))
+
+    assert result == ["https://youtu.be/solo"]
+
+
+def test_yield_video_urls_from_info_expands_entries_and_skips_unusable():
+    """Test that playlist/channel entries expand to watch URLs, skipping deleted (None) and id-less videos."""
+    info = {"entries": [{"id": "abc"}, None, {"title": "no id"}, {"id": "xyz"}]}
+
+    result = list(playlist_testee.yield_video_urls_from_info(info, "https://example.com/channel"))
+
+    assert result == [
+        "https://www.youtube.com/watch?v=abc",
+        "https://www.youtube.com/watch?v=xyz",
+    ]
+
+
+def test_yield_video_urls_from_info_raises_when_extraction_returns_nothing():
+    """Test that a failed extraction (None info) raises a clear error instead of a TypeError."""
+    with pytest.raises(ValueError, match="Failed to extract any video information from https://example.com/gone"):
+        list(playlist_testee.yield_video_urls_from_info(None, "https://example.com/gone"))
+
+
+def test_yield_video_urls_from_playlist_extracts_then_expands(mocker):
+    """Test that playlist expansion flat-extracts the URL and branches the result into video URLs."""
+    mocker.patch.object(playlist_testee, "extract_flat_info", return_value={"entries": [{"id": "abc"}, {"id": "xyz"}]})
 
     result = list(playlist_testee.yield_video_urls_from_playlist("https://example.com/playlist"))
 
@@ -145,25 +196,25 @@ def test_yield_video_urls_from_playlist_includes_firefox_cookies_when_available(
         "https://www.youtube.com/watch?v=abc",
         "https://www.youtube.com/watch?v=xyz",
     ]
-    assert created["ydl"].options["cookiesfrombrowser"] == ("firefox",)
-    assert created["ydl"].extract_info_call == ("https://example.com/playlist", False)
 
 
-def test_yield_flattened_video_urls(mocker):
-    """Test that playlist URLs are expanded inline while direct video URLs pass through."""
+def test_yield_flattened_video_urls_delegates_each_url(mocker):
+    """Test that every input URL is expanded through yield_video_urls_from_playlist and concatenated."""
     mock_yield_playlist = mocker.patch.object(
         playlist_testee,
         'yield_video_urls_from_playlist',
-        return_value=iter(['video1', 'video2'])
+        side_effect=[iter(['direct1']), iter(['video1', 'video2'])],
     )
     result = playlist_testee.yield_flattened_video_urls([
         'https://youtube.com/watch?v=direct1',
         'https://youtube.com/playlist?list=123',
-        'https://youtube.com/watch?v=direct2',
     ])
     assert inspect.isgenerator(result)
-    assert list(result) == ['https://youtube.com/watch?v=direct1', 'video1', 'video2', 'https://youtube.com/watch?v=direct2']
-    mock_yield_playlist.assert_called_once_with('https://youtube.com/playlist?list=123')
+    assert list(result) == ['direct1', 'video1', 'video2']
+    assert mock_yield_playlist.call_args_list == [
+        mocker.call('https://youtube.com/watch?v=direct1'),
+        mocker.call('https://youtube.com/playlist?list=123'),
+    ]
 
 
 def test_download_playlist_with_default_titles_downloads_each_url(mocker):
