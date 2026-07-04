@@ -17,7 +17,6 @@ def mock_redis_client():
     mock_client.lrange.return_value = []
     mock_client.rpush.return_value = 1
     mock_client.delete.return_value = 1
-    mock_client.scan_iter.return_value = iter([])
     return mock_client
 
 

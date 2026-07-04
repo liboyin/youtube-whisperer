@@ -26,7 +26,6 @@ def test_yield_task(mock_redis, mocker):
         transcriber=TranscriberType.WHISPER,
         mode=TranscriberMode.TRANSCRIBE,
     )
-    mocker.patch('time.sleep')
 
     # > new message scrape yields task.
     mock_redis.xreadgroup.side_effect = [
