@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pathlib_extensions import OverwriteMode
 
-from youtube_whisperer.fastapi.models import Task
+from youtube_whisperer.models import Task
 from youtube_whisperer.utils import TranscriberType
 import youtube_whisperer.workers.azure_worker as testee
 

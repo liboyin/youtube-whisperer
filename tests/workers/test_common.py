@@ -5,7 +5,7 @@ import pytest
 import redis
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.fastapi.models import Task
+from youtube_whisperer.models import Task
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 import youtube_whisperer.workers.common as testee
 

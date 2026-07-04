@@ -5,7 +5,7 @@ from pathlib import Path
 from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
-from youtube_whisperer.fastapi.models import Task
+from youtube_whisperer.models import Task
 from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
 from youtube_whisperer.transcriber.whisper_transcriber import transcribe_file_with_default_model
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType

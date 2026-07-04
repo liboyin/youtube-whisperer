@@ -2,7 +2,7 @@ import redis
 from typing import cast
 from redis import StrictRedis
 
-from youtube_whisperer.fastapi.models import DeadLetter, Task, TaskQueues
+from youtube_whisperer.models import DeadLetter, Task, TaskQueues
 from youtube_whisperer.utils import TranscriberType
 
 YOUTUBE_STREAM = 'stream:youtube'

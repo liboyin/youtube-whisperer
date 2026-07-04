@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from pathlib_extensions import prepare_input_dir, prepare_output_file
 from redis import StrictRedis
 
-from youtube_whisperer.fastapi.models import AddAssetsResponse, AddTasksResponse, DeadLetter, Task, TaskQueues
+from youtube_whisperer.models import AddAssetsResponse, AddTasksResponse, DeadLetter, Task, TaskQueues
 from youtube_whisperer.queueing import DEAD_LETTER_QUEUE, clear_task_queues, list_dead_letters, list_task_queues, queue_transcription_tasks, queue_youtube_task
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR, REDIS_CLIENT, is_url
 

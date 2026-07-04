@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pathlib_extensions import OverwriteMode
 
-from youtube_whisperer.fastapi.models import Task
+from youtube_whisperer.models import Task
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 import youtube_whisperer.workers.youtube_worker as testee
 

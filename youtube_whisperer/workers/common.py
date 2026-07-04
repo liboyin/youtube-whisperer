@@ -5,7 +5,7 @@ from typing import Callable, Generator, cast
 import redis
 from redis import StrictRedis
 
-from youtube_whisperer.fastapi.models import Task
+from youtube_whisperer.models import Task
 from youtube_whisperer.queueing import decode_redis_value, get_stream_name, queue_dead_letter, WORKERS_GROUP, ensure_consumer_group
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType, is_url
 

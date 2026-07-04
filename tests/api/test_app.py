@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from redis import StrictRedis
 
-import youtube_whisperer.fastapi.app as testee
-from youtube_whisperer.fastapi.models import DeadLetter, Task, TaskQueues
+import youtube_whisperer.api.app as testee
+from youtube_whisperer.models import DeadLetter, Task, TaskQueues
 from youtube_whisperer.utils import TranscriberMode
 
 
@@ -282,7 +282,7 @@ def test_add_assets_catches_individual_file_write_failure(mocker, tmp_path):
     mock_upload.filename = "test.txt"
     bad_path = mocker.MagicMock()
     bad_path.open.side_effect = OSError("disk full")
-    mocker.patch("youtube_whisperer.fastapi.app.prepare_output_file", return_value=bad_path)
+    mocker.patch("youtube_whisperer.api.app.prepare_output_file", return_value=bad_path)
 
     result = asyncio.run(testee.add_assets([mock_upload], dir_path=tmp_path))
 

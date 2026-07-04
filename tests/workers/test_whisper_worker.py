@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from pathlib_extensions import OverwriteMode
 import pytest
 
-from youtube_whisperer.fastapi.models import Task
+from youtube_whisperer.models import Task
 from youtube_whisperer.transcriber.rejection_policy import RejectedTranscriptionError
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 import youtube_whisperer.workers.whisper_worker as testee
