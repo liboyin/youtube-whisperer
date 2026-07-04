@@ -6,6 +6,12 @@ import youtube_whisperer.fastapi.models as testee
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 
 
+def test_task_requires_explicit_source():
+    """Test that source has no default, so a task cannot be created without one."""
+    with pytest.raises(ValidationError):
+        testee.Task()
+
+
 def test_task_source_validator():
     """Test that task sources are stripped and blank sources are rejected."""
     task = testee.Task(source="  http://example.com/video  ")
@@ -16,42 +22,42 @@ def test_task_source_validator():
 
 def test_task_transcriber_validator():
     """Test that task transcribers accept supported values and reject invalid ones."""
-    task = testee.Task(transcriber="whisper")
+    task = testee.Task(source="/tmp/audio.wav", transcriber="whisper")
     assert task.transcriber == TranscriberType.WHISPER
-    task = testee.Task(transcriber=TranscriberType.AZURE)
+    task = testee.Task(source="/tmp/audio.wav", transcriber=TranscriberType.AZURE)
     assert task.transcriber == TranscriberType.AZURE
     with pytest.raises(ValidationError):
-        testee.Task(transcriber="unknown")
+        testee.Task(source="/tmp/audio.wav", transcriber="unknown")
     with pytest.raises(ValidationError):
-        testee.Task(transcriber="local")
+        testee.Task(source="/tmp/audio.wav", transcriber="local")
 
 
 def test_task_language_validator():
     """Test that task languages accept valid codes and reject invalid ones."""
     english = LanguageCode("en")
-    task = testee.Task(language="en")
+    task = testee.Task(source="/tmp/audio.wav", language="en")
     assert task.language == english
-    task = testee.Task(language=english)
+    task = testee.Task(source="/tmp/audio.wav", language=english)
     assert task.language == english
     with pytest.raises(ValidationError):
-        testee.Task(language="")
+        testee.Task(source="/tmp/audio.wav", language="")
     with pytest.raises(ValidationError):
-        testee.Task(language="invalid")
+        testee.Task(source="/tmp/audio.wav", language="invalid")
 
 
 def test_task_mode_validator():
     """Test that task modes accept supported values and reject unknown ones."""
-    task = testee.Task(mode="transcribe")
+    task = testee.Task(source="/tmp/audio.wav", mode="transcribe")
     assert task.mode == TranscriberMode.TRANSCRIBE
-    task = testee.Task(mode=TranscriberMode.TRANSLATE)
+    task = testee.Task(source="/tmp/audio.wav", mode=TranscriberMode.TRANSLATE)
     assert task.mode == TranscriberMode.TRANSLATE
     with pytest.raises(ValidationError):
-        testee.Task(mode="unknown")
+        testee.Task(source="/tmp/audio.wav", mode="unknown")
 
 
 def test_task_language_accepts_repr_string():
     """Test that task languages can be parsed from a LanguageCode repr string."""
-    task = testee.Task(language="LanguageCode(source='en-us', target=None)")
+    task = testee.Task(source="/tmp/audio.wav", language="LanguageCode(source='en-us', target=None)")
     assert task.language == LanguageCode("en-us")
 
 
@@ -59,7 +65,7 @@ def test_task_language_rejects_non_string_value():
     """Test that non-string language values raise a direct TypeError."""
     # Pydantic v2 does not wrap TypeError from plain validators, so it propagates directly
     with pytest.raises(TypeError, match="Unexpected language"):
-        testee.Task(language=123)
+        testee.Task(source="/tmp/audio.wav", language=123)
 
 
 def test_task_model_json_schema_exposes_language_as_documented_string():

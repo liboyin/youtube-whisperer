@@ -76,7 +76,7 @@ def test_list_dead_letters_deserializes_entries(mock_redis):
 
 def test_list_task_queues_returns_queue_snapshot(mocker, mock_redis):
     """Test that streaming snapshot maintains original pending and active routing API interfaces."""
-    task1 = Task()
+    task1 = Task(source='bar')
     task2 = Task(source='foo')
     mocker.patch.object(testee, 'list_stream_tasks', side_effect=[
         ([task1], [task2]), # YOUTUBE
