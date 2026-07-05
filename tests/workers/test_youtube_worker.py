@@ -63,3 +63,20 @@ def test_dispatch_task_queues_follow_up_transcription_tasks(mocker):
             )
         ],
     )
+
+
+def test_process_task_none_transcriber_downloads_without_queueing_follow_up(mocker):
+    """Test that a `none` transcriber downloads the media but never enqueues transcription, even without an SRT."""
+    task = Task(source='https://example.com/video', language='en', transcriber=TranscriberType.NONE)
+    mocker.patch.object(testee, 'yield_flattened_video_urls', return_value=iter(['https://example.com/video']))
+    mock_download = mocker.patch.object(
+        testee,
+        'download_video_and_transcript_with_default_title',
+        return_value=(Path('/tmp/video.mp4'), False),  # transcript missing: would normally queue a follow-up
+    )
+    mock_queue_transcription_tasks = mocker.patch.object(testee, 'queue_transcription_tasks')
+
+    testee.YouTubeWorker('youtube-0').process_task(task)
+
+    mock_download.assert_called_once_with('https://example.com/video', task.language, overwrite=OverwriteMode.NEVER)
+    mock_queue_transcription_tasks.assert_not_called()

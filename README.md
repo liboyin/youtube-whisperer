@@ -69,17 +69,17 @@ update_lock.sh                  # Regenerate requirements.txt from the environme
 Four components cooperate:
 
 1. **REST API** (`api/app.py`) — Accepts tasks. URL tasks are queued directly for the YouTube worker. Filesystem glob patterns are resolved in the API itself because that is a cheap local operation with no network I/O.
-2. **YouTube worker** — Expands playlists and channels, downloads video/audio, attempts a transcript download, and enqueues a follow-up filesystem transcription task (for the requested transcriber) only when an SRT is still missing.
+2. **YouTube worker** — Expands playlists and channels, downloads video/audio, attempts a transcript download, and enqueues a follow-up filesystem transcription task (for the requested transcriber) only when an SRT is still missing. A `none` transcriber requests download only, so no follow-up transcription task is ever enqueued.
 3. **Transcription workers** — The Whisper and Azure workers consume their Redis streams via a shared consumer group and write SRT files.
 4. **Redis** — Stores the streams, tracks each consumer's Pending Entries List (PEL), and holds the dead-letter list.
 
 ## Data Flow
 
-1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper` or `azure`), and a language.
+1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper`, `azure`, or `none` to download a URL without transcribing it), and a language.
 2. The API routes URL tasks to `stream:youtube`. Filesystem glob patterns are expanded immediately and the concrete file paths are pushed to `stream:whisper` or `stream:azure`.
 3. The YouTube worker expands playlist/channel URLs, downloads media, and tries to fetch an existing transcript.
-4. If a transcript is already present, the work is considered complete and no follow-up transcription task is queued.
-5. If a transcript is missing, the YouTube worker enqueues a concrete filesystem task into the requested transcriber's stream.
+4. If a transcript is already present (or the transcriber is `none`), the work is considered complete and no follow-up transcription task is queued.
+5. Otherwise, if a transcript is missing, the YouTube worker enqueues a concrete filesystem task into the requested transcriber's stream.
 6. A Whisper or Azure worker consumes the task via the consumer group, processes the media, and only then runs `XACK` + `XDEL` — so a failure dead-letters the task and a crash leaves it recoverable rather than silently dropped.
 
 ## Queue Layout

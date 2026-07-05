@@ -12,7 +12,7 @@ from redis import StrictRedis
 
 from youtube_whisperer.models import AddTasksResponse, DeadLetter, Task, TaskQueues
 from youtube_whisperer.queueing import DEAD_LETTER_QUEUE, clear_task_queues, list_dead_letters, list_task_queues, queue_transcription_tasks, queue_youtube_task
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, REDIS_CLIENT, is_url
+from youtube_whisperer.utils import WHISPER_ASSETS_DIR, REDIS_CLIENT, TranscriberType, is_url
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,9 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
     Returns:
         AddTasksResponse: {
             successful: Tasks that have been successfully added to the work queue
-            failed: Tasks / patterns that failed to resolve
+            failed: Tasks / patterns that were not actionable: a filesystem pattern that
+                matched no files, or a filesystem source with the `none` transcriber
+                (which only applies to downloadable URL sources)
         }
     """
     successful_tasks: list[Task] = []
@@ -102,6 +104,10 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
         if is_url(pattern.source):
             successful_tasks.append(pattern)
             youtube_tasks.append(pattern)
+        elif pattern.transcriber == TranscriberType.NONE:
+            # `none` means "download only"; a local file has nothing to download and, without
+            # transcription, no output would be produced, so the task is not actionable.
+            failed_tasks.append(pattern)
         elif resolved_tasks := resolve_filesystem_tasks(pattern):
             successful_tasks.extend(resolved_tasks)
             transcription_tasks.extend(resolved_tasks)

@@ -12,7 +12,9 @@ class Task(BaseModel):
         It is required: there is no default, so `POST /tasks` must specify an explicit source per task.
 
     transcriber: TranscriberType
-        `whisper` for faster-whisper or `azure` for Azure Speech Recognition API. Defaults to `whisper`.
+        `whisper` for faster-whisper, `azure` for Azure Speech Recognition API, or `none` to download
+        a YouTube source without transcribing it. Defaults to `whisper`. `none` only applies to URL
+        sources; a filesystem source with `none` is not actionable and is reported as failed.
 
     language: LanguageCode
         The output language of transcription/translation. Must follow BCP-47 (works for Azure and Whisper) or ISO 639-1 (works for Whisper only).

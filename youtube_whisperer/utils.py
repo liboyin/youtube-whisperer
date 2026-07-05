@@ -38,6 +38,7 @@ REDIS_CLIENT = redis.StrictRedis(connection_pool=REDIS_POOL)
 class TranscriberType(str, Enum):
     WHISPER = 'whisper'
     AZURE = 'azure'
+    NONE = 'none'  # Download only: skip transcription (see YouTubeWorker.process_task).
 
     @classmethod
     def values(cls) -> tuple[str, ...]:

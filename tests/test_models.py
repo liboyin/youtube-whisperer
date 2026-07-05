@@ -21,11 +21,13 @@ def test_task_source_validator():
 
 
 def test_task_transcriber_validator():
-    """Test that task transcribers accept supported values and reject invalid ones."""
+    """Test that task transcribers accept supported values, including download-only `none`, and reject invalid ones."""
     task = testee.Task(source="/tmp/audio.wav", transcriber="whisper")
     assert task.transcriber == TranscriberType.WHISPER
     task = testee.Task(source="/tmp/audio.wav", transcriber=TranscriberType.AZURE)
     assert task.transcriber == TranscriberType.AZURE
+    task = testee.Task(source="https://example.com/video", transcriber="none")
+    assert task.transcriber == TranscriberType.NONE
     with pytest.raises(ValidationError):
         testee.Task(source="/tmp/audio.wav", transcriber="unknown")
     with pytest.raises(ValidationError):

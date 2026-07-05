@@ -6,7 +6,7 @@ from youtube_whisperer.downloaders import download_video_and_transcript_with_def
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
 from youtube_whisperer.models import Task
 from youtube_whisperer.queueing import YOUTUBE_STREAM, queue_transcription_tasks
-from youtube_whisperer.utils import REDIS_CLIENT
+from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType
 from youtube_whisperer.workers.common import BaseWorker
 
 
@@ -36,7 +36,8 @@ class YouTubeWorker(BaseWorker):
         The YouTube worker expands playlist or channel inputs into individual video
         URLs, downloads each source to a local waveform-compatible path, and queues
         follow-up Whisper or Azure transcription tasks for any sources that still
-        need transcripts.
+        need transcripts. A `none` transcriber requests download only, so no
+        follow-up transcription work is enqueued regardless of transcript presence.
 
         Args:
             task: The queued YouTube task whose source should be expanded and
@@ -46,6 +47,7 @@ class YouTubeWorker(BaseWorker):
             None. Follow-up tasks are enqueued in Redis as a side effect when
             transcript generation is still required.
         """
+        transcription_requested = task.transcriber != TranscriberType.NONE
         follow_up_tasks: list[Task] = []
         for source in yield_flattened_video_urls([task.source]):
             concrete_task = task.model_copy(update={'source': source})
@@ -54,7 +56,7 @@ class YouTubeWorker(BaseWorker):
                 concrete_task.language,
                 overwrite=OverwriteMode.NEVER,
             )
-            if not transcript_found:
+            if transcription_requested and not transcript_found:
                 follow_up_tasks.append(concrete_task.model_copy(update={
                     'source': str(waveform_file_path),
                 }))

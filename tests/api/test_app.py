@@ -120,6 +120,23 @@ def test_add_tasks_routes_youtube_and_whisper_work(client, mocker):
     mock_queue_transcription_tasks.assert_called_once_with(ANY, [resolved_whisper_task])
 
 
+def test_add_tasks_rejects_filesystem_source_with_none_transcriber(client, mocker):
+    """Test that a filesystem source with the `none` transcriber is failed without resolving globs or queueing."""
+    none_task = Task(source='/tmp/audio.wav', language='en', transcriber='none')
+    mocker.patch.object(testee, 'is_url', return_value=False)
+    mock_resolve_filesystem = mocker.patch.object(testee, 'resolve_filesystem_tasks')
+    mock_queue_youtube_task = mocker.patch.object(testee, 'queue_youtube_task')
+    mock_queue_transcription_tasks = mocker.patch.object(testee, 'queue_transcription_tasks')
+
+    response = client.post("/tasks", json=[none_task.model_dump(mode='json')])
+
+    assert response.status_code == 201
+    assert response.json() == {'successful': [], 'failed': [none_task.model_dump(mode='json')]}
+    mock_resolve_filesystem.assert_not_called()  # not actionable: never resolved
+    mock_queue_youtube_task.assert_not_called()
+    mock_queue_transcription_tasks.assert_not_called()
+
+
 def test_add_tasks_failed_resolution(client, mocker):
     """Test that unresolved filesystem tasks are returned in the failed list."""
     task = Task(source='/tmp/*.wav', language='en')

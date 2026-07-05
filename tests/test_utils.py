@@ -24,8 +24,8 @@ def test_redis_pool_defaults_to_compose_service_endpoint():
 
 
 def test_transcriber_type_values():
-    """Test that the transcriber enum exposes the supported transcriber names."""
-    assert testee.TranscriberType.values() == ('whisper', 'azure')
+    """Test that the transcriber enum exposes the supported transcriber names, including download-only `none`."""
+    assert testee.TranscriberType.values() == ('whisper', 'azure', 'none')
 
 
 def test_transcriber_type_rejects_legacy_local_alias():
