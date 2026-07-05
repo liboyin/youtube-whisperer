@@ -30,21 +30,60 @@ def test_segment_to_srt_block():
     assert srt_block.content == ['Segment']
 
 
-def test_transcribe_waveform_switches_translate_to_transcribe_for_english(caplog):
-    """Test that translate mode is downgraded to transcribe when the source is English."""
-    model = SimpleNamespace(
+def make_logging_model() -> SimpleNamespace:
+    """Return a stand-in Whisper model that echoes the resolved language and task into its info dict."""
+    return SimpleNamespace(
         transcribe=lambda waveform, lang_code, task: (
             iter(["segment"]),
             {"lang": lang_code, "task": task},
         )
     )
-    language = LanguageCode("en")
+
+
+def test_transcribe_waveform_switches_translate_to_transcribe_for_english(caplog):
+    """Test that translating an English source into English is downgraded to transcribe, as it is a no-op."""
+    model = make_logging_model()
+    language = LanguageCode("en", "en")
 
     with caplog.at_level(logging.INFO):
         result = list(testee.transcribe_waveform(model, np.array([1.0]), TranscriberMode.TRANSLATE, language))
 
     assert result == ["segment"]
     assert "{'lang': 'en', 'task': 'transcribe'}" in caplog.text
+
+
+def test_transcribe_waveform_translates_non_english_source_to_english(caplog):
+    """Test that a non-English source with an English target runs Whisper's translate task (e.g. zh->en)."""
+    model = make_logging_model()
+    language = LanguageCode("zh", "en")
+
+    with caplog.at_level(logging.INFO):
+        result = list(testee.transcribe_waveform(model, np.array([1.0]), TranscriberMode.TRANSLATE, language))
+
+    assert result == ["segment"]
+    assert "{'lang': 'zh', 'task': 'translate'}" in caplog.text
+
+
+@pytest.mark.parametrize("language", [
+    LanguageCode("zh"),          # translate requires a target; None is not English
+    LanguageCode("zh", "zh"),    # Whisper cannot translate into a non-English target
+])
+def test_transcribe_waveform_rejects_translate_without_english_target(language):
+    """Test that translate mode is rejected unless the target is English, since Whisper only outputs English."""
+    with pytest.raises(ValueError, match="Whisper can only translate into English"):
+        list(testee.transcribe_waveform(make_logging_model(), np.array([1.0]), TranscriberMode.TRANSLATE, language))
+
+
+def test_transcribe_waveform_ignores_target_in_transcribe_mode(caplog):
+    """Test that transcribe mode outputs the source language and never rejects on the target field."""
+    model = make_logging_model()
+    language = LanguageCode("zh", "en")
+
+    with caplog.at_level(logging.INFO):
+        result = list(testee.transcribe_waveform(model, np.array([1.0]), TranscriberMode.TRANSCRIBE, language))
+
+    assert result == ["segment"]
+    assert "{'lang': 'zh', 'task': 'transcribe'}" in caplog.text
 
 
 def test_get_default_whisper_model_builds_once_and_caches(mocker):

@@ -8,6 +8,7 @@
 
 - **Download:** YouTube videos, playlists, and channels, plus existing transcripts in a user-specified language.
 - **Transcribe:** Generate SRT subtitle files from filesystem video/audio files.
+- **Translate:** Whisper can translate a non-English source into English (e.g. `zh->en`); English is the only supported target.
 - **Whisper transcriber:** `faster-whisper` on an NVIDIA GPU or CPU. Default model is `large-v3` (~9 GB RAM/VRAM). Runs synchronously.
 - **Cloud transcriber:** Azure AI Speech Services, tracked synchronously per worker.
 - **Task queue:** Redis Streams with a shared consumer group for assignment, crash recovery, orphan recovery, and dead-lettering.
@@ -75,7 +76,7 @@ Four components cooperate:
 
 ## Data Flow
 
-1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper`, `azure`, or `none` to download a URL without transcribing it), and a language.
+1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper`, `azure`, or `none` to download a URL without transcribing it), a language, and a `mode` (`transcribe` or `translate`).
 2. The API routes URL tasks to `stream:youtube`. Filesystem glob patterns are expanded immediately and the concrete file paths are pushed to `stream:whisper` or `stream:azure`.
 3. The YouTube worker expands playlist/channel URLs, downloads media, and tries to fetch an existing transcript.
 4. If a transcript is already present (or the transcriber is `none`), the work is considered complete and no follow-up transcription task is queued.
@@ -116,6 +117,10 @@ The API only performs local filesystem glob expansion. All network-facing YouTub
 ### Dual transcription engines
 
 The project started as a privacy-focused transcriber using Whisper. Azure Speech was added later for two reasons: (1) transcribing public content where on-device privacy guarantees are unnecessary, and (2) working around occasional Whisper failures on non-English audio. Azure was chosen as the most cost-effective option in the Sydney, Australia region.
+
+### Translation is Whisper-only and English-only
+
+Each task carries a `mode` (`transcribe` or `translate`). Translation is currently supported only on the Whisper engine, which can translate any supported source language **into English only** — so translate mode requires an English target (e.g. `zh->en`). A translate request with a missing or non-English target (e.g. `en->zh`) is rejected in `transcriber/whisper_transcriber.py` and the task is dead-lettered. Translating an English source into English (`en->en`) is a no-op and falls back to transcription. Azure ignores `mode` and always transcribes; multi-target translation via Azure Speech Translation is not wired up.
 
 ### Known-bad Whisper output rejection
 

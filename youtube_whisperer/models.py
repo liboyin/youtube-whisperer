@@ -20,7 +20,9 @@ class Task(BaseModel):
         The output language of transcription/translation. Must follow BCP-47 (works for Azure and Whisper) or ISO 639-1 (works for Whisper only).
 
     mode: TranscriberMode
-        Whether to run Whisper in transcribe mode or translate mode.
+        Whether to transcribe (output in the source language) or translate. Whisper can only
+        translate into English, so translate mode requires an English target (e.g. `zh->en`);
+        any other target is rejected when the task is processed.
     """
     source: str
     transcriber: TranscriberType = TranscriberType.WHISPER
