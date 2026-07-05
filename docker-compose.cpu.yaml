@@ -91,6 +91,10 @@ services:
       - redis_vol:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      # Grace period before failing checks count: Redis is still starting up right after
+      # container create, so failures during this window are ignored (a passing check ends
+      # the grace period early and marks the service healthy).
+      start_period: 10s
       interval: 5s
       timeout: 3s
       retries: 5
