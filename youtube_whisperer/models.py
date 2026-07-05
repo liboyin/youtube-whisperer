@@ -49,11 +49,6 @@ class AddTasksResponse(BaseModel):
     failed: list[Task]
 
 
-class AddAssetsResponse(BaseModel):
-    successful: list[str]
-    failed: list[str]
-
-
 class TaskQueues(BaseModel):
     youtube: list[Task]
     whisper_pending: list[Task]

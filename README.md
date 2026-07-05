@@ -69,7 +69,7 @@ update_lock.sh                  # Regenerate requirements.txt from the environme
 
 Four components cooperate:
 
-1. **REST API** (`api/app.py`) — Accepts tasks and asset uploads. URL tasks are queued directly for the YouTube worker. Filesystem glob patterns are resolved in the API itself because that is a cheap local operation with no network I/O.
+1. **REST API** (`api/app.py`) — Accepts tasks. URL tasks are queued directly for the YouTube worker. Filesystem glob patterns are resolved in the API itself because that is a cheap local operation with no network I/O.
 2. **YouTube worker** — Expands playlists and channels, downloads video/audio, attempts a transcript download, and enqueues a follow-up filesystem transcription task (for the requested transcriber) only when an SRT is still missing.
 3. **Transcription workers** — The Whisper and Azure workers consume their Redis streams via a shared consumer group and write SRT files.
 4. **Redis** — Stores the streams, tracks each consumer's Pending Entries List (PEL), and holds the dead-letter list.
@@ -148,7 +148,7 @@ The top-level CLI (`python -m youtube_whisperer`) runs the full pipeline in-proc
 
 ## Security / trust model
 
-The API is **unauthenticated by design** and assumes a trusted, LAN-only or single-user deployment. It exposes destructive and powerful operations — `DELETE /tasks`, `DELETE /assets`, arbitrary filesystem-glob task sources, and file upload — to any client that can reach it. Do **not** expose it directly to the public internet; put it behind a VPN, a reverse proxy with authentication, or a firewall. Upload filenames are sanitized so an upload cannot escape the assets directory, but that is the only input-trust boundary the service enforces.
+The API is **unauthenticated by design** and assumes a trusted, LAN-only or single-user deployment. It exposes destructive and powerful operations — `DELETE /tasks`, `DELETE /assets`, and arbitrary filesystem-glob task sources — to any client that can reach it. Do **not** expose it directly to the public internet; put it behind a VPN, a reverse proxy with authentication, or a firewall.
 
 ## Configuration
 
@@ -204,7 +204,7 @@ docker compose up                              # GPU (NVIDIA runtime)
 docker compose -f docker-compose.cpu.yaml up   # CPU only
 ```
 
-This starts `redis` (with a healthcheck the other services wait on), `app` (FastAPI via uvicorn on port `8001`), `youtube_worker`, `whisper_worker`, and `azure_worker`. Interactive API docs are served at `http://localhost:8001/docs`. The REST API exposes `/tasks`, `/dead-letters`, and `/assets` (each with GET plus the relevant POST/DELETE). Scale a transcription worker with, e.g., `docker compose up --scale azure_worker=2`; the replicas get distinct consumer names automatically.
+This starts `redis` (with a healthcheck the other services wait on), `app` (FastAPI via uvicorn on port `8001`), `youtube_worker`, `whisper_worker`, and `azure_worker`. Interactive API docs are served at `http://localhost:8001/docs`. The REST API exposes `/tasks` (GET/POST/DELETE), `/dead-letters` (GET/DELETE), and `/assets` (GET to list, DELETE to clean up redundant media). Scale a transcription worker with, e.g., `docker compose up --scale azure_worker=2`; the replicas get distinct consumer names automatically.
 
 ### Running components directly
 
