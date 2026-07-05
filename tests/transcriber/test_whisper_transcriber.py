@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from types import SimpleNamespace
 
 from faster_whisper.transcribe import Segment
@@ -156,32 +155,3 @@ def test_transcribe_file_with_default_model_propagates_error(mocker, tmp_path):
 
     with pytest.raises(RuntimeError, match="boom"):
         testee.transcribe_file_with_default_model(input_path, LANGUAGE)
-
-
-def test_whisper_main_parses_arguments_and_transcribes_each_path(mocker):
-    """Test that the CLI transcribes each provided path with the parsed options."""
-    args = SimpleNamespace(
-        paths=[Path("/tmp/a.wav"), Path("/tmp/b.wav")],
-        language=LANGUAGE,
-        overwrite=OverwriteMode.NEVER,
-        mode=TranscriberMode.TRANSLATE,
-    )
-    mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
-    mock_transcribe = mocker.patch.object(testee, "transcribe_file_with_default_model")
-
-    testee.main()
-
-    assert mock_transcribe.call_args_list == [
-        mocker.call(
-            Path("/tmp/a.wav"),
-            LANGUAGE,
-            overwrite=OverwriteMode.NEVER,
-            mode=TranscriberMode.TRANSLATE,
-        ),
-        mocker.call(
-            Path("/tmp/b.wav"),
-            LANGUAGE,
-            overwrite=OverwriteMode.NEVER,
-            mode=TranscriberMode.TRANSLATE,
-        ),
-    ]

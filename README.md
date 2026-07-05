@@ -26,7 +26,6 @@
 
 ```
 youtube_whisperer/
-├── __main__.py                 # CLI entry point: in-process pipeline, no Redis
 ├── config.py                   # Pydantic Settings loaded from environment / .env
 ├── models.py                   # Pydantic domain + request/response models (Task, DeadLetter, ...)
 ├── utils.py                    # Shared enums, pooled Redis client, URL helper
@@ -76,7 +75,7 @@ Four components cooperate:
 
 ## Data Flow
 
-1. A user submits one or more tasks via the CLI or `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper` or `azure`), and a language.
+1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper` or `azure`), and a language.
 2. The API routes URL tasks to `stream:youtube`. Filesystem glob patterns are expanded immediately and the concrete file paths are pushed to `stream:whisper` or `stream:azure`.
 3. The YouTube worker expands playlist/channel URLs, downloads media, and tries to fetch an existing transcript.
 4. If a transcript is already present, the work is considered complete and no follow-up transcription task is queued.
@@ -141,10 +140,6 @@ Workers run as independent Docker services rather than background tasks inside t
 ### SRT as the output format
 
 SRT was chosen to match an existing library of subtitle files. SRT serialization and deduplication are isolated in `adaptors/srt_deduplicator.py`; each transcriber owns the small conversion from its native segment type to an `SrtBlock`. Supporting another output format (e.g. WebVTT, JSON) would mean adding a sibling serializer next to `save_segments_as_srt`.
-
-### CLI and per-module entry points
-
-The top-level CLI (`python -m youtube_whisperer`) runs the full pipeline in-process without Redis. It was built primarily for development and testing in the devcontainer, not as a production interface. Several modules also expose their own `main()` for standalone use — e.g. `downloaders/playlist_downloader.py`, `downloaders/transcript_downloader.py`, `transcriber/whisper_transcriber.py`, `transcriber/azure_transcriber.py`, and `adaptors/srt_deduplicator.py`.
 
 ## Security / trust model
 
@@ -214,9 +209,6 @@ uvicorn youtube_whisperer.api.app:app --host 0.0.0.0 --port 8001
 
 # Worker (one role per process)
 python -m youtube_whisperer.workers {youtube|whisper|azure} [--slot ID] [--poll-interval-seconds N]
-
-# CLI (in-process, no Redis) — accepts video/playlist URLs and/or local file paths
-python -m youtube_whisperer <source>... -l <language> [-t whisper|azure] [-m transcribe|translate] [-o <overwrite-mode>]
 ```
 
 The repository also ships `extract_subtitle_text.sh` (strip timestamps from an SRT) and `ls_mp4_without_srt.sh` (find videos lacking a sibling SRT).

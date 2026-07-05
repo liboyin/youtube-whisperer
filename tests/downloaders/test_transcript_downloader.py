@@ -221,23 +221,3 @@ def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, 
     assert '<' not in result.name
     assert '>' not in result.name
     assert '"' not in result.name
-
-
-def test_main_downloads_given_urls(mocker):
-    """Test that the CLI downloads a default-titled SRT for each provided URL."""
-    from types import SimpleNamespace
-    args = SimpleNamespace(
-        urls=["https://www.youtube.com/watch?v=test"],
-        language=LanguageCode("en"),
-        overwrite=OverwriteMode.ALWAYS,
-    )
-    mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
-    mock_downloader_cls = mocker.patch.object(testee, "TranscriptDownloader")
-    mock_downloader_cls.return_value.download_as_srt_file_with_default_title.return_value = None
-
-    testee.main()
-
-    mock_downloader_cls.assert_called_once_with("https://www.youtube.com/watch?v=test", LanguageCode("en"))
-    mock_downloader_cls.return_value.download_as_srt_file_with_default_title.assert_called_once_with(
-        overwrite=OverwriteMode.ALWAYS
-    )

@@ -1,4 +1,3 @@
-import argparse
 import logging
 from pathlib import Path
 from typing import Collection
@@ -177,20 +176,3 @@ class TranscriptDownloader:
         if self.download_as_srt_file(output_file_path, overwrite=overwrite):
             return output_file_path
         return None
-
-
-def main() -> None:
-    """
-    CLI entry point to download video transcripts from URLs.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("urls", nargs='+', metavar='url', help="URLs of videos to download transcripts for.")
-    parser.add_argument("-l", "--language", type=LanguageCode.from_str, help="Requested transcript language to download.")
-    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
-    args = parser.parse_args()
-    for url in args.urls:
-        TranscriptDownloader(url, args.language).download_as_srt_file_with_default_title(overwrite=args.overwrite)
-
-
-if __name__ == '__main__':
-    main()

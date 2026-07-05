@@ -120,15 +120,3 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
 
     save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True)
     return output_file_path
-
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("audio_file", type=Path, help="Path to the audio file to transcribe")
-    parser.add_argument("source_language", type=LanguageCode.from_str, help="Source language code (e.g., en-US)")
-    args = parser.parse_args()
-    transcribe_audio_file(
-        input_file_path=args.audio_file,
-        language=args.source_language
-    )

@@ -1,4 +1,3 @@
-import argparse
 from pathlib import Path
 from typing import Any, Generator, Iterable
 
@@ -110,20 +109,3 @@ def download_playlist_with_default_titles(url: str, target_dir: Path = WHISPER_A
         list[Path]: A list of paths to downloaded video files.
     """
     return [download_video_with_default_title(v, target_dir, overwrite) for v in yield_video_urls_from_playlist(url)]
-
-
-def main() -> None:
-    """
-    CLI entry point to download videos from playlist URLs.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("urls", nargs='+', metavar='url', help="URLs of playlists to download.")
-    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help='Whether to overwrite existing video files. Defaults to `prompt`.')
-    args = parser.parse_args()
-    overwrite = args.overwrite
-    for url in args.urls:
-        download_playlist_with_default_titles(url, overwrite=overwrite)
-
-
-if __name__ == "__main__":
-    main()

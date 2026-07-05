@@ -1,4 +1,3 @@
-import argparse
 from dataclasses import dataclass
 import logging
 from pathlib import Path
@@ -181,20 +180,3 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
     output_file_path.write_text(convert_srt_blocks_to_str(blocks))
     return output_file_path
-
-
-def main() -> None:
-    """
-    CLI entry point to deduplicate SRT files.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="SRT file paths to deduplicate.")
-    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
-    args = parser.parse_args()
-    overwrite = args.overwrite
-    for path in args.paths:
-        deduplicate_srt_file(path, overwrite=overwrite)
-
-
-if __name__ == '__main__':
-    main()

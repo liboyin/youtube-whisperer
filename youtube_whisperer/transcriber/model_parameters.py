@@ -1,5 +1,4 @@
 import multiprocessing
-import pprint
 from typing import Any
 
 import ctranslate2
@@ -40,7 +39,3 @@ def get_default_whisper_model_parameters() -> dict[str, Any]:
         result["compute_type"] = "int8"
         result["cpu_threads"] = multiprocessing.cpu_count()
     return result
-
-
-if __name__ == "__main__":
-    pprint.pprint(get_default_whisper_model_parameters())

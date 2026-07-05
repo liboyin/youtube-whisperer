@@ -1,6 +1,5 @@
 from pathlib import Path
 from textwrap import dedent
-from types import SimpleNamespace
 
 from pathlib_extensions import OverwriteMode
 import pytest
@@ -173,15 +172,3 @@ def test_deduplicate_srt_file_returns_early_when_overwrite_never(tmp_path):
     result = testee.deduplicate_srt_file(srt_file, overwrite=OverwriteMode.NEVER)
     assert result is srt_file
     assert srt_file.read_text() == original_content
-
-
-def test_main_deduplicates_given_paths(mocker, tmp_path):
-    """Test that the CLI deduplicates each provided path with the parsed overwrite mode."""
-    srt_file = tmp_path / "test.srt"
-    args = SimpleNamespace(paths=[srt_file], overwrite=OverwriteMode.ALWAYS)
-    mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
-    mock_dedup = mocker.patch.object(testee, "deduplicate_srt_file")
-
-    testee.main()
-
-    mock_dedup.assert_called_once_with(srt_file, overwrite=OverwriteMode.ALWAYS)

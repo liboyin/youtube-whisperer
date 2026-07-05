@@ -1,7 +1,6 @@
 import inspect
 import logging
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -243,21 +242,4 @@ def test_download_playlist_with_default_titles_downloads_each_url(mocker):
     assert mock_download.call_args_list == [
         mocker.call("url-1", Path("/tmp"), OverwriteMode.NEVER),
         mocker.call("url-2", Path("/tmp"), OverwriteMode.NEVER),
-    ]
-
-
-def test_playlist_main_parses_urls_and_forwards_overwrite(mocker):
-    """Test that the CLI downloads each provided playlist with the parsed overwrite mode."""
-    args = SimpleNamespace(
-        urls=["playlist-1", "playlist-2"],
-        overwrite=OverwriteMode.ALWAYS,
-    )
-    mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
-    mock_download = mocker.patch.object(playlist_testee, "download_playlist_with_default_titles")
-
-    playlist_testee.main()
-
-    assert mock_download.call_args_list == [
-        mocker.call("playlist-1", overwrite=OverwriteMode.ALWAYS),
-        mocker.call("playlist-2", overwrite=OverwriteMode.ALWAYS),
     ]

@@ -1,4 +1,3 @@
-import argparse
 import functools
 import logging
 from pathlib import Path
@@ -117,21 +116,3 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
     segments_generator = reject_bad_segments(transcribe_waveform_with_default_model(waveform, mode, language))
     save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
     return output_file_path
-
-
-def main() -> None:
-    """
-    CLI entry point to transcribe waveform files with Whisper and save each result to an SRT file.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("paths", type=Path, nargs='+', metavar='path', help="Waveform file paths to transcribe.")
-    parser.add_argument("-l", "--language", type=LanguageCode.from_str, help="Language to transcribe waveform files.")
-    parser.add_argument("-m", "--mode", type=TranscriberMode, choices=TranscriberMode.values(), default=TranscriberMode.TRANSCRIBE, help="Whether to run Whisper in transcribe mode or translate mode. Defaults to `transcribe`.")
-    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing SRT files. Defaults to `prompt`.")
-    args = parser.parse_args()
-    for path in args.paths:
-        transcribe_file_with_default_model(path, args.language, overwrite=args.overwrite, mode=args.mode)
-
-
-if __name__ == "__main__":
-    main()

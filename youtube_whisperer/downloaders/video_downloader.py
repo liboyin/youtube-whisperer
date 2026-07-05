@@ -1,4 +1,3 @@
-import argparse
 from pathlib import Path
 
 from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars, truncate_filename
@@ -48,20 +47,3 @@ def download_video_with_default_title(url: str, target_dir: Path = WHISPER_ASSET
     target_path = truncate_filename(target_dir / f'{title}.mp4', max_length=220)
     download_video(url, target_path, overwrite=overwrite)
     return target_path
-
-
-def main() -> None:
-    """
-    CLI entry point to download videos from URLs.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("urls", nargs='+', metavar='url', help="URLs of videos to download.")
-    parser.add_argument("-o", "--overwrite", type=OverwriteMode, choices=OverwriteMode.values(), default=OverwriteMode.PROMPT, help="Whether to overwrite existing video files. Defaults to `prompt`.")
-    args = parser.parse_args()
-    overwrite = args.overwrite
-    for url in args.urls:
-        download_video_with_default_title(url, overwrite=overwrite)
-
-
-if __name__ == '__main__':
-    main()

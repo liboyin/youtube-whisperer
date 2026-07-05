@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 
 from pathlib_extensions import OverwriteMode
 
@@ -84,20 +83,3 @@ def test_download_video_with_default_title_sanitizes_title_and_downloads(mocker,
         expected_path,
         overwrite=OverwriteMode.NEVER,
     )
-
-
-def test_video_main_parses_urls_and_calls_download(mocker):
-    """Test that the CLI downloads each provided URL with the parsed overwrite mode."""
-    args = SimpleNamespace(
-        urls=["video-1", "video-2"],
-        overwrite=OverwriteMode.NEVER,
-    )
-    mocker.patch("argparse.ArgumentParser.parse_args", return_value=args)
-    mock_download = mocker.patch.object(video_testee, "download_video_with_default_title")
-
-    video_testee.main()
-
-    assert mock_download.call_args_list == [
-        mocker.call("video-1", overwrite=OverwriteMode.NEVER),
-        mocker.call("video-2", overwrite=OverwriteMode.NEVER),
-    ]
