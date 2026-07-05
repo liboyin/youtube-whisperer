@@ -4,8 +4,10 @@ x-build-args: &build-args
   PYPI_PROXY: ${PYPI_PROXY:-}
 
 x-volumes: &volumes
-  # Whisper model cache; defaults to a named volume so models persist across rebuilds.
-  - ${WHISPER_MODELS_DIR:-whisper_models}:/home/ubuntu/.whisper
+  # Whisper model cache; defaults to a named volume so models persist across rebuilds. This names
+  # only the host side of the mount, so it is distinct from the WHISPER_MODELS_DIR setting that
+  # tells the app where the cache lives inside the container (/home/ubuntu/.whisper).
+  - ${WHISPER_MODELS_VOLUME:-whisper_models}:/home/ubuntu/.whisper
   # Media library; defaults to the repo's ./assets directory. Override with a host path in .env.
   - ${ASSETS_DIR:-./assets}:/workspaces/youtube-whisperer/assets
   # Firefox profile for yt-dlp cookies; defaults to an empty named volume (no cookies).
