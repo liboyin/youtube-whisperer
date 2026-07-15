@@ -1,72 +1,15 @@
-# Python bytecode and extension modules
+# Secrets — never commit
+.env
+
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-
-# Build and packaging artifacts
-.Python
-build/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-share/python-wheels/
-var/
-wheels/
-pip-wheel-metadata/
-*.egg
-*.egg-info/
-.installed.cfg
-MANIFEST
-youtube_whisperer.egg-info/
-
-# Virtual environments and local env files
-.env
-.env.*
-!.env.example
 .venv/
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.python-version
-
-# Test, coverage, and type-checker caches
-.coverage
-.coverage.*
-.hypothesis/
-.mypy_cache/
-.nox/
+*.egg-info/
 .pytest_cache/
+.mypy_cache/
 .ruff_cache/
-.tox/
-.pyre/
-.pytype/
-.cache
-cover/
-coverage.xml
-htmlcov/
-nosetests.xml
-*.cover
-*.py,cover
-dmypy.json
-.dmypy.json
-
-# Local tooling and editor state
-.ipynb_checkpoints/
-.ropeproject/
-.spyderproject
-.spyproject
-.claude/
-.vscode/
-profile_default/
-ipython_config.py
+.coverage
 
 # OS-generated files
 .DS_Store
@@ -74,3 +17,6 @@ Thumbs.db
 
 # Project-local data
 assets/
+
+# Misc.
+.vscode/
