@@ -1,7 +1,14 @@
-x-build-args: &build-args
-  # Optional caching proxies. Default to empty (direct internet); set in .env to use a proxy.
-  APT_PROXY: ${APT_PROXY:-}
-  PYPI_PROXY: ${PYPI_PROXY:-}
+x-build: &build
+  context: .
+  additional_contexts:
+    # Shared apt/pip install scripts, pinned to an immutable tag. Set BUILD_COMMON_CONTEXT
+    # in .env to a local clone to build offline, or to test a change to the helpers before
+    # it is tagged.
+    build_common: "${BUILD_COMMON_CONTEXT:-https://github.com/liboyin/docker-build-common.git#v1.0.0}"
+  args:
+    # Optional caching proxies. Default to empty (direct internet); set in .env to use a proxy.
+    APT_PROXY: ${APT_PROXY:-}
+    PYPI_PROXY: ${PYPI_PROXY:-}
 
 x-volumes: &volumes
   # Whisper model cache; defaults to a named volume so models persist across rebuilds. This names
@@ -16,9 +23,7 @@ x-volumes: &volumes
 
 services:
   app:
-    build:
-      context: .
-      args: *build-args
+    build: *build
     container_name: youtube-whisperer-app
     init: true
     restart: unless-stopped
@@ -36,9 +41,7 @@ services:
     entrypoint: ["uvicorn", "youtube_whisperer.api.app:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "debug"]
 
   youtube_worker:
-    build:
-      context: .
-      args: *build-args
+    build: *build
     init: true
     restart: unless-stopped
     volumes: *volumes
@@ -52,9 +55,7 @@ services:
     entrypoint: ["python", "-m", "youtube_whisperer.workers", "youtube"]
 
   whisper_worker:
-    build:
-      context: .
-      args: *build-args
+    build: *build
     init: true
     restart: unless-stopped
     volumes: *volumes
@@ -68,9 +69,7 @@ services:
     entrypoint: ["python", "-m", "youtube_whisperer.workers", "whisper"]
 
   azure_worker:
-    build:
-      context: .
-      args: *build-args
+    build: *build
     init: true
     restart: unless-stopped
     volumes: *volumes

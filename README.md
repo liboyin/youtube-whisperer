@@ -146,6 +146,18 @@ Workers run as independent Docker services rather than background tasks inside t
 
 SRT was chosen to match an existing library of subtitle files. SRT serialization and deduplication are isolated in `adaptors/srt_deduplicator.py`; each transcriber owns the small conversion from its native segment type to an `SrtBlock`. Supporting another output format (e.g. WebVTT, JSON) would mean adding a sibling serializer next to `save_segments_as_srt`.
 
+### Build helpers come from a shared repository
+
+The `apt` and `pip` steps of the image build live in [`docker-build-common`](https://github.com/liboyin/docker-build-common), not in this repo. They used to be local `docker_apt_install.sh` / `docker_pip_install.sh` scripts, copy-pasted across several projects and hand-synced, which drifted — fixes reached some repos and not others.
+
+Compose supplies the helpers as a named build context (`build_common`) pinned to an immutable tag, and the Dockerfile bind-mounts that context for the length of each `RUN`. Bind-mounting rather than `COPY` keeps them build-time only: nothing is added to a layer and nothing ships in the image. `BUILD_COMMON_CONTEXT` overrides the pinned URL with a local clone, which both avoids the network and allows testing a helper change before it is tagged.
+
+The consequence is that `docker build` on its own no longer works — it has no `build_common` context and BuildKit would look for an image by that name on Docker Hub. Build through Compose, or pass the context explicitly:
+
+```
+docker buildx build --build-context build_common=https://github.com/liboyin/docker-build-common.git#v1.0.0 .
+```
+
 ## Security / trust model
 
 The API is **unauthenticated by design** and assumes a trusted, LAN-only or single-user deployment. It exposes destructive and powerful operations — `DELETE /tasks`, `DELETE /assets`, and arbitrary filesystem-glob task sources — to any client that can reach it. Do **not** expose it directly to the public internet; put it behind a VPN, a reverse proxy with authentication, or a firewall.
@@ -179,6 +191,7 @@ Compose also reads a few **interpolation** variables (host-side paths and build 
 | `FIREFOX_PROFILE_DIR` | `firefox_profile` (named volume) | Host Firefox profile for yt-dlp cookies; set it to download private/age-gated videos. |
 | `APT_PROXY` | empty (none) | Optional apt caching proxy used during image build. |
 | `PYPI_PROXY` | empty (none) | Optional PyPI proxy used during image build. |
+| `BUILD_COMMON_CONTEXT` | pinned Git URL (`docker-build-common.git#v1.0.0`) | Source of the shared build helpers; point it at a local clone to build offline. |
 
 ## Build & Run
 
@@ -203,6 +216,8 @@ pip install -e .[dev]             # editable install + dev tooling
 docker compose up                              # GPU (NVIDIA runtime)
 docker compose -f docker-compose.cpu.yaml up   # CPU only
 ```
+
+The image build pulls its `apt`/`pip` helper scripts from the shared [`docker-build-common`](https://github.com/liboyin/docker-build-common) repository, so the first build needs to reach GitHub unless `BUILD_COMMON_CONTEXT` points at a local clone (see [Build helpers come from a shared repository](#build-helpers-come-from-a-shared-repository)).
 
 This starts `redis` (with a healthcheck the other services wait on), `app` (FastAPI via uvicorn on port `8001`), `youtube_worker`, `whisper_worker`, and `azure_worker`. Interactive API docs are served at `http://localhost:8001/docs`. The REST API exposes `/tasks` (GET/POST/DELETE), `/dead-letters` (GET/DELETE), and `/assets` (GET to list, DELETE to clean up redundant media). Scale a transcription worker with, e.g., `docker compose up --scale azure_worker=2`; the replicas get distinct consumer names automatically.
 
