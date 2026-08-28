@@ -1,9 +1,14 @@
-from dataclasses import dataclass
 import logging
+from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator
 
-from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
+from pathlib_extensions import (
+    OverwriteMode,
+    overwrite_existing_path,
+    prepare_input_file,
+    prepare_output_file,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +63,7 @@ class SrtBlock:
         """
         result = [
             str(line_number),
-            ''.join([self.start_time, ' ', ARROW, ' ', self.end_time]),
+            f'{self.start_time} {ARROW} {self.end_time}',
         ]
         result.extend(self.content)
         result.append('')  # there must be an empty line at the end of each block, including the last one

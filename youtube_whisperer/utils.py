@@ -1,9 +1,10 @@
-from enum import Enum
 import re
+from enum import Enum
 
 import redis
 
 from youtube_whisperer.config import Settings
+
 
 def create_redis_pool(settings: Settings) -> redis.ConnectionPool:
     """Build the shared Redis connection pool from settings.

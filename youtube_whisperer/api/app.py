@@ -1,9 +1,10 @@
-from collections import defaultdict
 import glob
 import logging
 import os
+from collections import defaultdict
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.responses import JSONResponse
@@ -11,8 +12,20 @@ from pathlib_extensions import prepare_input_dir
 from redis import StrictRedis
 
 from youtube_whisperer.models import AddTasksResponse, DeadLetter, Task, TaskQueues
-from youtube_whisperer.queueing import DEAD_LETTER_QUEUE, clear_task_queues, list_dead_letters, list_task_queues, queue_transcription_tasks, queue_youtube_task
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR, REDIS_CLIENT, TranscriberType, is_url
+from youtube_whisperer.queueing import (
+    DEAD_LETTER_QUEUE,
+    clear_task_queues,
+    list_dead_letters,
+    list_task_queues,
+    queue_transcription_tasks,
+    queue_youtube_task,
+)
+from youtube_whisperer.utils import (
+    REDIS_CLIENT,
+    WHISPER_ASSETS_DIR,
+    TranscriberType,
+    is_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +69,12 @@ def get_redis_client() -> Generator[StrictRedis, None, None]:
     yield REDIS_CLIENT
 
 
+RedisClientDep = Annotated[StrictRedis, Depends(get_redis_client)]
+AssetsDirDep = Annotated[Path, Depends(get_assets_dir)]
+
+
 @app.get("/tasks", response_model=TaskQueues)
-async def get_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> TaskQueues:
+async def get_tasks(redis_client: RedisClientDep) -> TaskQueues:
     """
     Retrieve all pending and active tasks from the Redis queues.
 
@@ -81,7 +98,7 @@ def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
 
 
 @app.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
-async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(get_redis_client)) -> AddTasksResponse:
+async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTasksResponse:
     """
     Add new tasks to the appropriate Redis queues.
 
@@ -121,7 +138,7 @@ async def add_tasks(patterns: list[Task], redis_client: StrictRedis = Depends(ge
 
 
 @app.delete("/tasks", response_model=TaskQueues)
-async def clear_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> TaskQueues:
+async def clear_tasks(redis_client: RedisClientDep) -> TaskQueues:
     """
     Clear all pending and active tasks from the Redis queues.
 
@@ -132,7 +149,7 @@ async def clear_tasks(redis_client: StrictRedis = Depends(get_redis_client)) -> 
 
 
 @app.get("/dead-letters", response_model=list[DeadLetter])
-async def get_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)) -> list[DeadLetter]:
+async def get_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
     """
     Retrieve failed tasks from the dead-letter queue.
 
@@ -143,7 +160,7 @@ async def get_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)
 
 
 @app.delete("/dead-letters", response_model=list[DeadLetter])
-async def clear_dead_letters(redis_client: StrictRedis = Depends(get_redis_client)) -> list[DeadLetter]:
+async def clear_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
     """
     Clear the dead-letter queue.
 
@@ -156,7 +173,7 @@ async def clear_dead_letters(redis_client: StrictRedis = Depends(get_redis_clien
 
 
 @app.get("/assets", response_model=list[str])
-async def list_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
+async def list_assets(dir_path: AssetsDirDep) -> list[str]:
     """
     List all contents of the specified directory.
 
@@ -208,7 +225,7 @@ def redundant_media_paths(stem_to_suffixes: dict[str, set[str]]) -> list[Path]:
 
 
 @app.delete("/assets", response_model=list[str])
-async def clean_assets(dir_path: Path = Depends(get_assets_dir)) -> list[str]:
+async def clean_assets(dir_path: AssetsDirDep) -> list[str]:
     """
     Clean up redundant files in the specified directory.
 

@@ -1,14 +1,21 @@
-from abc import ABC, abstractmethod
 import logging
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Callable, Generator, cast
+from typing import cast
 
 import redis
 from redis import StrictRedis
 
 from youtube_whisperer.config import Settings
 from youtube_whisperer.models import Task
-from youtube_whisperer.queueing import decode_redis_value, get_stream_name, queue_dead_letter, WORKERS_GROUP, ensure_consumer_group
+from youtube_whisperer.queueing import (
+    WORKERS_GROUP,
+    decode_redis_value,
+    ensure_consumer_group,
+    get_stream_name,
+    queue_dead_letter,
+)
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType, is_url
 
 logger = logging.getLogger(__name__)
@@ -133,12 +140,10 @@ class BaseWorker(ABC):
         Returns:
             The Redis key string for the stream this worker consumes.
         """
-        pass
 
     @abstractmethod
     def get_consumer_name(self) -> str:
         """Return the active consumer name assigned to this worker."""
-        pass
 
     def yield_tasks(self, poll_interval_seconds: int) -> Generator[tuple[bytes, Task], None, None]:
         """Yield tasks from the worker's queue.
@@ -168,7 +173,6 @@ class BaseWorker(ABC):
         Args:
             task: The task to be processed by this worker.
         """
-        pass
 
     def process_queue(self, poll_interval_seconds: int = 5) -> None:
         """Poll the queue indefinitely and process tasks.
@@ -248,4 +252,3 @@ class TranscriptionWorker(BaseWorker):
             task: Task containing transcriber configuration.
             source: Local filesystem path to the media file.
         """
-        pass

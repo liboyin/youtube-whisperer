@@ -1,11 +1,14 @@
+from collections.abc import Generator, Iterable
 from pathlib import Path
-from typing import Any, Generator, Iterable
+from typing import Any
 
-from pathlib_extensions import OverwriteMode
 import yt_dlp
+from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.downloaders.utils import is_firefox_cookies_available
-from youtube_whisperer.downloaders.video_downloader import download_video_with_default_title
+from youtube_whisperer.downloaders.video_downloader import (
+    download_video_with_default_title,
+)
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 

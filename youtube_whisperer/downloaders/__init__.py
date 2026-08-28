@@ -4,7 +4,9 @@ from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.downloaders.transcript_downloader import TranscriptDownloader
-from youtube_whisperer.downloaders.video_downloader import download_video_with_default_title
+from youtube_whisperer.downloaders.video_downloader import (
+    download_video_with_default_title,
+)
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 

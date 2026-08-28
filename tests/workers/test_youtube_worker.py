@@ -2,10 +2,10 @@ from pathlib import Path
 
 from pathlib_extensions import OverwriteMode
 
+import youtube_whisperer.workers.youtube_worker as testee
 from youtube_whisperer.config import Settings
 from youtube_whisperer.models import Task
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
-import youtube_whisperer.workers.youtube_worker as testee
 
 
 def test_youtube_worker_stream_bindings(mocker):

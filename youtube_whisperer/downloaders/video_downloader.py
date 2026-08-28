@@ -1,9 +1,18 @@
 from pathlib import Path
 
-from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars, truncate_filename
 import yt_dlp
+from pathlib_extensions import (
+    OverwriteMode,
+    overwrite_existing_path,
+    prepare_output_file,
+    replace_os_reserved_chars,
+    truncate_filename,
+)
 
-from youtube_whisperer.downloaders.utils import get_video_title, is_firefox_cookies_available
+from youtube_whisperer.downloaders.utils import (
+    get_video_title,
+    is_firefox_cookies_available,
+)
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 

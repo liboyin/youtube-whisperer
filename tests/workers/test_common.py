@@ -4,10 +4,10 @@ from pathlib import Path
 import pytest
 import redis
 
+import youtube_whisperer.workers.common as testee
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.models import Task
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
-import youtube_whisperer.workers.common as testee
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_yield_task(mock_redis, mocker):
     assert msg_id == b'1234-0'
     assert task == expected_task
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="Test exception"):
         next(task_generator)
 
     assert mock_redis.xreadgroup.call_args_list == [
@@ -95,7 +95,7 @@ def test_yield_task_self_heals_after_nogroup_on_claim(mock_redis, mocker):
     ]
 
     gen = testee.yield_task(mock_redis, 'stream:name', 'grp', 'c1', poll_interval_seconds=1)
-    msg_id, task = next(gen)
+    msg_id, _task = next(gen)
 
     assert msg_id == b'5555-0'
     assert mock_ensure.call_count == 2  # once at startup + once after NOGROUP on claim

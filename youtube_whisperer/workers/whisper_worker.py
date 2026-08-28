@@ -7,8 +7,12 @@ from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
 from youtube_whisperer.models import Task
-from youtube_whisperer.transcriber.model_parameters import get_default_cuda_flag as use_cuda
-from youtube_whisperer.transcriber.whisper_transcriber import transcribe_file_with_default_model
+from youtube_whisperer.transcriber.model_parameters import (
+    get_default_cuda_flag as use_cuda,
+)
+from youtube_whisperer.transcriber.whisper_transcriber import (
+    transcribe_file_with_default_model,
+)
 from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType
 from youtube_whisperer.workers.common import TranscriptionWorker
 
@@ -28,7 +32,7 @@ def is_gpu_healthy() -> bool:
     try:
         result = subprocess.run(["nvidia-smi"], check=False)
         return result.returncode == 0
-    except Exception:
+    except OSError:
         return False
 
 

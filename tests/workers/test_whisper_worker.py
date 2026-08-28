@@ -1,13 +1,13 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from pathlib_extensions import OverwriteMode
 import pytest
+from pathlib_extensions import OverwriteMode
 
+import youtube_whisperer.workers.whisper_worker as testee
 from youtube_whisperer.models import Task
 from youtube_whisperer.transcriber.rejection_policy import RejectedTranscriptionError
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
-import youtube_whisperer.workers.whisper_worker as testee
 
 
 def test_is_gpu_healthy_returns_true_when_nvidia_smi_succeeds(mocker):

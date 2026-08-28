@@ -2,7 +2,9 @@
 from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
-from youtube_whisperer.downloaders import download_video_and_transcript_with_default_title
+from youtube_whisperer.downloaders import (
+    download_video_and_transcript_with_default_title,
+)
 from youtube_whisperer.downloaders.playlist_downloader import yield_flattened_video_urls
 from youtube_whisperer.models import Task
 from youtube_whisperer.queueing import YOUTUBE_STREAM, queue_transcription_tasks

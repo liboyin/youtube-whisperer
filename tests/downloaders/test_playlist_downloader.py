@@ -3,14 +3,12 @@ import logging
 from pathlib import Path
 
 import pytest
-
 from pathlib_extensions import OverwriteMode
 
-from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 import youtube_whisperer.downloaders as downloaders_testee
 import youtube_whisperer.downloaders.playlist_downloader as playlist_testee
 import youtube_whisperer.downloaders.utils as utils_testee
-
+from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 
 LANGUAGE = LanguageCode("en")
 

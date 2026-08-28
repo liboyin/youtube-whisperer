@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 from pathlib_extensions import OverwriteMode
 
+import youtube_whisperer.workers.azure_worker as testee
 from youtube_whisperer.models import Task
 from youtube_whisperer.utils import TranscriberType
-import youtube_whisperer.workers.azure_worker as testee
 
 
 def test_dispatch_task_with_conversion(mocker):

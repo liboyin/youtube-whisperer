@@ -1,5 +1,5 @@
 import logging
-from typing import Generator, Iterable
+from collections.abc import Generator, Iterable
 
 from faster_whisper.transcribe import Segment
 

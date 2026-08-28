@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import Any
 
 import azure.cognitiveservices.speech as speechsdk
+import soundfile as sf
 from azure.cognitiveservices.speech import SpeechRecognitionResult
 from faster_whisper.utils import format_timestamp
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
-import soundfile as sf
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt

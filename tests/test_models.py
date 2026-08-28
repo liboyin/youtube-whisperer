@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 import youtube_whisperer.models as testee
+from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 
 

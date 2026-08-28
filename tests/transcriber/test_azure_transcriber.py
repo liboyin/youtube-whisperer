@@ -1,10 +1,9 @@
-from pathlib import Path
 import threading
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-
 from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
@@ -188,10 +187,12 @@ def test_transcribe_audio_file_times_out_and_stops_recognition(mocker):
     # Shrink the floor so the timeout path fires immediately instead of blocking for the real floor.
     mocker.patch.object(testee, "MIN_AZURE_TIMEOUT_SECONDS", 0.01)
 
-    with mock.patch.object(testee, "speechsdk", fake_speechsdk), \
-         mock.patch.object(testee, "get_audio_duration_seconds", return_value=0):
-        with pytest.raises(TimeoutError, match="Transcription timed out"):
-            testee.transcribe_audio_file(Path("audio.wav"), language)
+    with (
+        mock.patch.object(testee, "speechsdk", fake_speechsdk),
+        mock.patch.object(testee, "get_audio_duration_seconds", return_value=0),
+        pytest.raises(TimeoutError, match="Transcription timed out"),
+    ):
+        testee.transcribe_audio_file(Path("audio.wav"), language)
 
     assert fake_speechsdk.created_recognizer.stop_calls == 1
 
@@ -237,11 +238,13 @@ def test_transcribe_audio_file_surfaces_azure_cancellation_error_without_timing_
     fake_speechsdk = FakeSpeechSDK(on_start)
     language = mock.Mock(get_source_as_BCP=mock.Mock(return_value="en-us"))
 
-    with mock.patch.object(testee, "speechsdk", fake_speechsdk), \
-         mock.patch.object(testee, "get_audio_duration_seconds", return_value=0.01), \
-         mock.patch.object(testee, "save_segments_as_srt") as save_mock:
-        with pytest.raises(RuntimeError, match=error_details):
-            testee.transcribe_audio_file(Path("audio.wav"), language)
+    with (
+        mock.patch.object(testee, "speechsdk", fake_speechsdk),
+        mock.patch.object(testee, "get_audio_duration_seconds", return_value=0.01),
+        mock.patch.object(testee, "save_segments_as_srt") as save_mock,
+        pytest.raises(RuntimeError, match=error_details),
+    ):
+        testee.transcribe_audio_file(Path("audio.wav"), language)
 
     assert fake_speechsdk.created_recognizer is not None
     assert fake_speechsdk.created_recognizer.stop_calls == 1

@@ -3,7 +3,12 @@ from pathlib import Path
 
 import ffmpeg
 import numpy as np
-from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_input_file, prepare_output_file
+from pathlib_extensions import (
+    OverwriteMode,
+    overwrite_existing_path,
+    prepare_input_file,
+    prepare_output_file,
+)
 
 logger = logging.getLogger(__name__)
 

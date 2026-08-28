@@ -1,12 +1,16 @@
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 from typing import Any, Self
 
 from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
-from pydantic_core.core_schema import CoreSchema, no_info_plain_validator_function, to_string_ser_schema
+from pydantic_core.core_schema import (
+    CoreSchema,
+    no_info_plain_validator_function,
+    to_string_ser_schema,
+)
 
 BCP_LANG_CODES = {'en-us', 'zh-cn'}  # Azure uses BCP-47 language codes. They can be downcasted to ISO 639-1, but not vice versa.
-ISO_LANG_CODES = set(x.split('-')[0] for x in BCP_LANG_CODES)  # Whisper uses ISO 639-1 language codes
+ISO_LANG_CODES = {x.split('-')[0] for x in BCP_LANG_CODES}  # Whisper uses ISO 639-1 language codes
 
 
 class UnregisteredLanguageCode(Exception):
@@ -34,9 +38,8 @@ class LanguageCode:
         """
         if self.source not in BCP_LANG_CODES and self.source not in ISO_LANG_CODES:
             raise UnregisteredLanguageCode(self.source)
-        if self.target is not None:
-            if self.target not in BCP_LANG_CODES and self.target not in ISO_LANG_CODES:
-                raise UnregisteredLanguageCode(self.target)
+        if self.target is not None and self.target not in BCP_LANG_CODES and self.target not in ISO_LANG_CODES:
+            raise UnregisteredLanguageCode(self.target)
 
     def __str__(self) -> str:
         """Render the language code as ``source`` or ``source->target``.

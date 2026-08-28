@@ -1,9 +1,10 @@
 from unittest.mock import call
-import redis
-import pytest
 
-from youtube_whisperer.models import DeadLetter, Task, TaskQueues
+import pytest
+import redis
+
 import youtube_whisperer.queueing as testee
+from youtube_whisperer.models import DeadLetter, Task, TaskQueues
 from youtube_whisperer.utils import TranscriberType
 
 

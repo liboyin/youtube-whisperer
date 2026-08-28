@@ -1,19 +1,23 @@
 import functools
 import logging
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
+import numpy as np
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
 from faster_whisper.utils import format_timestamp
-import numpy as np
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
-from youtube_whisperer.transcriber.model_parameters import get_default_whisper_model_parameters
+from youtube_whisperer.transcriber.model_parameters import (
+    get_default_whisper_model_parameters,
+)
 from youtube_whisperer.transcriber.rejection_policy import reject_bad_segments
-from youtube_whisperer.transcriber.waveform_loader import load_whisper_waveform_from_file
+from youtube_whisperer.transcriber.waveform_loader import (
+    load_whisper_waveform_from_file,
+)
 from youtube_whisperer.utils import TranscriberMode
 
 logger = logging.getLogger(__name__)

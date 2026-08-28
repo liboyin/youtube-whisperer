@@ -1,5 +1,6 @@
-import redis
 from typing import cast
+
+import redis
 from redis import StrictRedis
 
 from youtube_whisperer.models import DeadLetter, Task, TaskQueues

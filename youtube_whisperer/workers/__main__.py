@@ -1,7 +1,7 @@
 import argparse
-from enum import Enum
 import logging
 import socket
+from enum import Enum
 
 from youtube_whisperer.config import Settings
 from youtube_whisperer.workers.azure_worker import AzureWorker

@@ -1,10 +1,22 @@
 import logging
+from collections.abc import Collection
 from pathlib import Path
-from typing import Collection
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
-from pathlib_extensions import OverwriteMode, overwrite_existing_path, prepare_output_file, replace_os_reserved_chars, truncate_filename
-from youtube_transcript_api import FetchedTranscript, NoTranscriptFound, TranscriptsDisabled, TranscriptList, YouTubeTranscriptApi
+from pathlib_extensions import (
+    OverwriteMode,
+    overwrite_existing_path,
+    prepare_output_file,
+    replace_os_reserved_chars,
+    truncate_filename,
+)
+from youtube_transcript_api import (
+    FetchedTranscript,
+    NoTranscriptFound,
+    TranscriptList,
+    TranscriptsDisabled,
+    YouTubeTranscriptApi,
+)
 from youtube_transcript_api.formatters import SRTFormatter
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode

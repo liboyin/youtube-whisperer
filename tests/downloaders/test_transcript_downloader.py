@@ -1,10 +1,11 @@
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
 from pathlib_extensions import OverwriteMode
 
-from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 import youtube_whisperer.downloaders.transcript_downloader as testee
+from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 
 
 def test_get_video_id():

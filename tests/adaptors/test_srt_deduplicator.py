@@ -1,8 +1,8 @@
 from pathlib import Path
 from textwrap import dedent
 
-from pathlib_extensions import OverwriteMode
 import pytest
+from pathlib_extensions import OverwriteMode
 
 import youtube_whisperer.adaptors.srt_deduplicator as testee
 

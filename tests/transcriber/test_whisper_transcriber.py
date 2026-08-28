@@ -1,17 +1,19 @@
 import logging
 from types import SimpleNamespace
 
-from faster_whisper.transcribe import Segment
 import numpy as np
-from pathlib_extensions import OverwriteMode
 import pytest
+from faster_whisper.transcribe import Segment
+from pathlib_extensions import OverwriteMode
 
+import youtube_whisperer.transcriber.whisper_transcriber as testee
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock
-from youtube_whisperer.transcriber.rejection_policy import REJECTED_SUBSTRINGS, RejectedTranscriptionError
-import youtube_whisperer.transcriber.whisper_transcriber as testee
+from youtube_whisperer.transcriber.rejection_policy import (
+    REJECTED_SUBSTRINGS,
+    RejectedTranscriptionError,
+)
 from youtube_whisperer.utils import TranscriberMode
-
 
 LANGUAGE = LanguageCode("zh")
 
