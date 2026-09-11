@@ -60,6 +60,7 @@ assets/                         # Media library and SRT output (source of truth)
 Dockerfile                      # CUDA-based image build
 docker-compose.yaml             # GPU services (extends the CPU compose file)
 docker-compose.cpu.yaml         # CPU services: redis, app, and the three workers
+check-coverage.sh               # Run the suite and enforce the per-file coverage policy
 ```
 
 > Note: the web layer lives in `youtube_whisperer/api/` (renamed from `fastapi/`) so the package no longer shadows the third-party `fastapi` distribution, and the Pydantic models live in a neutral `youtube_whisperer/models.py` rather than inside the web layer, so the queue and worker layers do not import from the API layer.
@@ -244,15 +245,17 @@ After changing dependencies in `pyproject.toml` and reinstalling, review and com
 
 ## Testing
 
-After any code change, all of the following MUST pass (see `pyproject.toml` for configuration):
+After any code change, all of the following MUST pass:
 
 ```
-pytest                  # runs in random order; enforces ≥80% branch coverage
+./check-coverage.sh     # runs the suite, then enforces the per-file coverage policy
 mypy youtube_whisperer
 ruff check .
 ```
 
-`pytest` is configured to fail under 80% coverage and to print `--cov-report=term-missing`; use that report to confirm each file meets the ≥80% line/branch threshold required by `AGENTS.md`.
+`check-coverage.sh` runs `pytest` and then fails if any measured file, or the project total, falls below 80% statement or branch coverage. It owns the coverage policy that `AGENTS.md` requires, because pytest's own `--cov-fail-under` guards only the project total. Set `COVERAGE_THRESHOLD` to use a different threshold; extra arguments are forwarded to pytest.
+
+`pyproject.toml` holds the pytest and coverage configuration. Tests run in random order via `pytest-randomly`, and the run prints its seed; reproduce an ordering failure with `--randomly-seed=<seed>`. Run `pytest` directly for focused work, but note that a subset run reports a coverage failure even when every selected test passes; pass `--no-cov` to silence it.
 
 ## Operational Notes
 

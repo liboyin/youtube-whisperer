@@ -49,6 +49,7 @@ docker-compose*.yaml
 .env
 
 # Scripts
+check-coverage.sh
 extract_subtitle_text.sh
 ls_mp4_without_srt.sh
 
