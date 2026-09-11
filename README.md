@@ -60,7 +60,6 @@ assets/                         # Media library and SRT output (source of truth)
 Dockerfile                      # CUDA-based image build
 docker-compose.yaml             # GPU services (extends the CPU compose file)
 docker-compose.cpu.yaml         # CPU services: redis, app, and the three workers
-update_lock.sh                  # Regenerate requirements.txt from the environment (run by hand)
 ```
 
 > Note: the web layer lives in `youtube_whisperer/api/` (renamed from `fastapi/`) so the package no longer shadows the third-party `fastapi` distribution, and the Pydantic models live in a neutral `youtube_whisperer/models.py` rather than inside the web layer, so the queue and worker layers do not import from the API layer.
@@ -197,7 +196,7 @@ Compose also reads a few **interpolation** variables (host-side paths and build 
 
 ### Dev Container (recommended)
 
-Open the repository in VS Code and reopen in the Dev Container (`.devcontainer/`). The container builds from the `Dockerfile` via the `app` service and runs `postCreateCommand.sh`, which installs the pinned dependencies from `requirements.txt` and then installs this project with its dev extras (`pip install -e .[dev]`). It no longer regenerates the lock file (see [Updating dependencies](#updating-dependencies)).
+Open the repository in VS Code and reopen in the Dev Container (`.devcontainer/`). The container builds from the `Dockerfile` via the `app` service and runs `postCreateCommand.sh`, which installs the pinned dependencies from `requirements.txt` and then installs this project with its dev extras (`pip install -e .[dev]`). It also regenerates the lock file on every create (see [Updating dependencies](#updating-dependencies)).
 
 ### Local install (without the Dev Container)
 
@@ -235,13 +234,13 @@ The repository also ships `extract_subtitle_text.sh` (strip timestamps from an S
 
 ### Updating dependencies
 
-`requirements.txt` is a lock file regenerated **intentionally**, not on every devcontainer create. After changing dependencies in `pyproject.toml` and reinstalling, run:
+`requirements.txt` is a lock file. `.devcontainer/postCreateCommand.sh` regenerates it from the installed environment on every container create:
 
 ```
-./update_lock.sh   # pip freeze (excluding this project) > requirements.txt
+pip freeze | grep -v "youtube-whisperer\|youtube_whisperer" > requirements.txt
 ```
 
-Then review and commit the updated lock file.
+After changing dependencies in `pyproject.toml` and reinstalling, review and commit the regenerated lock file. Because the regeneration is a side effect of creating the container rather than a deliberate step, the lock file can also change on a plain rebuild; making it intentional is tracked in [TODO.md](TODO.md).
 
 ## Testing
 

@@ -31,13 +31,14 @@ pip-wheel-metadata/
 *.egg-info/
 
 # AI agent files
+.agents
 .claude
 AGENTS.md
 CLAUDE.md
 
 # Documentations
-PLAN.md
 README.md
+TODO.md
 
 # Docker files
 Dockerfile

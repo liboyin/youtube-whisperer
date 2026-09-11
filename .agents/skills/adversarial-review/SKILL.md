@@ -14,7 +14,17 @@ Return a reviewer-triaged report without changing the repository. The reviewer M
 2. **Dispatch one reviewer.** Tell it to read this skill but execute only step 3 and return the defined report; the main agent owns steps 1, 2, and 4. Launch the reviewer agent without inherited conversation history using the applicable supported harness:
 
    - **Codex:** spawn the reviewer as a native subagent with `spawn_agent`, using `fork_turns: "none"` and explicit `model: "gpt-5.6-sol"` and `reasoning_effort: "high"` overrides. Native subagents inherit the current Full Access environment; no sandbox configuration is required.
-   - **Claude Code with the Codex plugin:** dispatch the reviewer with `/codex:rescue --fresh --write --model gpt-5.6-sol --effort high <review prompt>` or a fresh underlying companion `task` command with the same model and effort. Never use `--resume` or `--resume-last`. The plugin is [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc); install it with `/plugin marketplace add openai/codex-plugin-cc`, `/plugin install codex@openai-codex`, `/reload-plugins`, then `/codex:setup`.
+   - **Claude Code with the Codex plugin:** dispatch the reviewer with `/codex:rescue --fresh --write --model gpt-5.6-sol --effort high <review prompt>` or a fresh underlying companion `task` command with the same model and effort. Never use `--resume` or `--resume-last`.
+
+   When the Codex plugin is not installed, install it without asking, then verify:
+
+   ```bash
+   claude plugin marketplace add openai/codex-plugin-cc
+   claude plugin install codex@openai-codex
+   claude plugin list
+   ```
+
+   The plugin is [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc), which also documents the `codex` binary it drives and the `codex login` that authenticates it. Authentication is interactive and cannot be automated. If any step fails, stop and tell the user which command to run manually; do not work around a failed install.
 
    (The reviewer needs filesystem write access only to create and test a scratch copy outside the repository. Native Codex receives that access from the inherited environment; Claude Code receives it through `--write`. Regardless of harness, the dispatch MUST tell the reviewer to treat the repository as strictly read-only, to build and test only in its scratch copy, and to remove that copy at exit. Construct the scratch copy from the tracked target state, apply only the in-scope staged and unstaged changes, and copy only explicitly identified in-scope untracked files. Never recursively copy ignored or out-of-scope content. If the reviewer cannot create the scratch copy, it returns a `Review blocked` verdict. The reviewer is trusted to follow this read-only contract. Step 1's snapshot and step 4's comparison detect accidental repository mutations; they are not a security boundary.)
 
@@ -28,7 +38,7 @@ Return a reviewer-triaged report without changing the repository. The reviewer M
 
    The reviewer MAY ask for further information when missing context could affect a finding or verdict. Reply with the minimum factual context and record the exchange under **Assumptions**.
 
-   If `gpt-5.6-sol` or the applicable dispatch mechanism is unavailable, stop and ask the user. Do not substitute or issue a verdict.
+   If `gpt-5.6-sol` or the applicable dispatch mechanism is still unavailable after that install attempt, stop and ask the user. Do not substitute or issue a verdict.
 
 3. **Review.** The reviewer:
 

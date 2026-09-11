@@ -4,7 +4,7 @@ This file owns the working principles for this repository. All agents MUST follo
 
 - **AGENTS.md:** concise working principles and required standards.
 - **[Adversarial review skill](.agents/skills/adversarial-review/SKILL.md):** how to conduct review, including dispatch, snapshots, investigation, triage, and reporting.
-- **[PLAN.md](PLAN.md):** review findings, phased future work, accepted decisions, and per-phase verification.
+- **[TODO.md](TODO.md):** future work, accepted decisions, dependencies, execution boundaries, and its own maintenance rules.
 - **[README.md](README.md):** current architecture, dataflow, design assumptions, and build, run, and test procedures.
 
 Link to the owning document instead of duplicating its procedure. Operational instructions do not override the safety and ownership principles here.
@@ -38,7 +38,7 @@ Link to the owning document instead of duplicating its procedure. Operational in
 - Automated tests MUST NOT reach external services such as YouTube or Azure Speech, a real Redis server, a real Whisper model, or any path outside a test-owned temporary directory, even temporarily.
 - Use test-owned state for filesystem paths, environment variables, settings, and queue clients; prefer fixtures such as `tmp_path` and `monkeypatch` that own their teardown. Snapshot/restore is permitted only for owned state. Do not seed real configuration to prove non-access, and do not leave files, environment variables, or streams behind.
 - Shared asynchronous resources and process-global doubles MUST have per-test ownership, synchronized access, cancellation, quiescence, and local accounting for late work. These guarantees MUST hold after timeouts and failures. Tests run in random order under `pytest-randomly`, so order-dependent state is a defect rather than a flake.
-- `pyproject.toml` owns the executable coverage policy; planned changes belong in PLAN.md. Line, statement, and branch coverage MUST each be at least 80% for every file and for the project. Inspect `--cov-report=term-missing` per file instead of relying on the aggregate gate. Exclusions MUST have a narrow rationale and an end-to-end smoke check validated when the exclusion changes; directory location alone does not justify excluding application logic, and unperformed manual checks MUST be recorded as limitations.
+- `pyproject.toml` owns the executable coverage policy; planned changes belong in TODO. Line, statement, and branch coverage MUST each be at least 80% for every file and for the project. Inspect `--cov-report=term-missing` per file instead of relying on the aggregate gate. Exclusions MUST have a narrow rationale and an end-to-end smoke check validated when the exclusion changes; directory location alone does not justify excluding application logic, and unperformed manual checks MUST be recorded as limitations.
 
 # Validation and Review
 
@@ -48,10 +48,11 @@ Link to the owning document instead of duplicating its procedure. Operational in
 - The reviewer owns classification and verdict; the main agent owns independent investigation, implementation, and required user dispositions. After fixes or rollback, repeat full gates and obtain a fresh review. Finish only when no Blocking finding remains and every surfaced finding has its required disposition. Never silently discard or reclassify a finding.
 - Documentation-only changes and read-only assessments are exempt from application gates and formal adversarial review. Verify their claims, references, completeness, and diff instead. Report what was actually checked.
 - Verify success with checks that distinguish failure. Explain non-zero exits, verify absence directly, and verify rollback against the recorded pre-change state.
+- Never point a development or test run at real host data: the media library behind `ASSETS_DIR`, the browser profile behind `FIREFOX_PROFILE_DIR`, or the host model cache. NEVER read or copy that browser profile; it holds live session cookies. Treat every value in `.env` as a secret: do not echo, log, commit, or transmit it. `docker compose down -v` destroys the Redis volume holding queued tasks and pending-entry state, so it requires explicit user authorization.
 - Clean up processes and artifacts you create. Identify owned PIDs before using `kill`; NEVER use `pkill -f`. Re-check this file and the task boundary before finishing.
 
 # Version Control
 
 - Keep functionally independent changes in separate, self-contained commits once implemented, validated, and documented. Honor requests to leave drafts uncommitted.
 - Stage explicit paths, inspect the staged diff and repository status immediately before committing, and exclude unrelated work. NEVER use `git add -A` or `git commit -a`.
-- Commit messages MUST start with `<Claude/Codex/Antigravity/...>: <one-line summary>`, followed by a blank line and explanatory paragraphs. Do not add a `Co-Authored-By` line.
+- Commit messages MUST start with `<Claude/Codex/...>: <one-line summary>`, followed by a blank line and explanatory paragraphs. Do not add a `Co-Authored-By` line.
