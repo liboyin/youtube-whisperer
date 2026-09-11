@@ -4,7 +4,7 @@ x-build: &build
     # Shared apt/pip install scripts, pinned to an immutable tag. Set BUILD_COMMON_CONTEXT
     # in .env to a local clone to build offline, or to test a change to the helpers before
     # it is tagged.
-    build_common: "${BUILD_COMMON_CONTEXT:-https://github.com/liboyin/docker-build-common.git#v1.0.0}"
+    build_common: "${BUILD_COMMON_CONTEXT:-https://github.com/liboyin/docker-build-common.git#v1.1.0}"
   args:
     # Optional caching proxies. Default to empty (direct internet); set in .env to use a proxy.
     APT_PROXY: ${APT_PROXY:-}
