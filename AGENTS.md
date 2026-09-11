@@ -1,77 +1,57 @@
-This document contains guidelines that all AI agents MUST follow.
+This file owns the working principles for this repository. All agents MUST follow it and explicit user instructions. CAPITALIZED requirement words have the meanings defined by BCP 14 (RFC 2119 and RFC 8174).
 
-The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, RECOMMENDED, NOT RECOMMENDED, MAY, and OPTIONAL in this document are to be interpreted as described in BCP 14 (IETF RFC 2119 and RFC 8174) when, and only when, they appear in all capitals, as shown here.
+# Document Boundaries
 
-# Meta Guidelines
+- **AGENTS.md:** concise working principles and required standards.
+- **[Adversarial review skill](.agents/skills/adversarial-review/SKILL.md):** how to conduct review, including dispatch, snapshots, investigation, triage, and reporting.
+- **[PLAN.md](PLAN.md):** review findings, phased future work, accepted decisions, and per-phase verification.
+- **[README.md](README.md):** current architecture, dataflow, design assumptions, and build, run, and test procedures.
 
-- If not running in a Docker container, you MUST stop and confirm with the user before continuing.
-- You MUST read relevant code & documentation, and plan your actions before making a file change.
-- State assumptions explicitly. When you notice an ambiguity that materially affects the project (e.g. scope, architecture, dataflow, correctness, or security), you MUST confirm with the user before continuing.
-- Isolated subtasks (tasks that require little or no additional context from the main conversation and produce a small, well-bounded result for follow-up work) SHOULD be executed in subagents to keep the main context window clean.
-- Before considering a task done, you MUST re-check that all instructions in this file are followed.
+Link to the owning document instead of duplicating its procedure. Operational instructions do not override the safety and ownership principles here.
 
-# Documentation Guidelines
+# Scope and Decisions
 
-- Each document SHOULD own its assigned topic, and other docs SHOULD link or summarize without becoming competing sources of truth.
-- Documentation MUST be updated as soon as its content no longer reflects the latest state of the project.
-- `README.md` describes project structure, architecture, dataflow, and build & test procedures.
-- Design decisions & assumptions MUST be documented in whichever document fits best (e.g. README, a design doc, or the task's execution log), and SHOULD record the reasoning behind them.
-- New or modified functions/methods in non-test scripts MUST have Google-style docstrings; unit test functions MUST have a one-line docstring.
+- If not running in a Docker container, stop and confirm with the user before continuing.
+- Read relevant code and documentation and inspect repository status before editing. Preserve unrelated work.
+- Each change MUST have a boundary: intent, dependencies, non-goals, validation strategy, and done criteria. Revalidate written tasks against the affected code; do not implement them mechanically or broaden their material scope unilaterally.
+- State assumptions. Confirm unresolved choices that materially affect scope, architecture, dataflow, correctness, security, or user-visible behavior before dependent work; continue independent work where possible.
+- Accepted decisions and user authorization persist. Do not ask again about settled choices. Document superseding decisions and their reasoning before committing the affected change.
+- Non-material assumptions MAY be made when repository evidence supports them and they preserve the requested outcome. Name the assumption, evidence, and effect in the handoff.
+- Isolated subtasks with small, bounded results SHOULD use subagents. The main agent remains accountable for integration and verification.
 
-# Implementation Guidelines
+# Design and Documentation
 
-- Implement only what was asked with small, surgical changes. Do not add features or unrelated refactors unless explicitly asked to.
-- Prefer the simplest implementation. Each function/class/module MUST have a single responsibility and a well-defined interface; other SOLID principles MAY be relaxed in favor of simplicity.
-- Implementations MUST be easy to test with minimal mocking. Pure functions are preferred, and side effects SHOULD be isolated.
-- Code SHOULD use up-to-date features from languages, libraries, frameworks, and external services. These change quickly and assumptions about them go stale, most dangerously at planning time. You SHOULD verify behavior empirically or against the documentation for the version in use before planning or building on them.
+- Prefer the simplest cohesive implementation within the assigned scope. Give each function, class, and module a clear responsibility; prefer pure logic, isolated side effects, and minimal mocking over unnecessary abstractions.
+- Respect lint limits without splitting cohesive code solely for length. A narrow exception MUST explain the responsibility or invariant it preserves. Avoid `Any` or `type: ignore` type annotations
+- Before removing a layer, identify all unique behavior it carries, including copy, errors, ordering, timing, diagnostics, and API- or CLI-visible behavior. Give retained behavior an explicit owner and preserve its verification.
+- Verify changing language, framework, library, and service assumptions empirically or against version-appropriate documentation.
+- Update documentation when the change makes it stale. Distinguish current behavior, accepted future decisions, proposals, and unverified hypotheses.
+- Verify current empirical claims before recording them. Historical evidence MUST identify its revision, relevant environment, provenance, and limitations; it does not certify current validation.
+- New or changed non-test functions, methods, and classes MUST have Google-style docstrings covering purpose and any non-obvious contracts, side effects, or constraints. Test names MUST describe the protected behavior and each test keeps a one-line docstring; comments should explain non-obvious reasons or trade-offs.
 
 # Test Guidelines
 
-- Tests MUST encode WHY behavior matters, not just WHAT it does. A test that does not fail when business logic changes is wrong.
-- Whenever measurable, line, statement, and branch coverage MUST each be ≥80% for each file and at the project level.
-- See `pyproject.toml` for test configs. Note that tests run in random order (`pytest-randomly`).
-- You MUST manually review per-file test coverage aided by `--cov-report=term-missing` to meet the ≥80% requirement.
-- Order test functions to match the source file's function order.
-- Import the module under test as `import youtube_whisperer.my_module as testee`; call functions as `testee.function_name` and mock attributes via `patch.object(testee, 'attribute', ...)`.
-- After any code change, all of the following unit tests and static analysis MUST pass before sending the change for review:
+- Tests MUST protect behavior or an invariant and fail when it breaks. Prefer controlled inputs, injected clocks, and explicit completion over elapsed-time waits.
+- For each added or changed invariant, mutation evidence MUST cover a revert, a plausible regression, and an over-restriction where applicable. Each applicable mutant MUST fail a relevant test in an isolated scratch copy. Explain inapplicable categories; evidence belongs to the invariant and MAY be shared across assertions.
+- Before removing or weakening coverage, demonstrate that a mutant breaking the protected property still fails another test. A surviving mutant requires investigation, not automatic removal of coverage.
+- Tests MUST import the module under test as `import youtube_whisperer.my_module as testee`, call it as `testee.function_name`, and patch its attributes with `patch.object(testee, 'attribute', ...)`. Order test functions to match the source file's function order.
+- Automated tests MUST NOT reach external services such as YouTube or Azure Speech, a real Redis server, a real Whisper model, or any path outside a test-owned temporary directory, even temporarily.
+- Use test-owned state for filesystem paths, environment variables, settings, and queue clients; prefer fixtures such as `tmp_path` and `monkeypatch` that own their teardown. Snapshot/restore is permitted only for owned state. Do not seed real configuration to prove non-access, and do not leave files, environment variables, or streams behind.
+- Shared asynchronous resources and process-global doubles MUST have per-test ownership, synchronized access, cancellation, quiescence, and local accounting for late work. These guarantees MUST hold after timeouts and failures. Tests run in random order under `pytest-randomly`, so order-dependent state is a defect rather than a flake.
+- `pyproject.toml` owns the executable coverage policy; planned changes belong in PLAN.md. Line, statement, and branch coverage MUST each be at least 80% for every file and for the project. Inspect `--cov-report=term-missing` per file instead of relying on the aggregate gate. Exclusions MUST have a narrow rationale and an end-to-end smoke check validated when the exclusion changes; directory location alone does not justify excluding application logic, and unperformed manual checks MUST be recorded as limitations.
 
-```
-pytest
-mypy youtube_whisperer
-ruff check .
-```
+# Validation and Review
 
-# Review Guidelines
+- Establish a passing baseline at HEAD before implementation. Reuse baseline evidence only for the same unchanged revision and relevant environment, with provenance. Run tests only in an environment satisfying the ownership rules above. A failing baseline SHOULD be fixed in a separate, authorized change first.
+- Use focused checks during development. The final code, test, or configuration candidate MUST pass `pytest`, `mypy youtube_whisperer`, and `ruff check .`. Inspect per-file coverage and warnings; resolve new source warnings and explain accepted tooling warnings.
+- Every non-trivial code, test, or configuration change MUST pass the review skill's complete procedure before commit. A change is non-trivial if it could affect runtime behavior, test guarantees, build/configuration output, security, concurrency, state/data flow, or user-visible behavior. When uncertain, run the review.
+- The reviewer owns classification and verdict; the main agent owns independent investigation, implementation, and required user dispositions. After fixes or rollback, repeat full gates and obtain a fresh review. Finish only when no Blocking finding remains and every surfaced finding has its required disposition. Never silently discard or reclassify a finding.
+- Documentation-only changes and read-only assessments are exempt from application gates and formal adversarial review. Verify their claims, references, completeness, and diff instead. Report what was actually checked.
+- Verify success with checks that distinguish failure. Explain non-zero exits, verify absence directly, and verify rollback against the recorded pre-change state.
+- Clean up processes and artifacts you create. Identify owned PIDs before using `kill`; NEVER use `pkill -f`. Re-check this file and the task boundary before finishing.
 
-All non-trivial changes that touch code, test, or configuration MUST go through adversarial reviews before commit. (Documentation-only changes are exempted.)
+# Version Control
 
-Use the `/adversarial-review` skill (`.claude/skills/adversarial-review/`) as a function call: provide the context of the change — its purpose, the in-scope paths, known-unrelated dirty paths, and out-of-scope items the user has already accepted — and expect a triaged review report without code changes.
-
-The reviewer scrutinizes the change with the following questions:
-
-- Does it achieve the intended purpose?
-- Is it bug-free?
-- Can it be simplified?
-- Is it consistent with the documentation?
-- Are there design flaws or anti-patterns?
-- Are there design choices that make testing or validation unnecessarily difficult?
-- Anything else a senior reviewer would push back on? (Use judgment)
-
-The main agent remains accountable for the execute-review loop:
-
-1. Implement the requested change.
-2. Call the review skill on the current dirty tree.
-3. Fix blocking findings, plus any non-blocking findings whose fix is trivial.
-4. Repeat from step 2 until the skill reports no blocking findings.
-5. Ask the user to decide the remaining non-blocking findings, if any: fix, defer, or ignore.
-
-# Version Control Guidelines
-
-- Commit each functionally independent change once fully implemented, tested, and documented.
-- Commit messages MUST follow this template. Do not add "Co-Authored-By" line:
-
-```
-<Your name: Claude/Codex/Antigravity/...>: <one-line summary>
-
-<One paragraph describing the change in detail. If more than one paragraph is necessary to explain the change, the commit SHOULD be broken down.>
-```
+- Keep functionally independent changes in separate, self-contained commits once implemented, validated, and documented. Honor requests to leave drafts uncommitted.
+- Stage explicit paths, inspect the staged diff and repository status immediately before committing, and exclude unrelated work. NEVER use `git add -A` or `git commit -a`.
+- Commit messages MUST start with `<Claude/Codex/Antigravity/...>: <one-line summary>`, followed by a blank line and explanatory paragraphs. Do not add a `Co-Authored-By` line.
