@@ -12,10 +12,9 @@
     "remoteUser": "ubuntu",
     "workspaceFolder": "/workspaces/youtube-whisperer",
     "mounts": [
-        // share Git + SSH + Claude Code plugins config between host and container
+        // share Git + SSH config between host and container
         "source=${localEnv:HOME}/.gitconfig,target=/home/ubuntu/.gitconfig,type=bind,readonly",
         "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind,readonly",
-        "source=${localEnv:HOME}/.claude/plugins/installed_plugins.json,target=/home/ubuntu/.claude/plugins/installed_plugins.json,type=bind",
         // override .dockerignore to mount the entire workspace
         "source=${localWorkspaceFolder},target=/workspaces/youtube-whisperer,type=bind"
     ],
