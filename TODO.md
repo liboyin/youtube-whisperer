@@ -20,7 +20,7 @@ This section owns how TODO is updated. General working principles belong in AGEN
 
 The inherited findings come from the 2026-07 full-project review recorded in the former `PLAN.md`. Every one of them was revalidated by source inspection on 2026-09-11 against commit 98c4518, in the project devcontainer on Python 3.12.3. All but the entries below are implemented; the legacy mapping records each disposition.
 
-Gate results at that revision: 197 tests pass, mypy reports no issues across 27 source files, `ruff check .` is clean, and total coverage is 98.5% statement and 92.5% branch. The per-file branch shortfalls in NB1 were measured by `./check-coverage.sh` at the same revision.
+Gate results at that revision: 197 tests pass, mypy reports no issues across 27 source files, `ruff check .` is clean, and total coverage is 98.5% statement and 92.5% branch. That revision predates the per-file branch coverage work, so its numbers do not describe the current tree.
 
 **Validated** means source inspection or a recorded command at that revision supported the finding. **Not independently validated** identifies work accepted from a user request without separate evidence. Revalidate affected claims and remedies against the execution revision.
 
@@ -33,7 +33,7 @@ Gate results at that revision: 197 tests pass, mypy reports no issues across 27 
 | D1 | Tests are not type-checked. The mypy gate covers `youtube_whisperer` only, and widening it is not planned work. | NB3 |
 | D2 | The adversarial review harness is the Codex plugin for Claude Code. Antigravity is removed and is not a substitute reviewer. | B1 |
 | D3 | Governance files track their ClipboardTTS counterparts. Deviate only for local project context, and record the deviation. | Documentation ownership |
-| D4 | `check-coverage.sh` owns the executable coverage policy. `pyproject.toml` keeps the pytest and aggregate coverage configuration. | NB1 |
+| D4 | `check-coverage.sh` owns the executable coverage policy. `pyproject.toml` keeps the pytest and aggregate coverage configuration. | Coverage policy |
 
 ### Decisions carried forward from PLAN.md
 
@@ -65,18 +65,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 ### Non-blocking
 
-#### NB1 — Three files are below the mandated branch-coverage threshold
-
-**Validated — `./check-coverage.sh` at 98c4518.** Statement coverage clears 80% everywhere, but branch coverage does not, so the coverage gate fails at HEAD.
-
-| File | Statement | Branch |
-|---|---|---|
-| [workers/common.py](youtube_whisperer/workers/common.py) | 92.4% | 70.0% |
-| [downloaders/utils.py](youtube_whisperer/downloaders/utils.py) | 100% | 75.0% |
-| [downloaders/video_downloader.py](youtube_whisperer/downloaders/video_downloader.py) | 100% | 75.0% |
-
-**Direction:** cover the missing branches with tests that encode why the behavior matters. **Non-goals:** lowering `COVERAGE_THRESHOLD`, adding coverage exclusions, or deleting branches solely to satisfy the gate. **Acceptance:** `./check-coverage.sh` exits zero at the default threshold.
-
 #### NB2 — Ruff runs with its default rule set
 
 **Validated — no `[tool.ruff]` configuration exists at 98c4518.** Only the default `E4`, `E7`, `E9`, and `F` rules are active, so nothing enforces line length, import ordering, docstring style, or common-bug patterns. AGENTS requires narrow, justified lint exceptions, but almost nothing currently produces one. **Paths:** [pyproject.toml](pyproject.toml). **Direction:** after the inventory required by the investigation gate, select a broader set. Pydocstyle with the Google convention would mechanize the docstring rule that AGENTS states in prose. **Acceptance:** `ruff check .` passes under the expanded selection and every `noqa` carries the rationale AGENTS requires. **Non-goals:** restructuring code beyond what the selected rules demand.
@@ -99,7 +87,7 @@ No outstanding nits.
 
 ## Ready for implementation
 
-NB1 and NB4 are ready as written. NB2 and NB3 need their investigation gates cleared first. B1 needs an action on the host that an agent inside the container cannot perform. NB5 needs a user decision on the mechanism before it has a boundary.
+NB4 is ready as written. NB2 and NB3 need their investigation gates cleared first. B1 needs an action on the host that an agent inside the container cannot perform. NB5 needs a user decision on the mechanism before it has a boundary.
 
 ## Deferred, accepted, and completed dispositions
 
@@ -107,6 +95,7 @@ NB1 and NB4 are ready as written. NB2 and NB3 need their investigation gates cle
 - Legacy finding 11 is accepted without change under D6 and documented in README's known limitations.
 - Legacy finding 25 is accepted under D5; README's security and trust model section owns it.
 - Legacy finding 9 is closed. The single remaining `assert` narrows a type and carries a comment saying so; it does not validate external input.
+- NB1 is implemented. The three files below the branch-coverage threshold are covered and `./check-coverage.sh` passes at the default threshold; the implementation commit holds the evidence.
 - Legacy finding 26 remains open as NB5. Every other inherited finding is implemented.
 - `ISSUES.md` was deleted before the PLAN.md review; its still-open item became legacy finding 5 and is implemented.
 

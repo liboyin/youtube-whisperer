@@ -59,6 +59,26 @@ def test_download_video_downloads_with_cookies_when_available(mocker, tmp_path):
     assert created["ydl"].download_calls == [["https://example.com/watch?v=2"]]
 
 
+def test_download_video_omits_cookies_when_unavailable(mocker, tmp_path):
+    """Test that the download omits Firefox cookies when no browser profile is available."""
+    target_path = tmp_path / "video.mp4"
+    created = {}
+
+    def fake_factory(options):
+        created["ydl"] = FakeYoutubeDL(options)
+        return created["ydl"]
+
+    mocker.patch.object(video_testee, "prepare_output_file")
+    mocker.patch.object(video_testee, "is_firefox_cookies_available", return_value=False)
+    mocker.patch.object(video_testee.yt_dlp, "YoutubeDL", side_effect=fake_factory)
+
+    video_testee.download_video("https://example.com/watch?v=4", target_path, OverwriteMode.ALWAYS)
+
+    # Asking yt-dlp for browser cookies that do not exist makes it fail instead of downloading anonymously.
+    assert "cookiesfrombrowser" not in created["ydl"].options
+    assert created["ydl"].download_calls == [["https://example.com/watch?v=4"]]
+
+
 def test_download_video_with_default_title_sanitizes_title_and_downloads(mocker, tmp_path):
     """Test that the video title is sanitized into the output filename before downloading."""
     mocker.patch.object(video_testee, "get_video_title", return_value="bad:/title")
