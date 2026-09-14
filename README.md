@@ -70,7 +70,7 @@ check-coverage.sh               # Run the suite and enforce the per-file coverag
 Four components cooperate:
 
 1. **REST API** (`api/app.py`) — Accepts tasks. URL tasks are queued directly for the YouTube worker. Filesystem glob patterns are resolved in the API itself because that is a cheap local operation with no network I/O.
-2. **YouTube worker** — Expands playlists and channels, downloads video/audio, attempts a transcript download, and enqueues a follow-up filesystem transcription task (for the requested transcriber) only when an SRT is still missing. A `none` transcriber requests download only, so no follow-up transcription task is ever enqueued.
+2. **YouTube worker** — Expands playlists and channels, then processes each expanded video independently: it downloads video/audio, attempts a transcript download, and enqueues a follow-up filesystem transcription task (for the requested transcriber) as soon as that video turns out to still be missing an SRT. A `none` transcriber requests download only, so no follow-up transcription task is ever enqueued.
 3. **Transcription workers** — The Whisper and Azure workers consume their Redis streams via a shared consumer group and write SRT files.
 4. **Redis** — Stores the streams, tracks each consumer's Pending Entries List (PEL), and holds the dead-letter list.
 
@@ -78,10 +78,11 @@ Four components cooperate:
 
 1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper`, `azure`, or `none` to download a URL without transcribing it), a language, and a `mode` (`transcribe` or `translate`).
 2. The API routes URL tasks to `stream:youtube`. Filesystem glob patterns are expanded immediately and the concrete file paths are pushed to `stream:whisper` or `stream:azure`.
-3. The YouTube worker expands playlist/channel URLs, downloads media, and tries to fetch an existing transcript.
-4. If a transcript is already present (or the transcriber is `none`), the work is considered complete and no follow-up transcription task is queued.
-5. Otherwise, if a transcript is missing, the YouTube worker enqueues a concrete filesystem task into the requested transcriber's stream.
-6. A Whisper or Azure worker consumes the task via the consumer group, processes the media, and only then runs `XACK` + `XDEL` — so a failure dead-letters the task and a crash leaves it recoverable rather than silently dropped.
+3. The YouTube worker expands playlist/channel URLs into individual video URLs, then handles each video on its own: it downloads the media and tries to fetch an existing transcript.
+4. If a transcript is already present (or the transcriber is `none`), that video is complete and no follow-up transcription task is queued.
+5. Otherwise, if a transcript is missing, the YouTube worker immediately enqueues a concrete filesystem task for that video into the requested transcriber's stream, before moving to the next video.
+6. If a video fails to download, look up captions, or enqueue its follow-up, that one video is dead-lettered under its own video URL and the remaining videos are still processed. See [Playlist videos succeed or fail independently](#playlist-videos-succeed-or-fail-independently).
+7. A Whisper or Azure worker consumes the task via the consumer group, processes the media, and only then runs `XACK` + `XDEL` — so a failure dead-letters the task and a crash leaves it recoverable rather than silently dropped.
 
 ## Queue Layout
 
@@ -105,6 +106,14 @@ The Whisper, Azure, and YouTube workers each read their stream through one share
 ### YouTube work runs outside the API
 
 The API only performs local filesystem glob expansion. All network-facing YouTube work (expansion, download, transcript lookup) happens in the dedicated YouTube worker, so a slow or failing download never blocks an API request.
+
+### Playlist videos succeed or fail independently
+
+A playlist or channel task fans out into many videos, and one unavailable video should not cost the others their work. The YouTube worker therefore enqueues each video's follow-up transcription task as soon as that video is downloaded, instead of buffering them until the whole playlist finishes. A video that fails is dead-lettered under its own concrete video URL, carrying `stream:youtube` as its origin queue, and expansion continues with the next video. The parent playlist task is acknowledged once every expanded video has been attempted, so `GET /dead-letters` lists exactly the videos that need attention and each can be resubmitted on its own.
+
+Two failures still belong to the parent task: a failure while expanding the playlist itself, and a failure to write the dead letter. Both propagate to the shared worker loop, which dead-letters (or, for an interrupt, leaves pending) the original task — follow-ups already enqueued for completed videos stay durable either way.
+
+Reprocessing is safe. A recovered or resubmitted playlist re-downloads nothing that already exists under `OverwriteMode.NEVER`, and a video whose SRT has since been written reports its transcript as present, so no duplicate transcription task is queued.
 
 ### Azure completion is synchronous per worker
 

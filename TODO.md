@@ -77,6 +77,12 @@ These choices do not need to be asked again. Validate exact implementation detai
 | D15 | Empty decoded audio must be reported as a failed task rather than acknowledged without output. | NB23; supersedes the documented successful skip |
 | D16 | After successful video download, caption-service errors should allow download-only completion or the requested transcription fallback. | NB24; supersedes fatal caption-service errors for this case |
 
+### Accepted user decisions — 2026-09-14
+
+| ID | Decision and rationale | Applies to |
+|---|---|---|
+| D17 | A playlist/channel video that fails does not stop the remaining videos. Each failed video is dead-lettered under its own concrete video URL so it can be retried alone, and the parent task is acknowledged once every expanded video has been attempted. The user chose continue-and-report over stopping at the first failure because one private or unavailable video should not cost a large playlist its work. | B3 (implemented); coordinate NB24 |
+
 Accepted limitations above have no implementation assignment. Revisit if the user changes the product contract or evidence shows impact outside the accepted scenario. They do not waive AGENTS' safety requirements.
 
 ### Constraints that remain in force
@@ -97,10 +103,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 #### B2 — Tests probe filesystem paths outside their ownership
 
 **Severity: High. Validated — source inspection.** [API tests](tests/api/test_app.py):267 call the real directory-listing helper on `/definitely/missing`; [Azure tests](tests/transcriber/test_azure_transcriber.py):169,195,220,247 pass relative `audio.wav`, causing the real transcriber to probe workspace `audio.srt`. An existing file can change the execution path or trigger a prompt. This violates AGENTS even when a probe finds nothing. **Outcome:** all filesystem accesses use test-owned paths and teardown. **Acceptance:** instrument accesses in an isolated test environment, cover existing/missing outputs, and demonstrate no access outside owned temporary paths. **Dependencies:** resolve before running baseline gates; coordinate configuration ownership with NB12. No production files may be seeded or copied to prove non-access.
-
-#### B3 — A later playlist failure loses earlier transcription follow-ups
-
-**Severity: High. Validated — source and isolated reproduction.** [YouTubeWorker.process_task](youtube_whisperer/workers/youtube_worker.py):53–66 buffers follow-ups until the entire playlist/channel finishes. A first successful download without SRT followed by a second download exception produces zero enqueue calls; the parent then dead-letters and is acknowledged. Earlier media remains without its requested transcription. **Outcome:** preserve and deliver completed-item progress despite later expansion/download failure. **Acceptance:** earlier success followed by extraction/download failure, failed enqueue, retry, and restart do not strand required follow-ups. **Dependencies:** decide stop-versus-continue behavior for remaining playlist items before implementation; recording the defect does not choose that policy.
 
 #### B4 — URL translation can finish with source-language captions
 
@@ -210,7 +212,7 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 #### NB24 — Caption-service errors abort already-downloaded video work
 
-**Severity: Medium. Validated — source inspection; requested under D16.** [Transcript lookup](youtube_whisperer/downloaders/transcript_downloader.py):89–117 handles disabled/missing transcripts but propagates other service failures through [download orchestration](youtube_whisperer/downloaders/__init__.py):26–28. After media has downloaded, the worker therefore dead-letters download-only work or skips its requested transcription fallback. **Outcome:** retain the successful media result, report the caption-service problem, and complete download-only work or enqueue the selected transcriber. **Acceptance:** listing/fetching service errors after successful download preserve the media and chosen fallback; genuine media-download, local output-write, and transcription failures still surface appropriately. **Dependencies:** D16; coordinate NB19 timeout handling, B3 playlist progress, and B4 translation semantics. Do not catch all local/programming errors as though captions were merely unavailable.
+**Severity: Medium. Validated — source inspection; requested under D16.** [Transcript lookup](youtube_whisperer/downloaders/transcript_downloader.py):89–117 handles disabled/missing transcripts but propagates other service failures through [download orchestration](youtube_whisperer/downloaders/__init__.py):26–28. After media has downloaded, the worker therefore dead-letters download-only work or skips its requested transcription fallback. **Outcome:** retain the successful media result, report the caption-service problem, and complete download-only work or enqueue the selected transcriber. **Acceptance:** listing/fetching service errors after successful download preserve the media and chosen fallback; genuine media-download, local output-write, and transcription failures still surface appropriately. **Dependencies:** D16; coordinate NB19 timeout handling and B4 translation semantics, and preserve D17's per-video dead-lettering (a caption-service error currently dead-letters that one video). Do not catch all local/programming errors as though captions were merely unavailable.
 
 #### NB28 — Stream polling repeats decoding and group-recovery policy
 
@@ -218,7 +220,7 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 #### NB29 — Task preparation is embedded in the HTTP route
 
-**Severity: Low. Validated structural observation — source inspection at ed9b3a1 on 2026-09-14; proposed architecture improvement.** [add_tasks](youtube_whisperer/api/app.py):116–136 mixes pattern classification, filesystem expansion, response bookkeeping, and Redis submission. Its product rules can currently be exercised only through a module that imports FastAPI and the application's configured resources. **Outcome:** a small internal preparation operation returns routed tasks and failed patterns; the endpoint retains HTTP serialization and the existing queue adapter performs submission. **Acceptance:** preparation tests use owned files without FastAPI or Redis doubles; adapter tests preserve response/status, successful/failed ordering, URL-before-filesystem submission, metadata, and `none` handling. **Dependencies:** coordinate NB16/NB22 and NB4; preserve D11 best-effort submission and keep filesystem expansion in the API process. No new wire schema, workflow engine, or persisted state is proposed. Apply the same separation to per-video follow-up decisions only within B3/B4/NB24's assigned boundaries.
+**Severity: Low. Validated structural observation — source inspection at ed9b3a1 on 2026-09-14; proposed architecture improvement.** [add_tasks](youtube_whisperer/api/app.py):116–136 mixes pattern classification, filesystem expansion, response bookkeeping, and Redis submission. Its product rules can currently be exercised only through a module that imports FastAPI and the application's configured resources. **Outcome:** a small internal preparation operation returns routed tasks and failed patterns; the endpoint retains HTTP serialization and the existing queue adapter performs submission. **Acceptance:** preparation tests use owned files without FastAPI or Redis doubles; adapter tests preserve response/status, successful/failed ordering, URL-before-filesystem submission, metadata, and `none` handling. **Dependencies:** coordinate NB16/NB22 and NB4; preserve D11 best-effort submission and keep filesystem expansion in the API process. No new wire schema, workflow engine, or persisted state is proposed. Apply the same separation to per-video follow-up decisions only within B4/NB24's assigned boundaries; `YouTubeWorker.process_video` already owns the per-video step under D17.
 
 #### NB30 — Three download operations duplicate yt-dlp defaults
 
@@ -282,11 +284,12 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 NB4 is ready as written. NB2 and NB3 need their investigation gates cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
 
-B2 and NB12–NB13 establish the safe test environment required for subsequent application gates. Other new entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming, translation-caption preference, and playlist continuation must be settled before their dependent implementation. D13–D16 settle the product outcomes for NB22–NB24 and N7–N8; their implementation boundaries still need expansion. Documentation nits can proceed independently under AGENTS' documentation-only exemption.
+B2 and NB12–NB13 establish the safe test environment required for subsequent application gates. Other new entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming and translation-caption preference must be settled before their dependent implementation; playlist continuation is settled by D17. D13–D16 settle the product outcomes for NB22–NB24 and N7–N8; their implementation boundaries still need expansion. Documentation nits can proceed independently under AGENTS' documentation-only exemption.
 
 ## Deferred, accepted, and completed dispositions
 
 - B1 is closed at the user's explicit direction on 2026-09-12: the Claude+Codex workflow was proven externally (D7). No remaining setup blocker is carried forward.
+- B3 is implemented under D17: the YouTube worker enqueues each video's follow-up as soon as that video is downloaded and dead-letters a failed video under its own URL, so a later failure no longer discards earlier progress. README's [Playlist videos succeed or fail independently](README.md#playlist-videos-succeed-or-fail-independently) owns the resulting behavior.
 - The 2026-09-12 review accepts gap-bridging deduplication, dead-letter clearing races, production-worker startup in the devcontainer, best-effort batch enqueue, and manual repair of malformed Redis payloads under D8–D12; these are not omitted defects awaiting an implicit fix.
 
 - Legacy finding 2, path traversal in `POST /assets`, is obsolete rather than fixed: the upload endpoint no longer exists, so no client-controlled filename reaches the filesystem. Revisit only if uploads return.
