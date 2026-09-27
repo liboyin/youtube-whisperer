@@ -16,6 +16,8 @@ Return a reviewer-triaged report without changing the repository. The reviewer M
    - **Codex:** spawn the reviewer as a native subagent with `spawn_agent`, using `fork_turns: "none"` and explicit `model: "gpt-6-sol"` and `reasoning_effort: "high"` overrides. Native subagents inherit the current Full Access environment; no sandbox configuration is required.
    - **Claude Code with the Codex plugin:** dispatch the reviewer with `/codex:rescue --fresh --write --model gpt-6-sol --effort high <review prompt>` or a fresh underlying companion `task` command with the same model and effort. Never use `--resume` or `--resume-last`.
 
+   Track any background reviewer invocation through completion and capture its exit status and report before dispositioning findings; starting the task is not evidence that review completed.
+
    When the Codex plugin is not installed, install it without asking, then verify:
 
    ```bash
@@ -27,6 +29,8 @@ Return a reviewer-triaged report without changing the repository. The reviewer M
    The plugin is [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc), which also documents the `codex` binary it drives and the `codex login` that authenticates it. Authentication is interactive and cannot be automated. If any step fails, stop and tell the user which command to run manually; do not work around a failed install.
 
    **Scratch copy.** The reviewer writes only outside the repository, to build and test its copy of the target; native Codex inherits that access and Claude Code gets it from `--write`. Every dispatch MUST require the reviewer to keep the repository read-only, work only in that copy, and delete it at exit. Build the copy from the tracked target state plus the in-scope staged and unstaged changes, adding only the in-scope untracked files the dispatch names and never ignored or out-of-scope content; a reviewer that cannot create it returns `Review blocked`. The reviewer is trusted here: step 1's snapshot and step 4's comparison detect accidental mutation, they are not a security boundary.
+
+   A scratch copy does not itself satisfy AGENTS' test-ownership rules: focused tests and mutation runs also need test-owned paths, settings, and service doubles. Do not copy `.env`, browser profiles, media libraries, or model caches into the scratch copy, or run it against those resources through inherited configuration.
 
    **Sandbox fallback.** A container that forbids unprivileged user namespaces cannot start the reviewer's `bwrap` sandbox: every command fails and it returns `Review blocked` having inspected nothing. Confirm that first, for example that `unshare --user true` fails for root too, so an ordinary scratch-copy failure is not mistaken for it. The companion pins its sandbox mode in source, so no plugin flag reaches it and the reviewer must be driven through the CLI the plugin itself drives: `codex exec --dangerously-bypass-approvals-and-sandbox --model gpt-6-sol -c model_reasoning_effort="high"`. That run is fresh unless resumed and has no `--effort` flag; add `--skip-git-repo-check` when its working directory is outside a repository, and bypassing the sandbox already grants what `--write` would.
 
