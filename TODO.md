@@ -154,10 +154,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 **Severity: Medium. Validated — source and fake-recognizer reproduction (`started=1`, `stopped=0`).** [transcribe_audio_file](youtube_whisperer/transcriber/azure_transcriber.py):108–116 starts recognition, then inspects duration before entering its cleanup `try/finally`. An `sf.info` failure skips stop. **Outcome:** every started session is stopped on failure, with no output and normal worker error propagation. **Acceptance:** duration-inspection failure, startup failure, timeout, cancellation, and success have explicit owned cleanup. **Dependencies:** none; preserve the test-owned paths, synthetic settings, and callback quiescence established under B2/NB12/NB13. **Architecture review — 2026-09-14:** isolate start/wait/stop, callbacks, and result/error collection in a recognition operation; let the existing file entry point retain preflight and SRT output. Preserve synchronous completion, timeout floor/multiplier, empty-event handling, event order/logging, and cancellation details. This gives cleanup one responsibility without adding a session-class framework or moving file writes onto callback threads.
 
-#### NB10 — Azure final saving drops the caller's overwrite policy
-
-**Severity: Medium. Validated — source inspection.** [Azure saving](youtube_whisperer/transcriber/azure_transcriber.py):121 omits `overwrite`, so the serializer defaults to `PROMPT`. `ALWAYS` can prompt again; an SRT appearing during recognition can prompt or raise EOF even though the worker supplied `NEVER`. **Outcome:** honor the caller's policy throughout final publication. **Acceptance:** allowed replacement, denied replacement, and a competing output appearing during recognition never read stdin in worker mode. **Dependencies:** coordinate B6; update the existing test that currently expects only `deduplicate=True`.
-
 #### NB11 — Allowed video overwrites are not forwarded to yt-dlp
 
 **Severity: Medium. Validated — source and installed yt-dlp existing-file behavior.** [download_video](youtube_whisperer/downloaders/video_downloader.py):28–40 checks overwrite permission but never configures yt-dlp to overwrite. The pathlib helper only returns permission; yt-dlp's existing-video path defaults to retaining the file. Consequently `ALWAYS` does not fulfill the wrapper's replacement contract. **Outcome:** replace existing videos only when authorized by the supplied policy. **Acceptance:** owned existing-file scenarios verify `ALWAYS` replaces and `NEVER` preserves, using the library contract without external downloads. **Dependencies:** none; mocking the entire download operation is insufficient verification.
@@ -289,6 +285,8 @@ Other new entries are compact findings, not implementation assignments: expand e
 D18–D21 settle the compatibility, resource ownership, settings lifetime, and worker-identity choices for NB25–NB27. Expand their implementation boundaries before changing code; retain existing Python entry points and all previously accepted product behavior.
 
 ## Deferred, accepted, and completed dispositions
+
+- NB10 is implemented: Azure carries the caller’s overwrite policy through preflight and final SRT saving; README’s [Azure completion](README.md#azure-completion-is-synchronous-per-worker) describes the behavior. B6 publication and NB9 lifecycle cleanup remain separate work.
 
 - B1 is closed at the user's explicit direction on 2026-09-12: the Claude+Codex workflow was proven externally (D7). No remaining setup blocker is carried forward.
 - B3 is implemented under D17: the YouTube worker enqueues each video's follow-up as soon as that video is downloaded and dead-letters a failed video under its own URL, so a later failure no longer discards earlier progress. README's [Playlist videos succeed or fail independently](README.md#playlist-videos-succeed-or-fail-independently) owns the resulting behavior.

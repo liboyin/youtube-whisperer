@@ -117,7 +117,7 @@ Reprocessing is safe. A recovered or resubmitted playlist re-downloads nothing t
 
 ### Azure completion is synchronous per worker
 
-`transcribe_audio_file()` blocks until Azure finishes, fails, or times out (`max(60s, 1.5 × audio duration)` — the floor keeps short clips from timing out during session startup). The worker acknowledges the message only after that call returns, so an Azure failure is dead-lettered rather than lost.
+`transcribe_audio_file()` blocks until Azure finishes, fails, or times out (`max(60s, 1.5 × audio duration)` — the floor keeps short clips from timing out during session startup). The worker acknowledges the message only after that call returns, so an Azure failure is dead-lettered rather than lost. Azure carries the caller’s overwrite policy through preflight and final SRT saving: `ALWAYS` replaces output, `NEVER` preserves output even if it appears during recognition, and the default `PROMPT` asks for consent.
 
 ### The Whisper model is kept resident
 

@@ -64,7 +64,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
         input_file_path (Path): The path to the audio file to transcribe.
         language (LanguageCode): The language of the audio file.
         output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
+        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files at preflight and final saving. Defaults to `prompt`.
 
     Returns:
         Path | None: Output SRT file path, or `None` if transcription failed.
@@ -118,5 +118,5 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     if transcription_error is not None:
         raise transcription_error
 
-    save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True)
+    save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True, overwrite=overwrite)
     return output_file_path
