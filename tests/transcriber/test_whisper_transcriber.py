@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import numpy as np
@@ -88,19 +89,52 @@ def test_transcribe_waveform_ignores_target_in_transcribe_mode(caplog):
     assert "{'lang': 'zh', 'task': 'transcribe'}" in caplog.text
 
 
+@contextmanager
+def owned_default_whisper_model_cache():
+    """Isolate a fake default model in the process-wide cache.
+
+    The cache is cleared on entry and every exit, including assertion failures.
+
+    Yields:
+        None: A scope for constructing and checking a fake model.
+    """
+    testee.get_default_whisper_model.cache_clear()
+    try:
+        yield
+    finally:
+        testee.get_default_whisper_model.cache_clear()
+
+
 def test_get_default_whisper_model_builds_once_and_caches(mocker):
     """Test that the default model is built from resolved parameters once and served from cache thereafter."""
-    testee.get_default_whisper_model.cache_clear()
     model = mocker.MagicMock()
     mocker.patch.object(testee, "get_default_whisper_model_parameters", return_value={"device": "cpu"})
     mock_model_cls = mocker.patch.object(testee, "WhisperModel", return_value=model)
 
-    first = testee.get_default_whisper_model()
-    second = testee.get_default_whisper_model()
+    with owned_default_whisper_model_cache():
+        first = testee.get_default_whisper_model()
+        second = testee.get_default_whisper_model()
 
-    assert first is model and second is model
-    mock_model_cls.assert_called_once_with(device="cpu")  # built once, kept resident across calls
-    testee.get_default_whisper_model.cache_clear()
+        assert first is model and second is model
+        mock_model_cls.assert_called_once_with(device="cpu")  # built once, kept resident across calls
+
+
+def test_get_default_whisper_model_clears_fake_after_assertion_failure(mocker):
+    """Test that a failed assertion releases the fake so the next cache use builds anew."""
+    first_model = mocker.MagicMock()
+    next_model = mocker.MagicMock()
+    mock_model_cls = mocker.patch.object(testee, "WhisperModel", side_effect=[first_model, next_model])
+    mocker.patch.object(testee, "get_default_whisper_model_parameters", return_value={"device": "cpu"})
+
+    with pytest.raises(AssertionError, match="injected failure"), owned_default_whisper_model_cache():
+        assert testee.get_default_whisper_model() is first_model
+        raise AssertionError("injected failure")
+
+    assert testee.get_default_whisper_model.cache_info().currsize == 0
+    with owned_default_whisper_model_cache():
+        assert testee.get_default_whisper_model() is next_model
+        assert testee.get_default_whisper_model() is next_model
+    assert mock_model_cls.call_count == 2
 
 
 def test_transcribe_waveform_with_default_model_uses_cached_model(mocker):

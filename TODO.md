@@ -162,10 +162,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 **Severity: Medium. Validated — source and installed yt-dlp existing-file behavior.** [download_video](youtube_whisperer/downloaders/video_downloader.py):28–40 checks overwrite permission but never configures yt-dlp to overwrite. The pathlib helper only returns permission; yt-dlp's existing-video path defaults to retaining the file. Consequently `ALWAYS` does not fulfill the wrapper's replacement contract. **Outcome:** replace existing videos only when authorized by the supplied policy. **Acceptance:** owned existing-file scenarios verify `ALWAYS` replaces and `NEVER` preserves, using the library contract without external downloads. **Dependencies:** none; mocking the entire download operation is insufficient verification.
 
-#### NB14 — A failed cache test leaves its fake model resident
-
-**Severity: Low. Validated — source inspection.** [Whisper cache test](tests/transcriber/test_whisper_transcriber.py):91–103 clears the cache after assertions without a finalizer. An assertion failure leaves the mocked model cached after patches are restored, contaminating later randomly ordered tests. **Outcome:** own and clear the cache on every exit. **Acceptance:** inject failure after cache population and verify teardown and a subsequent test observe no stale fake. **Dependencies:** none; do not load a real model to test this.
-
 #### NB15 — API handlers block the event loop with synchronous work
 
 **Severity: Medium. Validated — source inspection.** [API endpoints](youtube_whisperer/api/app.py):77–240 are `async def` but call synchronous Redis/glob/directory/deletion operations directly. Slow Redis or a large traversal stalls unrelated requests in the configured single-process uvicorn service; the shared Redis pool deliberately has no read timeout for workers. **Outcome:** preserve responsiveness while blocking dependencies wait. **Acceptance:** hold one dependency behind an explicit barrier and verify an independent request completes; release and quiesce all work. **Dependencies:** preserve worker blocking-read semantics; do not impose a short shared socket timeout as a mechanical fix.
@@ -304,6 +300,7 @@ D18–D21 settle the compatibility, resource ownership, settings lifetime, and w
 - Legacy finding 9 is closed. The single remaining `assert` narrows a type and carries a comment saying so; it does not validate external input.
 - NB1 is implemented. The three files below the branch-coverage threshold are covered and `./check-coverage.sh` passes at the default threshold; the implementation commit holds the evidence.
 - B2 and NB12–NB13 are implemented as test-ownership work. Collection starts with synthetic configuration, API and Azure tests use temporary paths, tests use owned settings and clients, and Azure callback threads have owned cancellation and quiescence. README's [testing instructions](README.md#testing) cover the fresh-process requirement; the implementation commit holds current gate and mutation evidence.
+- NB14 is implemented. The Whisper cache test clears its fake model on every exit, including assertion failures; its separate implementation commit holds the evidence.
 - Legacy finding 26 remains open as NB5. Every other inherited finding is implemented.
 - `ISSUES.md` was deleted before the PLAN.md review; its still-open item became legacy finding 5 and is implemented.
 
