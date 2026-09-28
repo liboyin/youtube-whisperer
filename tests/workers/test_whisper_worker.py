@@ -10,6 +10,20 @@ from youtube_whisperer.transcriber.rejection_policy import RejectedTranscription
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 
 
+@pytest.fixture
+def client(mocker):
+    """Give each Whisper worker test an isolated Redis double."""
+    return mocker.MagicMock(name='redis-client')
+
+
+@pytest.fixture
+def worker(client):
+    """Bind the Whisper worker to the test-owned Redis client."""
+    instance = testee.WhisperWorker('gpu-0', client=client)
+    assert instance.client is client
+    return instance
+
+
 def test_is_gpu_healthy_returns_true_when_nvidia_smi_succeeds(mocker):
     """Test that the GPU health check succeeds when `nvidia-smi` exits cleanly."""
     mocker.patch.object(testee.subprocess, "run", return_value=SimpleNamespace(returncode=0))
@@ -58,27 +72,25 @@ def test_validate_gpu_health_or_exit_no_cuda(mocker):
     mock_exit.assert_not_called()
 
 
-def test_dispatch_task_for_whisper_transcriber(mocker):
+def test_dispatch_task_for_whisper_transcriber(mocker, worker):
     """Test dispatching to the Whisper transcriber."""
     mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_transcribe = mocker.patch.object(testee, 'transcribe_file_with_default_model')
     task = Task(source='/path.mp4', transcriber=TranscriberType.WHISPER, mode=TranscriberMode.TRANSCRIBE)
     source_path = Path('/path.mp4')
 
-    testee.WhisperWorker('gpu-0').dispatch_task(task, source_path)
+    worker.dispatch_task(task, source_path)
 
     mock_validate_gpu.assert_called_once()
     mock_transcribe.assert_called_once_with(source_path, task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
 
 
-def test_dispatch_task_propagates_transcription_failure(mocker):
+def test_dispatch_task_propagates_transcription_failure(mocker, worker):
     """Test that a Whisper transcription failure propagates so the worker loop can dead-letter the task."""
     mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mocker.patch.object(testee, 'transcribe_file_with_default_model', side_effect=RejectedTranscriptionError('bad output'))
     task = Task(source='/path.mp4', transcriber=TranscriberType.WHISPER)
 
     with pytest.raises(RejectedTranscriptionError, match='bad output'):
-        testee.WhisperWorker('gpu-0').dispatch_task(task, Path('/path.mp4'))
-
-
+        worker.dispatch_task(task, Path('/path.mp4'))
 

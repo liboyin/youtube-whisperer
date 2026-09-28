@@ -1,4 +1,3 @@
-import os
 from types import SimpleNamespace
 
 import pytest
@@ -18,25 +17,28 @@ def test_worker_role_rejects_legacy_local_alias():
 
 
 def test_resolve_worker_slot_prefers_explicit_slot(mocker):
-    """Test that an explicit slot overrides environment-derived slot names."""
-    mocker.patch.dict(os.environ, {'WORKER_SLOT_ID': '0'})
-    mocker.patch('socket.gethostname', return_value='host-slot')
+    """Test that an explicit slot bypasses settings and hostname lookup."""
+    mock_settings = mocker.patch.object(testee, 'Settings')
+    mock_hostname = mocker.patch.object(testee.socket, 'gethostname')
 
     assert testee.resolve_worker_slot('explicit-slot', 'whisper') == 'explicit-slot'
+    mock_settings.assert_not_called()
+    mock_hostname.assert_not_called()
 
 
 def test_resolve_worker_slot_falls_back_to_slot_id(mocker):
-    """Test that the worker slot uses `WORKER_SLOT_ID` combined with the role name."""
-    mocker.patch.dict(os.environ, {'WORKER_SLOT_ID': '7'})
-    mocker.patch('socket.gethostname', return_value='host-slot')
+    """Test that the configured slot ID is combined with the role name."""
+    mocker.patch.object(testee, 'Settings', return_value=SimpleNamespace(worker_slot_id='7'))
+    mock_hostname = mocker.patch.object(testee.socket, 'gethostname')
 
     assert testee.resolve_worker_slot(None, 'whisper') == 'whisper-7'
+    mock_hostname.assert_not_called()
 
 
 def test_resolve_worker_slot_falls_back_to_socket_hostname(mocker):
     """Test that slot resolution falls back to `socket.gethostname()`."""
-    mocker.patch.dict(os.environ, {}, clear=True)
-    mocker.patch('socket.gethostname', return_value='host-slot')
+    mocker.patch.object(testee, 'Settings', return_value=SimpleNamespace(worker_slot_id=None))
+    mocker.patch.object(testee.socket, 'gethostname', return_value='host-slot')
     assert testee.resolve_worker_slot(None, 'whisper') == 'host-slot'
 
 
@@ -85,6 +87,7 @@ def test_process_queue_rejects_unknown_worker_role():
 def test_main_parses_arguments_and_dispatches(mocker):
     """Test that the worker CLI parses arguments and dispatches to `process_queue`."""
     mock_process = mocker.patch.object(testee, 'process_queue')
+    mocker.patch.object(testee, 'Settings', return_value=SimpleNamespace(worker_role='whisper'))
     mocker.patch(
         'argparse.ArgumentParser.parse_args',
         return_value=SimpleNamespace(role='youtube', slot='yt-0', poll_interval_seconds=9),

@@ -1,11 +1,12 @@
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
 from pathlib_extensions import OverwriteMode
 
+import youtube_whisperer.workers.common as common_testee
 import youtube_whisperer.workers.youtube_worker as testee
-from youtube_whisperer.config import Settings
 from youtube_whisperer.models import Task
 from youtube_whisperer.utils import TranscriberMode, TranscriberType
 
@@ -42,8 +43,10 @@ def _raise(url):
     raise RuntimeError(f'download failed for {url}')
 
 
-def test_youtube_worker_stream_bindings(mocker, client):
+@pytest.mark.parametrize('claim_min_idle_seconds', [91, 92])
+def test_youtube_worker_stream_bindings(mocker, client, claim_min_idle_seconds):
     """Test that YouTube bindings natively map consumer names properly."""
+    mocker.patch.object(common_testee, 'Settings', return_value=SimpleNamespace(worker_claim_min_idle_seconds=claim_min_idle_seconds))
     worker = testee.YouTubeWorker('test-slot', client=client)
     assert worker.get_consumer_name() == 'test-slot'
     assert worker.get_stream_name() == testee.YOUTUBE_STREAM
@@ -57,7 +60,7 @@ def test_youtube_worker_stream_bindings(mocker, client):
         group_name=WORKERS_GROUP,
         consumer_name='test-slot',
         poll_interval_seconds=10,
-        claim_min_idle_seconds=Settings().worker_claim_min_idle_seconds,
+        claim_min_idle_seconds=claim_min_idle_seconds,
     )
 
 

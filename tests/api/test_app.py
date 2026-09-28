@@ -26,11 +26,14 @@ def mock_assets_dir(tmp_path):
 
 
 @pytest.fixture(autouse=True)
-def override_dependencies(mock_redis_client, mock_assets_dir):
-    testee.app.dependency_overrides[testee.get_redis_client] = lambda: mock_redis_client
-    testee.app.dependency_overrides[testee.get_assets_dir] = lambda: mock_assets_dir
-    yield
-    testee.app.dependency_overrides = {}
+def override_dependencies(mock_redis_client, mock_assets_dir, monkeypatch):
+    """Bind API dependencies and direct dependency calls to test-owned resources."""
+    monkeypatch.setattr(testee, 'REDIS_CLIENT', mock_redis_client)
+    monkeypatch.setattr(testee, 'WHISPER_ASSETS_DIR', mock_assets_dir)
+    monkeypatch.setattr(testee.app, 'dependency_overrides', {
+        testee.get_redis_client: lambda: mock_redis_client,
+        testee.get_assets_dir: lambda: mock_assets_dir,
+    })
 
 
 @pytest.fixture
@@ -38,14 +41,14 @@ def client():
     return TestClient(testee.app)
 
 
-def test_get_assets_dir_returns_configured_directory():
+def test_get_assets_dir_returns_configured_directory(mock_assets_dir):
     """Test that the assets dependency returns the configured assets directory."""
-    assert testee.get_assets_dir() == testee.WHISPER_ASSETS_DIR
+    assert testee.get_assets_dir() == mock_assets_dir
 
 
-def test_get_redis_client_yields_configured_client():
+def test_get_redis_client_yields_configured_client(mock_redis_client):
     """Test that the Redis dependency yields the configured Redis client."""
-    assert next(testee.get_redis_client()) is testee.REDIS_CLIENT
+    assert next(testee.get_redis_client()) is mock_redis_client
 
 
 def test_get_tasks_returns_queue_snapshot(client, mocker):
@@ -264,11 +267,11 @@ def test_list_assets_with_subdirectories(client, mock_assets_dir):
     assert str(subdir) in paths  # rglob("*") includes directory entries
 
 
-def test_list_assets_propagates_directory_listing_failure():
+def test_list_assets_propagates_directory_listing_failure(tmp_path, owned_path_probes):
     """Test that asset-listing failures propagate so the global handler can convert them to 500."""
-    bad_dir = Path("/definitely/missing")
+    bad_dir = tmp_path / "missing"
 
-    with pytest.raises(Exception, match="/definitely/missing"):
+    with owned_path_probes(), pytest.raises(FileNotFoundError, match="missing"):
         asyncio.run(testee.list_assets(dir_path=bad_dir))
 
 
@@ -307,10 +310,10 @@ def test_map_path_to_suffixes_excludes_directories(tmp_path):
     assert str(tmp_path / "video") not in result
 
 
-def test_map_path_to_suffixes_raises_for_missing_directory():
+def test_map_path_to_suffixes_raises_for_missing_directory(tmp_path, owned_path_probes):
     """Test that map_path_to_suffixes raises when the directory does not exist."""
-    with pytest.raises(Exception, match="/definitely/missing"):
-        testee.map_path_to_suffixes(Path("/definitely/missing"))
+    with owned_path_probes(), pytest.raises(FileNotFoundError, match="missing"):
+        testee.map_path_to_suffixes(tmp_path / "missing")
 
 
 def test_redundant_media_paths_selects_transient_siblings_of_completed_stems():
@@ -366,12 +369,13 @@ def test_clean_assets(client, mock_assets_dir, mocker):
     assert (mock_assets_dir / "another.mp4").exists()
 
 
-def test_clean_assets_propagates_directory_listing_failure(mocker):
+def test_clean_assets_propagates_directory_listing_failure(mocker, tmp_path):
     """Test that asset-cleaning listing failures propagate so the global handler can convert them to 500."""
-    mocker.patch.object(testee, 'map_path_to_suffixes', side_effect=Exception("/definitely/missing"))
+    missing_dir = tmp_path / "missing"
+    mocker.patch.object(testee, 'map_path_to_suffixes', side_effect=FileNotFoundError(missing_dir))
 
-    with pytest.raises(Exception, match="/definitely/missing"):
-        asyncio.run(testee.clean_assets(dir_path=Path("/definitely/missing")))
+    with pytest.raises(FileNotFoundError, match="missing"):
+        asyncio.run(testee.clean_assets(dir_path=missing_dir))
 
 
 def test_unhandled_exception_returns_sanitized_500(mocker):

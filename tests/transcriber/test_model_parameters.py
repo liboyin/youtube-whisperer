@@ -1,7 +1,16 @@
 from unittest import mock
 
+import pytest
+
 import youtube_whisperer.transcriber.model_parameters as testee
-from youtube_whisperer.utils import WHISPER_MODELS_DIR
+
+
+@pytest.fixture
+def model_cache_dir(tmp_path, monkeypatch):
+    """Own the model-cache setting for each parameter test."""
+    cache_dir = tmp_path / 'models'
+    monkeypatch.setenv('WHISPER_MODELS_DIR', str(cache_dir))
+    return cache_dir
 
 
 @mock.patch('ctranslate2.get_cuda_device_count')
@@ -28,53 +37,53 @@ def test_get_default_cuda_flag_without_env_var_cuda(mock_get_cuda_device_count, 
     mock_get_cuda_device_count.assert_called_once()
 
 
-def test_get_default_whisper_model_parameters_with_env_var_cpu(monkeypatch, mocker):
+def test_get_default_whisper_model_parameters_with_env_var_cpu(monkeypatch, mocker, model_cache_dir):
     """Test that CPU parameters use int8 compute and the detected CPU thread count."""
     monkeypatch.setenv("WHISPER_MODEL", "test_model")
     monkeypatch.setenv("WHISPER_USE_CUDA", "false")
     mocker.patch('multiprocessing.cpu_count', return_value=8)
     assert testee.get_default_whisper_model_parameters() == {
         "model_size_or_path": "test_model",
-        "download_root": str(WHISPER_MODELS_DIR),
+        "download_root": str(model_cache_dir),
         "device": "cpu",
         "compute_type": "int8",
         "cpu_threads": 8,
     }
 
 
-def test_get_default_whisper_model_parameters_with_env_var_cuda(monkeypatch):
+def test_get_default_whisper_model_parameters_with_env_var_cuda(monkeypatch, model_cache_dir):
     """Test that CUDA parameters use float32 compute and omit the CPU thread count."""
     monkeypatch.setenv("WHISPER_MODEL", "test_model")
     monkeypatch.setenv("WHISPER_USE_CUDA", "true")
     assert testee.get_default_whisper_model_parameters() == {
         "model_size_or_path": "test_model",
-        "download_root": str(WHISPER_MODELS_DIR),
+        "download_root": str(model_cache_dir),
         "device": "cuda",
         "compute_type": "float32",
     }
 
 
-def test_get_default_whisper_model_parameters_without_env_var_cpu(monkeypatch, mocker):
+def test_get_default_whisper_model_parameters_without_env_var_cpu(monkeypatch, mocker, model_cache_dir):
     """Test that CPU parameters are derived when the CUDA flag resolves to False."""
     monkeypatch.setenv("WHISPER_MODEL", "test_model")
     mocker.patch.object(testee, 'get_default_cuda_flag', return_value=False)
     mocker.patch('multiprocessing.cpu_count', return_value=8)
     assert testee.get_default_whisper_model_parameters() == {
         "model_size_or_path": "test_model",
-        "download_root": str(WHISPER_MODELS_DIR),
+        "download_root": str(model_cache_dir),
         "device": "cpu",
         "compute_type": "int8",
         "cpu_threads": 8,
     }
 
 
-def test_get_default_whisper_model_parameters_without_env_var_cuda(monkeypatch, mocker):
+def test_get_default_whisper_model_parameters_without_env_var_cuda(monkeypatch, mocker, model_cache_dir):
     """Test that CUDA parameters are derived when the CUDA flag resolves to True."""
     monkeypatch.setenv('WHISPER_MODEL', "test_model")
     mocker.patch.object(testee, 'get_default_cuda_flag', return_value=True)
     assert testee.get_default_whisper_model_parameters() == {
         "model_size_or_path": "test_model",
-        "download_root": str(WHISPER_MODELS_DIR),
+        "download_root": str(model_cache_dir),
         "device": "cuda",
         "compute_type": "float32",
     }

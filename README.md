@@ -266,6 +266,8 @@ ruff check .
 
 `pyproject.toml` holds the pytest and coverage configuration. Tests run in random order via `pytest-randomly`, and the run prints its seed; reproduce an ordering failure with `--randomly-seed=<seed>`. Run `pytest` directly for focused work, but note that a subset run reports a coverage failure even when every selected test passes; pass `--no-cov` to silence it.
 
+[The test bootstrap](tests/conftest.py) installs synthetic configuration before collecting application tests, including temporary home, asset, and model paths, an inert Redis endpoint, and no Azure credentials. It restores the process environment and removes its temporary directory when pytest exits. Start pytest in a fresh Python process; importing application settings before an embedded `pytest.main()` call, or repeating that call in the same process, is rejected because cached application modules would retain an earlier settings snapshot.
+
 ## Operational Notes
 
 - Run exactly one `youtube_worker`. Playlist/channel expansion and download are not idempotent across parallel expanders, so scaling the YouTube worker is not supported.
