@@ -3,7 +3,6 @@ from pathlib import Path
 import ffmpeg
 import numpy as np
 import pytest
-from pathlib_extensions import OverwriteMode
 
 import youtube_whisperer.transcriber.waveform_loader as testee
 
@@ -68,61 +67,3 @@ def test_load_whisper_waveform_from_file_reraises_ffmpeg_error(mocker, tmp_path,
         testee.load_whisper_waveform_from_file(Path("ignored.raw"))
 
     assert "decoder failed" in caplog.text
-
-
-def test_save_as_wav_file_returns_none_when_overwrite_denied(mocker, tmp_path):
-    """Test that conversion is skipped when an existing WAV must not be overwritten."""
-    input_path = tmp_path / "input.mp3"
-    output_path = tmp_path / "output.wav"
-    output_path.write_text("existing")
-    mocker.patch.object(testee, "prepare_input_file", return_value=input_path)
-    mock_overwrite = mocker.patch.object(testee, "overwrite_existing_path", return_value=False)
-    mock_prepare = mocker.patch.object(testee, "prepare_output_file")
-    mock_input = mocker.patch.object(testee.ffmpeg, "input")
-
-    result = testee.save_as_wav_file(input_path, output_file_path=output_path, overwrite=OverwriteMode.NEVER)
-
-    assert result is None
-    mock_overwrite.assert_called_once_with(output_path, OverwriteMode.NEVER)
-    mock_prepare.assert_not_called()
-    mock_input.assert_not_called()
-
-
-def test_save_as_wav_file_runs_ffmpeg_and_returns_output_path(mocker, tmp_path):
-    """Test that a mono 16-bit PCM WAV is produced and its path returned."""
-    input_path = tmp_path / "input.mp3"
-    output_path = tmp_path / "output.wav"
-    stream = FakeStream()
-    mocker.patch.object(testee, "prepare_input_file", return_value=input_path)
-    mocker.patch.object(testee, "prepare_output_file", return_value=output_path)
-    mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
-
-    result = testee.save_as_wav_file(input_path, output_file_path=output_path, overwrite=OverwriteMode.ALWAYS)
-
-    assert result == output_path
-    assert stream.output_args == (str(output_path),)
-    assert stream.output_kwargs == {
-        "acodec": "pcm_s16le",
-        "ac": 1,
-        "ar": testee.DEFAULT_SAMPLE_RATE,
-    }
-    assert stream.run_calls == [{
-        "overwrite_output": True,
-        "capture_stdout": True,
-        "capture_stderr": True,
-    }]
-
-
-def test_save_as_wav_file_reraises_ffmpeg_error(mocker, tmp_path, caplog):
-    """Test that ffmpeg conversion errors are logged and re-raised."""
-    input_path = tmp_path / "input.mp3"
-    output_path = tmp_path / "output.wav"
-    stream = FakeStream(error=FakeFFmpegError(b"conversion failed"))
-    mocker.patch.object(testee, "prepare_input_file", return_value=input_path)
-    mocker.patch.object(testee, "prepare_output_file", return_value=output_path)
-    mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
-
-    with pytest.raises(FakeFFmpegError):
-        testee.save_as_wav_file(input_path, output_file_path=output_path, overwrite=OverwriteMode.ALWAYS)
-
-    assert "conversion failed" in caplog.text

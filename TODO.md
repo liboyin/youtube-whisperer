@@ -91,7 +91,7 @@ These choices do not need to be asked again. Validate exact implementation detai
 
 | ID | Decision and rationale | Applies to |
 |---|---|---|
-| D22 | Publish completed artifacts by atomic inode replacement, preserving ordinary permission bits and following symlink targets. Hardlinked aliases retain the old contents; ownership, ACLs, and extended attributes may change. The user accepted these metadata limits because an interrupted write must not expose a false completion marker or truncate prior valid output. Scope is process interruption, without power-loss durability or stale-stage scavenging. | B6 SRT publication; B7 WAV publication |
+| D22 | Publish completed artifacts by atomic inode replacement, preserving ordinary permission bits and following symlink targets. Hardlinked aliases retain the old contents; ownership, ACLs, and extended attributes may change. The user accepted these metadata limits because an interrupted write must not expose a false completion marker or truncate prior valid output. Scope is process interruption, without power-loss durability or stale-stage scavenging. | SRT and WAV publication (implemented) |
 
 Accepted limitations above have no implementation assignment. Revisit if the user changes the product contract or evidence shows impact outside the accepted scenario. They do not waive AGENTS' safety requirements.
 
@@ -117,10 +117,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 #### B5 — Title-only filenames silently alias different videos
 
 **Severity: High. Validated — source and isolated equal-title reproduction.** [Video naming](youtube_whisperer/downloaders/video_downloader.py):55–58 and [transcript naming](youtube_whisperer/downloaders/transcript_downloader.py):186–187 derive identity solely from sanitized/truncated titles. Distinct video IDs can share MP4/SRT paths. Under worker `NEVER` semantics, the second video reuses the first media; if the first SRT is absent, captions can be paired with the wrong video. **Outcome:** preserve distinct video identities and safe repeat processing of the same video. **Acceptance:** equal titles, sanitization collisions, truncation collisions, and repeat downloads cannot substitute unrelated content. **Dependencies:** user naming/migration decision before implementation; preserve the human-browsable media-library contract and coordinate NB8. **Simplification review — 2026-09-14:** after that naming decision, use one pure naming rule for standalone MP4/SRT and combined-download paths, preserving suffixes, UTF-8 limits, and human-readable titles. The two current sanitization/truncation implementations should not evolve independently.
-
-#### B7 — Failed WAV conversion leaves a sidecar that Azure blindly reuses
-
-**Severity: High. Validated — source inspection.** [WAV conversion](youtube_whisperer/transcriber/waveform_loader.py):65–76 writes the final WAV directly, while [AzureWorker](youtube_whisperer/workers/azure_worker.py):43–49 checks only whether that file exists. Interrupted/failed ffmpeg conversion can leave a truncated sidecar; a retry reuses it, causing repeated failures or transcription of only a prefix. **Outcome:** publish/reuse completed conversions and clean only owned incomplete artifacts. **Acceptance:** failure after partial WAV creation followed by retry regenerates the correct input; existing good WAVs remain reusable and untouched when conversion fails. **Dependencies:** apply D22’s accepted atomic replacement and metadata contract, aligning the completion invariant with current [SRT publication](README.md#srt-as-the-output-format). SRT publication is implemented; keep WAV-specific conversion/reuse separate and do not introduce a metadata store.
 
 ### Non-blocking
 
@@ -287,6 +283,8 @@ Other new entries are compact findings, not implementation assignments: expand e
 D18–D21 settle the compatibility, resource ownership, settings lifetime, and worker-identity choices for NB25–NB27. Expand their implementation boundaries before changing code; retain existing Python entry points and all previously accepted product behavior.
 
 ## Deferred, accepted, and completed dispositions
+
+- B7 is implemented: WAV conversion publishes only after successful owned ffmpeg completion, cancels/reaps interrupted children and cleans only owned stages; Azure preserves existing-good sidecar reuse and retries regenerate unpublished audio. README’s [Azure completion](README.md#azure-completion-is-synchronous-per-worker) and [atomic publication contract](README.md#srt-as-the-output-format) own the resulting behavior and D22 limits.
 
 - NB10 is implemented: Azure carries the caller’s overwrite policy through preflight and final SRT saving; README’s [Azure completion](README.md#azure-completion-is-synchronous-per-worker) describes the behavior. Final SRT publication follows the shared [atomic publication contract](README.md#srt-as-the-output-format); NB9 lifecycle cleanup remains separate work.
 
