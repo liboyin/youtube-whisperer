@@ -89,9 +89,11 @@ def test_transcribe_waveform_requests_source_language_transcription(caplog, sour
 def test_whisper_helpers_expose_source_language_signatures():
     """Test that Python entry points retire operation arguments while retaining other parameters."""
     assert tuple(inspect.signature(testee.transcribe_waveform).parameters) == ('model', 'waveform', 'language')
-    assert tuple(inspect.signature(testee.transcribe_waveform_with_default_model).parameters) == ('waveform', 'language')
+    assert tuple(inspect.signature(testee.transcribe_waveform_with_default_model).parameters) == ('waveform', 'language', 'settings')
+    assert inspect.signature(testee.transcribe_waveform_with_default_model).parameters['settings'].kind == inspect.Parameter.KEYWORD_ONLY
+    assert inspect.signature(testee.transcribe_file_with_default_model).parameters['settings'].kind == inspect.Parameter.KEYWORD_ONLY
     assert tuple(inspect.signature(testee.transcribe_file_with_default_model).parameters) == (
-        'input_file_path', 'language', 'output_file_path', 'overwrite',
+        'input_file_path', 'language', 'output_file_path', 'overwrite', 'settings',
     )
 
 
@@ -143,6 +145,19 @@ def test_get_default_whisper_model_clears_fake_after_assertion_failure(mocker):
     assert mock_model_cls.call_count == 2
 
 
+def test_uncached_default_model_observes_invocation_environment_and_cached_model_stays_resident(mocker, monkeypatch):
+    """Default construction uses the current environment once until explicit cache cleanup."""
+    constructor = mocker.patch.object(testee, 'WhisperModel', side_effect=[mocker.Mock(), mocker.Mock()])
+    for name in ['first', 'second']:
+        with owned_default_whisper_model_cache():
+            monkeypatch.setenv('WHISPER_MODEL', name)
+            first = testee.get_default_whisper_model()
+            monkeypatch.setenv('WHISPER_MODEL', 'changed')
+            assert testee.get_default_whisper_model() is first
+            assert constructor.call_args.kwargs['model_size_or_path'] == name
+    assert constructor.call_count == 2
+
+
 def test_transcribe_waveform_with_default_model_uses_cached_model(mocker):
     """Test that waveform transcription reuses the cached default model instead of rebuilding it."""
     waveform = np.array([1.0], dtype=np.float32)
@@ -154,6 +169,34 @@ def test_transcribe_waveform_with_default_model_uses_cached_model(mocker):
 
     assert result == ["segment"]
     mock_transcribe.assert_called_once_with(model, waveform, LANGUAGE)
+
+
+def test_snapshot_models_are_lazy_reused_and_isolated_by_resolved_constructor_identity(mocker, monkeypatch, tmp_path):
+    """Differing model snapshots cannot share wrong model/cache/device/thread parameters."""
+    import youtube_whisperer.transcriber.model_parameters as parameters_testee
+
+    snapshots = [testee.Settings(whisper_model=name, whisper_models_dir=tmp_path / name, whisper_use_cuda=cuda)
+                 for name, cuda in [('first', False), ('second', True)]]
+    mocker.patch.object(parameters_testee.multiprocessing, 'cpu_count', return_value=4)
+    mocker.patch.object(parameters_testee.ctranslate2, 'get_cuda_device_count', side_effect=AssertionError('GPU probe'))
+    model_one, model_two = mocker.Mock(), mocker.Mock()
+    constructor = mocker.patch.object(testee, 'WhisperModel', side_effect=[model_one, model_two])
+    transcribe = mocker.patch.object(testee, 'transcribe_waveform', return_value=['owned'])
+    waveform = np.array([1], dtype=np.float32)
+    with owned_default_whisper_model_cache():
+        constructor.assert_not_called()
+        monkeypatch.setenv('WHISPER_MODEL', 'changed')
+        monkeypatch.setenv('WHISPER_MODELS_DIR', str(tmp_path / 'changed'))
+        for snapshot, model in zip(snapshots, [model_one, model_two], strict=True):
+            for _ in range(2):
+                assert testee.transcribe_waveform_with_default_model(waveform, LANGUAGE, settings=snapshot) == ['owned']
+                transcribe.assert_called_with(model, waveform, LANGUAGE)
+        assert constructor.call_args_list == [
+            mocker.call(model_size_or_path='first', download_root=str(tmp_path / 'first'), device='cpu', compute_type='int8', cpu_threads=4),
+            mocker.call(model_size_or_path='second', download_root=str(tmp_path / 'second'), device='cuda', compute_type='float32', cpu_threads=0),
+        ]
+        assert testee.get_default_whisper_model.cache_info().currsize == 2
+    assert testee.get_default_whisper_model.cache_info().currsize == 0
 
 
 def test_transcribe_file_with_default_model_returns_existing_output_when_overwrite_denied(mocker, tmp_path):
@@ -301,3 +344,14 @@ def test_transcribe_file_with_default_model_propagates_error(mocker, tmp_path):
 
     with pytest.raises(RuntimeError, match="boom"):
         testee.transcribe_file_with_default_model(input_path, LANGUAGE)
+
+
+def test_file_transcription_passes_supplied_snapshot_to_lazy_model_helper(mocker, tmp_path):
+    """File transcription preserves explicit model settings through waveform dispatch."""
+    snapshot = testee.Settings(whisper_model='owned')
+    waveform = np.array([1], dtype=np.float32)
+    mocker.patch.object(testee, 'load_whisper_waveform_from_file', return_value=waveform)
+    transcribe = mocker.patch.object(testee, 'transcribe_waveform_with_default_model', return_value=[])
+    mocker.patch.object(testee, 'save_segments_as_srt')
+    testee.transcribe_file_with_default_model(tmp_path / 'audio.wav', LANGUAGE, settings=snapshot)
+    transcribe.assert_called_once_with(waveform, LANGUAGE, settings=snapshot)

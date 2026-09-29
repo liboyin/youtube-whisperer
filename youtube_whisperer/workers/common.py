@@ -17,7 +17,7 @@ from youtube_whisperer.queueing import (
     get_stream_name,
     queue_dead_letter,
 )
-from youtube_whisperer.utils import REDIS_CLIENT
+from youtube_whisperer.runtime import Runtime
 
 logger = logging.getLogger(__name__)
 
@@ -125,14 +125,19 @@ def yield_task(
 class BaseWorker(ABC):
     """Abstract base worker providing a robust task-processing loop via Redis Streams."""
 
-    def __init__(self, client: StrictRedis = REDIS_CLIENT) -> None:
+    def __init__(self, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
         """Bind the worker to the Redis client it consumes and acknowledges tasks on.
 
         Args:
             client: Redis client used for stream reads, acknowledgements, and dead-lettering.
-                Defaults to the shared pooled client; tests can inject a substitute.
+                Borrowed when supplied; otherwise owned by this worker.
+            settings: Supplied settings snapshot, or invocation-time environment defaults.
+            runtime: Borrowed runtime supplying resources and the authoritative snapshot.
         """
-        self.client = client
+        self._owns_runtime = runtime is None
+        self.runtime = runtime if runtime is not None else Runtime(settings if settings is not None else Settings(), client)
+        self.settings = self.runtime.settings
+        self.client = self.runtime.client
 
     @abstractmethod
     def get_stream_name(self) -> str:
@@ -164,7 +169,7 @@ class BaseWorker(ABC):
             group_name=WORKERS_GROUP,
             consumer_name=consumer_name,
             poll_interval_seconds=poll_interval_seconds,
-            claim_min_idle_seconds=Settings().worker_claim_min_idle_seconds,
+            claim_min_idle_seconds=self.settings.worker_claim_min_idle_seconds,
         )
 
     @abstractmethod
@@ -187,38 +192,45 @@ class BaseWorker(ABC):
         Args:
             poll_interval_seconds: Number of seconds to wait before checking again when the queue is empty.
         """
-        stream_name = self.get_stream_name()
-        for msg_id, task in self.yield_tasks(poll_interval_seconds):
-            try:
-                self.process_task(task)
-            except Exception as e:
-                logger.exception("Error processing task %s", task)
-                queue_dead_letter(self.client, task, stream_name, str(e))
-            # Reached only on success or after a durable dead-letter; a BaseException
-            # or a failed dead-letter skips the acknowledgement and leaves the message
-            # pending for recovery.
-            pipe = self.client.pipeline()
-            pipe.xack(stream_name, WORKERS_GROUP, msg_id)
-            pipe.xdel(stream_name, msg_id)
-            pipe.execute()
-            logger.info("Acknowledged and deleted task from %s: %s", stream_name, task)
+        try:
+            stream_name = self.get_stream_name()
+            for msg_id, task in self.yield_tasks(poll_interval_seconds):
+                try:
+                    self.process_task(task)
+                except Exception as e:
+                    logger.exception("Error processing task %s", task)
+                    queue_dead_letter(self.client, task, stream_name, str(e))
+                # Reached only on success or after a durable dead-letter; a BaseException
+                # or a failed dead-letter skips the acknowledgement and leaves the message
+                # pending for recovery.
+                pipe = self.client.pipeline()
+                pipe.xack(stream_name, WORKERS_GROUP, msg_id)
+                pipe.xdel(stream_name, msg_id)
+                pipe.execute()
+                logger.info("Acknowledged and deleted task from %s: %s", stream_name, task)
+        finally:
+            if self._owns_runtime:
+                self.runtime.close()
 
 
 class TranscriptionWorker(BaseWorker):
     """Base class for transcriber workers utilizing Native Streams."""
 
-    def __init__(self, transcriber: TranscriberType, slot: str, client: StrictRedis = REDIS_CLIENT) -> None:
+    def __init__(self, transcriber: TranscriberType, slot: str, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
         """Initialize the transcription worker.
 
         Args:
             transcriber: Transcriber whose pending stream should be processed.
             slot: Bound consumer identity orchestrating message safety.
-            client: Redis client used for stream operations. Defaults to the shared pooled client.
+            client: Redis client used for stream operations. Borrowed when supplied; otherwise owned by this worker.
+            settings: Supplied snapshot, or invocation-time environment defaults.
+            runtime: Borrowed runtime supplying resources and its snapshot.
         """
-        super().__init__(client)
+        stream_name = get_stream_name(transcriber)
+        super().__init__(client, settings=settings, runtime=runtime)
         self.transcriber = transcriber
         self.slot = slot
-        self.stream_name = get_stream_name(self.transcriber)
+        self.stream_name = stream_name
 
     def get_stream_name(self) -> str:
         """Return the active stream name configured for this transcriber.

@@ -53,11 +53,12 @@ def test_dispatch_task_failed_conversion_retries_complete_wav_and_reuses_good_si
     task = Task(source=str(source), transcriber=TranscriberType.AZURE)
     completed_calls = []
 
-    def transcribe(audio_path, language, *, overwrite):
+    def transcribe(audio_path, language, *, overwrite, settings):
         """Verify complete WAV bytes synchronously at the mocked Azure boundary."""
         assert audio_path == sidecar
         assert language == task.language
         assert overwrite == OverwriteMode.NEVER
+        assert settings is worker.settings
         assert audio_path.read_bytes() == complete_wav
         assert not list(tmp_path.glob('.wav-*'))
         with wave.open(str(audio_path), 'rb') as reader:

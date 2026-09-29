@@ -6,15 +6,16 @@ from pathlib import Path
 from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
+from youtube_whisperer.config import Settings
 from youtube_whisperer.domain import TranscriberType
 from youtube_whisperer.models import Task
+from youtube_whisperer.runtime import Runtime
 from youtube_whisperer.transcriber.model_parameters import (
     get_default_cuda_flag as use_cuda,
 )
 from youtube_whisperer.transcriber.whisper_transcriber import (
     transcribe_file_with_default_model,
 )
-from youtube_whisperer.utils import REDIS_CLIENT
 from youtube_whisperer.workers.common import TranscriptionWorker
 
 logger = logging.getLogger(__name__)
@@ -37,32 +38,38 @@ def is_gpu_healthy() -> bool:
         return False
 
 
-def validate_gpu_health_or_exit() -> None:
+def validate_gpu_health_or_exit(settings: Settings | None = None) -> None:
     """Abort the worker when CUDA is enabled but the GPU health check fails.
 
     This guard is called immediately before Whisper transcription so the worker
     can restart cleanly instead of repeatedly failing jobs against an unhealthy
     CUDA environment.
 
+    Args:
+        settings: Supplied snapshot, or invocation-time environment defaults.
+
     Returns:
         None. The function exits the process with the worker restart status code
         when CUDA is enabled and the GPU health probe fails.
     """
-    if use_cuda() and not is_gpu_healthy():
+    if use_cuda(settings) and not is_gpu_healthy():
         logger.error("GPU health check failed. Restarting...")
         sys.exit(2)
 
 
 class WhisperWorker(TranscriptionWorker):
+    """Consume Whisper tasks with one configured, lazily resident model."""
 
-    def __init__(self, slot: str, client: StrictRedis = REDIS_CLIENT) -> None:
+    def __init__(self, slot: str, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
         """Initialize the Whisper transcription worker.
 
         Args:
             slot: The worker slot identifier determining which active queue to run under.
-            client: Redis client used for stream operations. Defaults to the shared pooled client.
+            settings: Supplied snapshot, or invocation-time environment defaults.
+            runtime: Borrowed runtime supplying resources and its snapshot.
+            client: Redis client used for stream operations. Borrowed when supplied; otherwise owned by this worker.
         """
-        super().__init__(TranscriberType.WHISPER, slot, client)
+        super().__init__(TranscriberType.WHISPER, slot, client, settings=settings, runtime=runtime)
 
     def dispatch_task(self, task: Task, source: Path) -> None:
         """Run Whisper transcription for a resolved filesystem source.
@@ -85,5 +92,5 @@ class WhisperWorker(TranscriptionWorker):
             Exception: If Whisper transcription fails; the error propagates to the worker
                 loop so the task is dead-lettered.
         """
-        validate_gpu_health_or_exit()
-        transcribe_file_with_default_model(source, task.language, overwrite=OverwriteMode.NEVER)
+        validate_gpu_health_or_exit(self.settings)
+        transcribe_file_with_default_model(source, task.language, overwrite=OverwriteMode.NEVER, settings=self.settings)

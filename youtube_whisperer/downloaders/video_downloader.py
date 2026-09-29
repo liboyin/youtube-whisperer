@@ -9,11 +9,11 @@ from pathlib_extensions import (
     truncate_filename,
 )
 
+from youtube_whisperer.config import Settings
 from youtube_whisperer.downloaders.utils import (
     get_video_title,
     is_firefox_cookies_available,
 )
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 
 def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> None:
@@ -40,18 +40,19 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
         ydl.download([url])
 
 
-def download_video_with_default_title(url: str, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
+def download_video_with_default_title(url: str, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
     """
     Downloads a video from the given URL and saves it with a default title in the target directory.
 
     Args:
         url (str): The URL of the video to download.
-        target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to `WHISPER_ASSET_DIR`.
+        target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to settings resolved at invocation.
         overwrite (OverwriteMode, optional): Whether to overwrite existing video files. Defaults to `prompt`.
 
     Returns:
         Path: The path to the downloaded video file.
     """
+    target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir
     title = replace_os_reserved_chars(get_video_title(url))
     target_path = truncate_filename(target_dir / f'{title}.mp4', max_length=220)
     download_video(url, target_path, overwrite=overwrite)

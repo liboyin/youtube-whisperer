@@ -4,6 +4,7 @@ import logging
 from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
+from youtube_whisperer.config import Settings
 from youtube_whisperer.domain import TranscriberType
 from youtube_whisperer.downloaders import (
     download_video_and_transcript_with_default_title,
@@ -15,7 +16,7 @@ from youtube_whisperer.queueing import (
     queue_dead_letter,
     queue_transcription_tasks,
 )
-from youtube_whisperer.utils import REDIS_CLIENT
+from youtube_whisperer.runtime import Runtime
 from youtube_whisperer.workers.common import BaseWorker
 
 logger = logging.getLogger(__name__)
@@ -23,14 +24,16 @@ logger = logging.getLogger(__name__)
 
 class YouTubeWorker(BaseWorker):
     """The YouTube worker expands playlists or channels and dispatches transcription tasks."""
-    def __init__(self, slot: str, client: StrictRedis = REDIS_CLIENT) -> None:
+    def __init__(self, slot: str, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
         """Initialize the YouTube worker binding the slot to the consumer identity.
 
         Args:
             slot: The consumer identity this worker uses to claim and recover tasks.
-            client: Redis client used for queueing follow-up tasks. Defaults to the shared pooled client.
+            settings: Supplied snapshot, or invocation-time environment defaults.
+            runtime: Borrowed runtime supplying resources and its snapshot.
+            client: Redis client used for queueing follow-up tasks. Borrowed when supplied; otherwise owned by this worker.
         """
-        super().__init__(client)
+        super().__init__(client, settings=settings, runtime=runtime)
         self.slot = slot
 
     def get_stream_name(self) -> str:
@@ -63,6 +66,7 @@ class YouTubeWorker(BaseWorker):
         waveform_file_path, transcript_found = download_video_and_transcript_with_default_title(
             task.source,
             task.language,
+            target_dir=self.runtime.assets_dir,
             overwrite=OverwriteMode.NEVER,
         )
         if task.transcriber != TranscriberType.NONE and not transcript_found:

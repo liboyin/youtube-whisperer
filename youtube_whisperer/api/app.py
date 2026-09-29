@@ -2,15 +2,17 @@ import glob
 import logging
 import os
 from collections import defaultdict
-from collections.abc import Generator
+from collections.abc import AsyncIterator, Generator
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
-from fastapi import Depends, FastAPI, Request, status
+from fastapi import APIRouter, Depends, FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from pathlib_extensions import prepare_input_dir
-from redis import StrictRedis
+from redis import ConnectionPool, StrictRedis
 
+from youtube_whisperer.config import Settings
 from youtube_whisperer.domain import TranscriberType, is_url
 from youtube_whisperer.models import AddTasksResponse, DeadLetter, Task, TaskQueues
 from youtube_whisperer.queueing import (
@@ -21,17 +23,15 @@ from youtube_whisperer.queueing import (
     queue_transcription_tasks,
     queue_youtube_task,
 )
-from youtube_whisperer.utils import (
-    REDIS_CLIENT,
-    WHISPER_ASSETS_DIR,
-)
+from youtube_whisperer.runtime import Runtime
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="YouTube Whisperer")
+# FastAPI requires a concrete Request annotation; None retains standalone calls.
+_NO_REQUEST = cast(Request, None)
+router = APIRouter()
 
 
-@app.exception_handler(Exception)
 async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
     """Convert any uncaught exception into a sanitized 500 response.
 
@@ -50,29 +50,43 @@ async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONR
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
-def get_assets_dir() -> Path:
+def get_assets_dir(request: Request = _NO_REQUEST) -> Path:
     """FastAPI dependency that supplies the configured asset directory.
+
+    Args:
+        request: Request whose app owns the snapshot; omitted for standalone access.
 
     Returns:
         Path: The root directory used as the media library.
     """
-    return WHISPER_ASSETS_DIR
+    application = request.app if request is not None else app
+    runtime = getattr(application.state, 'runtime', None)
+    return runtime.assets_dir if runtime is not None else Settings().whisper_assets_dir
 
 
-def get_redis_client() -> Generator[StrictRedis, None, None]:
+def get_redis_client(request: Request = _NO_REQUEST) -> Generator[StrictRedis, None, None]:
     """FastAPI dependency that supplies the shared, pooled Redis client.
 
+    Args:
+        request: Request whose app owns resources; omitted for standalone access.
+
     Yields:
-        StrictRedis: The process-wide Redis client backed by a connection pool.
+        StrictRedis: Runtime client, or an invocation-owned client closed after yielding.
     """
-    yield REDIS_CLIENT
+    application = request.app if request is not None else app
+    runtime = getattr(application.state, 'runtime', None)
+    if runtime is not None:
+        yield runtime.client
+    else:
+        with Runtime() as runtime:
+            yield runtime.client
 
 
 RedisClientDep = Annotated[StrictRedis, Depends(get_redis_client)]
 AssetsDirDep = Annotated[Path, Depends(get_assets_dir)]
 
 
-@app.get("/tasks", response_model=TaskQueues)
+@router.get("/tasks", response_model=TaskQueues)
 async def get_tasks(redis_client: RedisClientDep) -> TaskQueues:
     """
     Retrieve all pending and active tasks from the Redis queues.
@@ -96,7 +110,7 @@ def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
     return [pattern.model_copy(update={'source': str(path)}) for path in glob.glob(os.path.expanduser(pattern.source))]
 
 
-@app.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
 async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTasksResponse:
     """
     Add new tasks to the appropriate Redis queues.
@@ -136,7 +150,7 @@ async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTa
     return AddTasksResponse(successful=successful_tasks, failed=failed_tasks)
 
 
-@app.delete("/tasks", response_model=TaskQueues)
+@router.delete("/tasks", response_model=TaskQueues)
 async def clear_tasks(redis_client: RedisClientDep) -> TaskQueues:
     """
     Clear all pending and active tasks from the Redis queues.
@@ -147,7 +161,7 @@ async def clear_tasks(redis_client: RedisClientDep) -> TaskQueues:
     return clear_task_queues(redis_client)
 
 
-@app.get("/dead-letters", response_model=list[DeadLetter])
+@router.get("/dead-letters", response_model=list[DeadLetter])
 async def get_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
     """
     Retrieve failed tasks from the dead-letter queue.
@@ -158,7 +172,7 @@ async def get_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
     return list_dead_letters(redis_client)
 
 
-@app.delete("/dead-letters", response_model=list[DeadLetter])
+@router.delete("/dead-letters", response_model=list[DeadLetter])
 async def clear_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
     """
     Clear the dead-letter queue.
@@ -171,7 +185,7 @@ async def clear_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
     return dead_letters
 
 
-@app.get("/assets", response_model=list[str])
+@router.get("/assets", response_model=list[str])
 async def list_assets(dir_path: AssetsDirDep) -> list[str]:
     """
     List all contents of the specified directory.
@@ -223,7 +237,7 @@ def redundant_media_paths(stem_to_suffixes: dict[str, set[str]]) -> list[Path]:
     return redundant
 
 
-@app.delete("/assets", response_model=list[str])
+@router.delete("/assets", response_model=list[str])
 async def clean_assets(dir_path: AssetsDirDep) -> list[str]:
     """
     Clean up redundant files in the specified directory.
@@ -239,3 +253,40 @@ async def clean_assets(dir_path: AssetsDirDep) -> list[str]:
             file_path.unlink()
             removed_files.append(str(file_path))
     return sorted(removed_files)
+
+
+def create_app(
+    settings: Settings | None = None,
+    client: StrictRedis | None = None,
+    *,
+    pool: ConnectionPool | None = None,
+    owns_pool: bool = False,
+) -> FastAPI:
+    """Create an API whose lifespan owns one snapshot and its Redis resources.
+
+    Args:
+        settings: Supplied snapshot; None resolves environment at lifespan startup.
+        client: Borrowed client that lifespan must not close.
+        pool: Supplied pool, borrowed unless ownership is transferred.
+        owns_pool: Whether lifespan must disconnect a supplied pool.
+
+    Returns:
+        An independent application with the established routes and error handling.
+    """
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        """Bind resources at startup and release ownership even on interruption."""
+        with Runtime(settings, client, pool=pool, owns_pool=owns_pool) as runtime:
+            application.state.runtime = runtime
+            try:
+                yield
+            finally:
+                del application.state.runtime
+
+    application = FastAPI(title="YouTube Whisperer", lifespan=lifespan)
+    application.add_exception_handler(Exception, handle_unexpected_exception)
+    application.include_router(router)
+    return application
+
+
+app = create_app()

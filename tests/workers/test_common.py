@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 import redis
@@ -295,8 +294,8 @@ class MockWorker(testee.TranscriptionWorker):
 def test_transcription_worker_consumes_its_transcriber_stream_under_its_slot(mocker, mock_redis):
     """Test that a transcription worker reads its transcriber's stream under the slot identity it was given."""
     mock_yield = mocker.patch.object(testee, 'yield_task', return_value=iter([]))
-    mocker.patch.object(testee, 'Settings', return_value=SimpleNamespace(worker_claim_min_idle_seconds=99))
-    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0', client=mock_redis)
+    settings = testee.Settings(worker_claim_min_idle_seconds=99)
+    worker = MockWorker(TranscriberType.WHISPER, 'gpu-0', client=mock_redis, settings=settings)
 
     assert list(worker.yield_tasks(poll_interval_seconds=7)) == []
 
@@ -309,6 +308,49 @@ def test_transcription_worker_consumes_its_transcriber_stream_under_its_slot(moc
         poll_interval_seconds=7,
         claim_min_idle_seconds=99,
     )
+
+
+def test_worker_snapshot_claim_threshold_isolated_after_environment_mutation(mocker, monkeypatch):
+    """Borrowed clients and two supplied worker snapshots retain their own claim thresholds."""
+    snapshots = [testee.Settings(worker_claim_min_idle_seconds=value) for value in [31, 47]]
+    clients = [mocker.Mock(), mocker.Mock()]
+    workers = [MockWorker(TranscriberType.WHISPER, str(index), client, settings=snapshot)
+               for index, (client, snapshot) in enumerate(zip(clients, snapshots, strict=True))]
+    mock_yield = mocker.patch.object(testee, 'yield_task', return_value=iter([]))
+    monkeypatch.setenv('WORKER_CLAIM_MIN_IDLE_SECONDS', '999')
+    for worker, client, snapshot in zip(workers, clients, snapshots, strict=True):
+        worker.yield_tasks(3)
+        assert mock_yield.call_args.kwargs['claim_min_idle_seconds'] == snapshot.worker_claim_min_idle_seconds
+        assert mock_yield.call_args.kwargs['client'] is client
+        assert worker.settings is snapshot
+
+
+@pytest.mark.parametrize('failure', [None, RuntimeError('queue'), KeyboardInterrupt('queue')])
+def test_standalone_worker_queue_closes_owned_runtime_on_every_exit(mocker, failure):
+    """A directly constructed worker closes its owned runtime on normal and interrupted exit."""
+    from contextlib import nullcontext
+
+    runtime = mocker.patch.object(testee, 'Runtime').return_value
+    worker = MockWorker(TranscriberType.WHISPER, 'owned')
+    mocker.patch.object(worker, 'yield_tasks', return_value=iter([]), side_effect=failure)
+    expected = pytest.raises(type(failure), match='queue') if failure is not None else nullcontext()
+    with expected:
+        worker.process_queue()
+    runtime.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize('failure', [None, RuntimeError('borrowed'), KeyboardInterrupt('borrowed')])
+def test_worker_queue_leaves_borrowed_runtime_open(mocker, failure):
+    """Queue completion does not steal ownership from the caller's runtime."""
+    from contextlib import nullcontext
+
+    runtime = mocker.Mock()
+    worker = MockWorker(TranscriberType.WHISPER, 'owned', runtime=runtime)
+    mocker.patch.object(worker, 'yield_tasks', return_value=iter([]), side_effect=failure)
+    expected = pytest.raises(type(failure), match='borrowed') if failure is not None else nullcontext()
+    with expected:
+        worker.process_queue()
+    runtime.close.assert_not_called()
 
 
 def test_process_active_slot_queue_full_flow(mocker, mock_redis):

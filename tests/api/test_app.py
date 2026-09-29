@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock
 
 import pytest
@@ -27,8 +28,7 @@ def mock_assets_dir(tmp_path):
 @pytest.fixture(autouse=True)
 def override_dependencies(mock_redis_client, mock_assets_dir, monkeypatch):
     """Bind API dependencies and direct dependency calls to test-owned resources."""
-    monkeypatch.setattr(testee, 'REDIS_CLIENT', mock_redis_client)
-    monkeypatch.setattr(testee, 'WHISPER_ASSETS_DIR', mock_assets_dir)
+    monkeypatch.setattr(testee.app.state, 'runtime', SimpleNamespace(client=mock_redis_client, assets_dir=mock_assets_dir), raising=False)
     monkeypatch.setattr(testee.app, 'dependency_overrides', {
         testee.get_redis_client: lambda: mock_redis_client,
         testee.get_assets_dir: lambda: mock_assets_dir,
@@ -48,6 +48,19 @@ def test_get_assets_dir_returns_configured_directory(mock_assets_dir):
 def test_get_redis_client_yields_configured_client(mock_redis_client):
     """Test that the Redis dependency yields the configured Redis client."""
     assert next(testee.get_redis_client()) is mock_redis_client
+
+
+def test_standalone_api_dependencies_resolve_invocation_resources(mocker, monkeypatch, tmp_path):
+    """Direct dependency access without lifespan owns and closes its temporary client."""
+    # The module's autouse fixture supplies a runtime for older endpoint tests.
+    monkeypatch.delattr(testee.app.state, 'runtime')
+    monkeypatch.setenv('WHISPER_ASSETS_DIR', str(tmp_path))
+    assert testee.get_assets_dir() == tmp_path
+    runtime = mocker.patch.object(testee, 'Runtime').return_value.__enter__.return_value
+    dependency = testee.get_redis_client()
+    assert next(dependency) is runtime.client
+    dependency.close()
+    testee.Runtime.return_value.__exit__.assert_called_once()
 
 
 def test_get_tasks_returns_queue_snapshot(client, mocker):
@@ -426,3 +439,53 @@ def test_unhandled_exception_returns_sanitized_500(mocker):
     assert response.status_code == 500
     assert response.json() == {"detail": "Internal server error"}
     assert "hunter2" not in response.text
+
+
+def test_create_app_isolates_lifespan_snapshots_clients_and_asset_paths(tmp_path, monkeypatch, mocker):
+    """Simultaneous API lifespans retain separate settings and borrowed resources."""
+    roots = [tmp_path / 'first', tmp_path / 'second']
+    clients = [mocker.MagicMock(spec=StrictRedis), mocker.MagicMock(spec=StrictRedis)]
+    settings = [testee.Settings(whisper_assets_dir=root, whisper_models_dir=root / 'models') for root in roots]
+    for root in roots:
+        root.mkdir()
+        (root / 'owned.srt').write_text('complete')
+    applications = [testee.create_app(snapshot, client) for snapshot, client in zip(settings, clients, strict=True)]
+    lookup = mocker.patch.object(testee, 'list_task_queues', return_value=TaskQueues(youtube=[], whisper_pending=[], whisper_active=[], azure_pending=[], azure_active=[]))
+    with TestClient(applications[0]) as first, TestClient(applications[1]) as second:
+        monkeypatch.setenv('WHISPER_ASSETS_DIR', str(tmp_path / 'changed'))
+        for api, application, root, snapshot, client in zip(
+            [first, second], applications, roots, settings, clients, strict=True,
+        ):
+            assert api.get('/assets').json() == [str(root / 'owned.srt')]
+            assert api.get('/tasks').status_code == 200
+            lookup.assert_called_with(client)
+            assert application.state.runtime.settings is snapshot
+    for application, client in zip(applications, clients, strict=True):
+        assert not hasattr(application.state, 'runtime')
+        client.close.assert_not_called()
+
+
+@pytest.mark.parametrize('failure', [None, RuntimeError('lifespan'), KeyboardInterrupt('lifespan')])
+def test_api_lifespan_closes_owned_client_and_supplied_owned_pool(mocker, failure):
+    """API lifespan cleanup disconnects owned pools even on BaseException."""
+    from contextlib import nullcontext
+
+    pool, redis_client = mocker.Mock(), mocker.Mock()
+    import youtube_whisperer.runtime as runtime_testee
+
+    mocker.patch.object(runtime_testee.redis, 'StrictRedis', return_value=redis_client)
+    application = testee.create_app(pool=pool, owns_pool=True)
+
+    async def run_lifespan():
+        """Enter real application startup and inject a bounded body failure."""
+        async with application.router.lifespan_context(application):
+            assert application.state.runtime.client is redis_client
+            if failure is not None:
+                raise failure
+
+    expected = pytest.raises(type(failure), match='lifespan') if failure is not None else nullcontext()
+    with expected:
+        asyncio.run(run_lifespan())
+    redis_client.close.assert_called_once_with()
+    pool.disconnect.assert_called_once_with()
+    assert not hasattr(application.state, 'runtime')

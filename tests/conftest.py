@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-# Production modules create settings and clients while test modules are imported. Establish
-# synthetic values before collection, then restore the inherited process environment.
+# Explicit compatibility-resource access or helper calls can resolve configuration during
+# collection. Establish owned values first, then restore the inherited process environment.
 if any(name in sys.modules for name in ('youtube_whisperer.config', 'youtube_whisperer.utils')):
     raise pytest.UsageError('Run tests in a fresh Python process; application settings were imported before test isolation.')
 _bootstrap_cleanup = ExitStack()

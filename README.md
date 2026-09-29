@@ -26,10 +26,11 @@
 
 ```
 youtube_whisperer/
-├── config.py                   # Pydantic Settings loaded from environment / .env
+├── config.py                   # Pydantic Settings resolved from environment
 ├── domain.py                   # Resource-free transcriber enum and URL classifier
 ├── models.py                   # Pydantic domain + request/response models (Task, DeadLetter, ...)
-├── utils.py                    # Configured Redis resources/paths, compatible domain exports
+├── utils.py                    # Redis pool factory and lazy compatible exports
+├── runtime.py                  # Settings snapshot, configured paths, Redis ownership
 ├── queueing.py                 # Redis Streams: enqueue, snapshot, dead-letter
 ├── adaptors/
 │   ├── lang_code_adaptor.py    # BCP-47 / ISO 639-1 LanguageCode type
@@ -74,7 +75,7 @@ Four components cooperate:
 3. **Transcription workers** — The Whisper and Azure workers consume their Redis streams via a shared consumer group and write SRT files.
 4. **Redis** — Stores the streams, tracks each consumer's Pending Entries List (PEL), and holds the dead-letter list.
 
-`domain.py` owns `TranscriberType` and `is_url`; models and queueing import domain values directly and construct no Settings, Redis pool, or Redis client when imported. Existing `utils.TranscriberType` and `utils.is_url` imports forward the same objects. Importing `utils` still creates its configured paths and shared Redis resources; explicit runtime ownership and settings snapshots remain pending under [NB25](TODO.md#nb25--domain-imports-and-configuration-lack-an-explicit-runtime-owner).
+`domain.py` owns `TranscriberType` and `is_url`; models and queueing import domain values directly and construct no Settings, Redis pool, or Redis client when imported. Existing `utils.TranscriberType` and `utils.is_url` imports forward the same objects. Ordinary imports of `utils`, the API and workers also construct no settings or Redis resources. Explicit access to legacy `utils.REDIS_POOL`/`REDIS_CLIENT` creates a lazy compatibility runtime closed at process exit; legacy path exports resolve settings on each access. Existing public imports and positional transcription/download calls remain available.
 
 ## Data Flow
 
@@ -125,7 +126,7 @@ For non-WAV input, the Azure worker reuses an existing sidecar WAV or calls `sav
 
 ### The Whisper model is kept resident
 
-`get_default_whisper_model()` builds the `WhisperModel` once per process and caches it (`functools.lru_cache`). On a dedicated GPU worker the multi-GB model is loaded once and reused across every queued task instead of being reloaded per file.
+`get_default_whisper_model()` builds its default `WhisperModel` lazily on the first uncached invocation and keeps it resident. Runtime helpers pass an immutable identity containing model name, cache directory, device, compute type and CPU threads to the same cache, so matching configurations reuse a model and differing snapshots cannot reuse the wrong one. `cache_clear()` releases every cached identity. No-argument default calls retain their initial model until cache cleanup; supplied settings control runtime model configuration independently. Each Whisper task still performs its live GPU health check when CUDA is enabled.
 
 ### Dual transcription engines
 
@@ -187,7 +188,11 @@ The API is **unauthenticated by design** and assumes a trusted, LAN-only or sing
 
 ## Configuration
 
-Settings are read from environment variables (and `.env`) by `config.py`. All are optional except the Azure credentials, which are only required when using the Azure transcriber.
+Settings are read from exported environment variables by `config.py`; direct Python/API/worker launches do not load `.env` automatically. Compose injects `.env` into its application services. All settings are optional except the Azure credentials, which are only required when using the Azure transcriber.
+
+API lifespan and worker execution each own one `Runtime` settings snapshot, configured asset/model paths, Redis client and pool. The CLI shares its snapshot with slot resolution and worker execution. Later environment changes do not alter claims, downloads, Azure credentials or model configuration for that runtime. `create_app(settings, client)` and worker keyword arguments accept supplied snapshots and concrete borrowed clients. Created clients and owned pools close on completion, startup failure and interruption; supplied clients/pools are borrowed unless pool ownership is explicitly transferred with `owns_pool=True`. Redis blocking reads retain no socket timeout, a five-second connection timeout and 60-second health checks.
+
+Standalone download/model-parameter/CUDA/Azure helpers resolve missing defaults at invocation. Explicit paths and settings take precedence. A directly constructed worker resolves settings at construction and closes its own runtime when its queue loop exits; a supplied `runtime` remains caller-owned.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |

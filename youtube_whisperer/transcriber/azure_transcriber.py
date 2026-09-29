@@ -51,7 +51,7 @@ def recognition_result_to_srt_block(segment: SpeechRecognitionResult) -> SrtBloc
     return timestamps_to_srt_block(start_seconds, end_seconds, segment.text)
 
 
-def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
+def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, *, settings: Settings | None = None) -> Path | None:
     """
     Transcribes an audio file using Azure AI Speech service.
 
@@ -64,6 +64,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
         input_file_path (Path): The path to the audio file to transcribe.
         language (LanguageCode): The language of the audio file.
         output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
+        settings: Supplied credential snapshot, or invocation-time environment defaults.
         overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files at preflight and final saving. Defaults to `prompt`.
 
     Returns:
@@ -75,7 +76,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
             return output_file_path
         if overwrite == OverwriteMode.PROMPT:
             overwrite = OverwriteMode.ALWAYS
-    settings = Settings()
+    settings = settings if settings is not None else Settings()
     speech_config = speechsdk.SpeechConfig(subscription=settings.azure_speech_api_key, region=settings.azure_service_region)
     speech_config.speech_recognition_language = language.get_source_as_BCP()
     audio_config = speechsdk.audio.AudioConfig(filename=str(input_file_path))

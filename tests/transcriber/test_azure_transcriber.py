@@ -641,6 +641,44 @@ def test_async_fake_accounts_for_callback_failure():
     assert str(owner.errors[0]) == "callback failed"
 
 
+def test_transcribe_audio_file_uses_supplied_credentials_after_environment_mutation(mocker, monkeypatch, tmp_path, synthetic_azure_settings):
+    """Two supplied Azure snapshots bypass ambient credentials and Settings construction."""
+    from youtube_whisperer.config import Settings
+
+    snapshots = [Settings(azure_speech_api_key=name + '-key', azure_service_region=name + '-region')
+                 for name in ['first', 'second']]
+    monkeypatch.setenv('AZURE_SPEECH_API_KEY', 'changed-key')
+    monkeypatch.setenv('AZURE_SERVICE_REGION', 'changed-region')
+    synthetic_azure_settings.side_effect = AssertionError('ambient settings')
+    sdk = FakeSpeechSDK(lambda recognizer: recognizer.session_stopped.emit(SimpleNamespace()))
+    mocker.patch.object(testee, 'speechsdk', sdk)
+    mocker.patch.object(testee, 'get_audio_duration_seconds', return_value=0)
+    mocker.patch.object(testee, 'save_segments_as_srt')
+    for index, snapshot in enumerate(snapshots):
+        testee.transcribe_audio_file(tmp_path / f'{index}.wav', LanguageCode('en-us'), settings=snapshot)
+        assert sdk.created_speech_config.subscription == snapshot.azure_speech_api_key
+        assert sdk.created_speech_config.region == snapshot.azure_service_region
+    synthetic_azure_settings.assert_not_called()
+
+
+def test_standalone_azure_defaults_observe_current_owned_environment(mocker, monkeypatch, tmp_path, synthetic_azure_settings):
+    """Successive uncached Azure invocations resolve newly supplied environment credentials."""
+    from youtube_whisperer.config import Settings
+
+    synthetic_azure_settings.side_effect = Settings
+    sdk = FakeSpeechSDK(lambda recognizer: recognizer.session_stopped.emit(SimpleNamespace()))
+    mocker.patch.object(testee, 'speechsdk', sdk)
+    mocker.patch.object(testee, 'get_audio_duration_seconds', return_value=0)
+    mocker.patch.object(testee, 'save_segments_as_srt')
+    for name in ['first', 'second']:
+        monkeypatch.setenv('AZURE_SPEECH_API_KEY', name + '-key')
+        monkeypatch.setenv('AZURE_SERVICE_REGION', name + '-region')
+        testee.transcribe_audio_file(tmp_path / f'{name}.wav', LanguageCode('en-us'))
+        assert sdk.created_speech_config.subscription == name + '-key'
+        assert sdk.created_speech_config.region == name + '-region'
+    assert synthetic_azure_settings.call_count == 2
+
+
 def test_callback_owner_fixture_quiesces_after_test_assertion_fails(tmp_path):
     """Test that actual pytest failure teardown cancels and joins callback work."""
     (tmp_path / "conftest.py").write_text(dedent('''

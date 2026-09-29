@@ -3,24 +3,28 @@ from pathlib import Path
 from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
+from youtube_whisperer.config import Settings
 from youtube_whisperer.domain import TranscriberType
 from youtube_whisperer.models import Task
+from youtube_whisperer.runtime import Runtime
 from youtube_whisperer.transcriber.azure_transcriber import transcribe_audio_file
 from youtube_whisperer.transcriber.waveform_loader import save_as_wav_file
-from youtube_whisperer.utils import REDIS_CLIENT
 from youtube_whisperer.workers.common import TranscriptionWorker
 
 
 class AzureWorker(TranscriptionWorker):
+    """Consume Azure tasks using one runtime credential snapshot."""
 
-    def __init__(self, slot: str, client: StrictRedis = REDIS_CLIENT) -> None:
+    def __init__(self, slot: str, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
         """Initialize the Azure transcription worker.
 
         Args:
             slot: The worker slot identifier determining which active queue to run under.
-            client: Redis client used for stream operations. Defaults to the shared pooled client.
+            settings: Supplied snapshot, or invocation-time environment defaults.
+            runtime: Borrowed runtime supplying resources and its snapshot.
+            client: Redis client used for stream operations. Borrowed when supplied; otherwise owned by this worker.
         """
-        super().__init__(TranscriberType.AZURE, slot, client)
+        super().__init__(TranscriberType.AZURE, slot, client, settings=settings, runtime=runtime)
 
     def dispatch_task(self, task: Task, source: Path) -> None:
         """Run Azure Speech transcription for a resolved filesystem source.
@@ -48,4 +52,4 @@ class AzureWorker(TranscriptionWorker):
                     raise RuntimeError(f"Failed to create WAV file for {source}")
                 wav_source = converted_source
             source = wav_source
-        transcribe_audio_file(source, task.language, overwrite=OverwriteMode.NEVER)
+        transcribe_audio_file(source, task.language, overwrite=OverwriteMode.NEVER, settings=self.settings)

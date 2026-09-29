@@ -14,6 +14,7 @@ from youtube_whisperer.adaptors.srt_deduplicator import (
     save_segments_as_srt,
     timestamps_to_srt_block,
 )
+from youtube_whisperer.config import Settings
 from youtube_whisperer.transcriber.model_parameters import (
     get_default_whisper_model_parameters,
 )
@@ -56,35 +57,54 @@ def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, language: Lan
     return segments_generator
 
 
-@functools.lru_cache(maxsize=1)
-def get_default_whisper_model() -> WhisperModel:
-    """Build the default WhisperModel once per process and cache it.
+@functools.cache
+def get_default_whisper_model(*, parameters: tuple[str, str, str, str, int] | None = None) -> WhisperModel:
+    """Build a lazy resident model cached by immutable resolved constructor identity.
 
-    The model can be several GB (e.g. `large-v3`); on a dedicated GPU worker it is loaded once
-    and kept resident across tasks instead of being rebuilt for every queued file. The cache is
-    keyed on nothing, so the model is shared for the process lifetime.
+    No-argument calls retain the initial uncached invocation's environment model.
+    Explicit snapshots use a parameter tuple, so differing configurations cannot
+    reuse the wrong model. cache_clear() releases all identities, including default.
+
+    Args:
+        parameters: Model name, cache path, device, compute type and CPU threads;
+            None resolves defaults on initial uncached construction.
 
     Returns:
-        WhisperModel: The process-wide default model built from resolved parameters.
+        A resident Whisper model shared only with matching constructor identity.
     """
-    return WhisperModel(**get_default_whisper_model_parameters())
+    if parameters is None:
+        return WhisperModel(**get_default_whisper_model_parameters())
+    model_name, cache_dir, device, compute_type, cpu_threads = parameters
+    return WhisperModel(
+        model_size_or_path=model_name, download_root=cache_dir, device=device,
+        compute_type=compute_type, cpu_threads=cpu_threads,
+    )
 
 
-def transcribe_waveform_with_default_model(waveform: np.ndarray, language: LanguageCode) -> Iterable[Segment]:
+def transcribe_waveform_with_default_model(waveform: np.ndarray, language: LanguageCode, *, settings: Settings | None = None) -> Iterable[Segment]:
     """
     Transcribe the given waveform using the cached default WhisperModel.
 
     Args:
         waveform (np.ndarray): The waveform to transcribe.
         language (LanguageCode): The source language of the waveform.
+        settings: Supplied model snapshot; None uses the process default model.
 
     Returns:
         Iterable[Segment]: An iterable of lazy-evaluated Segments.
     """
-    return transcribe_waveform(get_default_whisper_model(), waveform, language)
+    if settings is None:
+        model = get_default_whisper_model()
+    else:
+        parameters = get_default_whisper_model_parameters(settings)
+        model = get_default_whisper_model(parameters=(
+            parameters['model_size_or_path'], parameters['download_root'],
+            parameters['device'], parameters['compute_type'], parameters.get('cpu_threads', 0),
+        ))
+    return transcribe_waveform(model, waveform, language)
 
 
-def transcribe_file_with_default_model(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
+def transcribe_file_with_default_model(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, *, settings: Settings | None = None) -> Path | None:
     """
     Transcribe a waveform file using default model parameters and save the output to an SRT file.
 
@@ -95,6 +115,7 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
         input_file_path (Path): Input waveform file path.
         language (LanguageCode): The source language of the waveform.
         output_file_path (Path | None, optional): Output SRT file path. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
+        settings: Supplied model snapshot; None uses the process default model.
         overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
 
     Returns:
@@ -115,6 +136,7 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
     if len(waveform) == 0:
         logger.warning("Skipping %s because empty waveform is loaded", input_file_path)
         return None
-    segments_generator = reject_bad_segments(transcribe_waveform_with_default_model(waveform, language))
+    segments = transcribe_waveform_with_default_model(waveform, language) if settings is None else transcribe_waveform_with_default_model(waveform, language, settings=settings)
+    segments_generator = reject_bad_segments(segments)
     save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
     return output_file_path

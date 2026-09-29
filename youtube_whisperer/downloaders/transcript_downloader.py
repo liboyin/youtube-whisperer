@@ -20,8 +20,8 @@ from youtube_transcript_api.formatters import SRTFormatter
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import publish_srt_text
+from youtube_whisperer.config import Settings
 from youtube_whisperer.downloaders.utils import get_video_title
-from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -175,17 +175,18 @@ class TranscriptDownloader:
         publish_srt_text(output_file_path, srt_text, overwrite=overwrite)
         return True
     
-    def download_as_srt_file_with_default_title(self, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
+    def download_as_srt_file_with_default_title(self, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
         """
         Downloads the transcript of a YouTube video as an SRT file named after the video title.
 
         Args:
-            target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to `WHISPER_ASSET_DIR`.
+            target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to settings resolved at invocation.
             overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
 
         Returns:
             Path | None: The path to the downloaded SRT file if successful, otherwise 'None'.
         """
+        target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir
         title = replace_os_reserved_chars(get_video_title(self.url))
         output_file_path = truncate_filename(target_dir / f'{title}.srt', max_length=220)
         if self.download_as_srt_file(output_file_path, overwrite=overwrite):

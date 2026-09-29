@@ -1,5 +1,4 @@
 from pathlib import Path
-from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -45,8 +44,8 @@ def _raise(url):
 @pytest.mark.parametrize('claim_min_idle_seconds', [91, 92])
 def test_youtube_worker_stream_bindings(mocker, client, claim_min_idle_seconds):
     """Test that YouTube bindings natively map consumer names properly."""
-    mocker.patch.object(common_testee, 'Settings', return_value=SimpleNamespace(worker_claim_min_idle_seconds=claim_min_idle_seconds))
-    worker = testee.YouTubeWorker('test-slot', client=client)
+    settings = common_testee.Settings(worker_claim_min_idle_seconds=claim_min_idle_seconds)
+    worker = testee.YouTubeWorker('test-slot', client=client, settings=settings)
     assert worker.get_consumer_name() == 'test-slot'
     assert worker.get_stream_name() == testee.YOUTUBE_STREAM
 
@@ -75,7 +74,7 @@ def test_process_video_queues_follow_up_when_transcript_is_missing(mocker, clien
 
     testee.YouTubeWorker('youtube-0', client=client).process_video(task)
 
-    mock_download.assert_called_once_with(VIDEO_1, task.language, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_called_once_with(VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwriteMode.NEVER)
     mock_queue.assert_called_once_with(client, [concrete_task(playlist_task, '/owned/video-1.mp4')])
 
 
@@ -105,8 +104,20 @@ def test_process_video_with_none_transcriber_downloads_without_queueing_follow_u
 
     testee.YouTubeWorker('youtube-0', client=client).process_video(task)
 
-    mock_download.assert_called_once_with(VIDEO_1, task.language, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_called_once_with(VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwriteMode.NEVER)
     mock_queue.assert_not_called()
+
+
+def test_process_video_uses_supplied_snapshot_asset_path_after_environment_mutation(mocker, client, playlist_task, tmp_path, monkeypatch):
+    """Separate YouTube workers send downloads to their own configured asset paths."""
+    snapshots = [testee.Settings(whisper_assets_dir=tmp_path / name) for name in ['one', 'two']]
+    workers = [testee.YouTubeWorker('owned', client, settings=snapshot) for snapshot in snapshots]
+    download = mocker.patch.object(testee, 'download_video_and_transcript_with_default_title', return_value=(tmp_path / 'media.mp4', True))
+    monkeypatch.setenv('WHISPER_ASSETS_DIR', str(tmp_path / 'changed'))
+    for worker, snapshot in zip(workers, snapshots, strict=True):
+        worker.process_video(playlist_task)
+        download.assert_called_with(playlist_task.source, playlist_task.language,
+                                    target_dir=snapshot.whisper_assets_dir, overwrite=OverwriteMode.NEVER)
 
 
 def test_process_task_queues_follow_ups_only_for_videos_missing_a_transcript(mocker, client, playlist_task):
@@ -123,8 +134,8 @@ def test_process_task_queues_follow_ups_only_for_videos_missing_a_transcript(moc
     testee.YouTubeWorker('youtube-0', client=client).process_task(playlist_task)
 
     assert mock_download.call_count == 2
-    mock_download.assert_any_call(VIDEO_1, playlist_task.language, overwrite=OverwriteMode.NEVER)
-    mock_download.assert_any_call(VIDEO_2, playlist_task.language, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_any_call(VIDEO_1, playlist_task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_any_call(VIDEO_2, playlist_task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwriteMode.NEVER)
     mock_queue.assert_called_once_with(client, [concrete_task(playlist_task, '/owned/video-2.mp4')])
     mock_dead_letter.assert_not_called()
 
@@ -139,7 +150,7 @@ def test_process_task_delivers_earlier_follow_ups_when_a_later_video_fails(mocke
     mocker.patch.object(
         testee,
         'download_video_and_transcript_with_default_title',
-        side_effect=lambda url, _language, overwrite: downloads[url] if url in downloads else _raise(url),
+        side_effect=lambda url, _language, target_dir, overwrite: downloads[url] if url in downloads else _raise(url),
     )
     mock_queue = mocker.patch.object(testee, 'queue_transcription_tasks')
     mock_dead_letter = mocker.patch.object(testee, 'queue_dead_letter')

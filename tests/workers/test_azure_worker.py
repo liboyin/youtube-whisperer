@@ -34,7 +34,7 @@ def test_dispatch_task_with_conversion(mocker, tmp_path, owned_path_probes, work
         worker.dispatch_task(task, source_path)
 
     mock_save_wav.assert_called_once_with(source_path, output_file_path=wav_path, overwrite=OverwriteMode.NEVER)
-    mock_transcribe.assert_called_once_with(wav_path, task.language, overwrite=OverwriteMode.NEVER)
+    mock_transcribe.assert_called_once_with(wav_path, task.language, overwrite=OverwriteMode.NEVER, settings=worker.settings)
 
 
 def test_dispatch_task_reuses_existing_sidecar_wav(mocker, tmp_path, worker):
@@ -49,7 +49,7 @@ def test_dispatch_task_reuses_existing_sidecar_wav(mocker, tmp_path, worker):
     worker.dispatch_task(task, source_path)
 
     mock_save_wav.assert_not_called()
-    mock_transcribe.assert_called_once_with(wav_path, task.language, overwrite=OverwriteMode.NEVER)
+    mock_transcribe.assert_called_once_with(wav_path, task.language, overwrite=OverwriteMode.NEVER, settings=worker.settings)
 
 
 def test_dispatch_task_without_conversion(mocker, worker):
@@ -62,7 +62,7 @@ def test_dispatch_task_without_conversion(mocker, worker):
     worker.dispatch_task(task, source_path)
 
     mock_save_wav.assert_not_called()
-    mock_transcribe.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER)
+    mock_transcribe.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER, settings=worker.settings)
 
 
 def test_dispatch_task_raises_when_wav_conversion_returns_no_path(mocker, tmp_path, owned_path_probes, worker):
