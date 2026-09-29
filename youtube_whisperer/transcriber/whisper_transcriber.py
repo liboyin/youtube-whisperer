@@ -6,11 +6,14 @@ from pathlib import Path
 import numpy as np
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
-from faster_whisper.utils import format_timestamp
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
+from youtube_whisperer.adaptors.srt_deduplicator import (
+    SrtBlock,
+    save_segments_as_srt,
+    timestamps_to_srt_block,
+)
 from youtube_whisperer.transcriber.model_parameters import (
     get_default_whisper_model_parameters,
 )
@@ -32,11 +35,7 @@ def segment_to_srt_block(segment: Segment) -> SrtBlock:
     Returns:
         SrtBlock: The SrtBlock representation of the input segment.
     """
-    return SrtBlock(
-        format_timestamp(segment.start, always_include_hours=True, decimal_marker=','),
-        format_timestamp(segment.end, always_include_hours=True, decimal_marker=','),
-        segment.text.strip().split('\n'),
-    )
+    return timestamps_to_srt_block(segment.start, segment.end, segment.text)
 
 
 def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, language: LanguageCode) -> Iterable[Segment]:

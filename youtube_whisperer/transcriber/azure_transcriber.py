@@ -6,11 +6,14 @@ from typing import Any
 import azure.cognitiveservices.speech as speechsdk
 import soundfile as sf
 from azure.cognitiveservices.speech import SpeechRecognitionResult
-from faster_whisper.utils import format_timestamp
 from pathlib_extensions import OverwriteMode, overwrite_existing_path
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.adaptors.srt_deduplicator import SrtBlock, save_segments_as_srt
+from youtube_whisperer.adaptors.srt_deduplicator import (
+    SrtBlock,
+    save_segments_as_srt,
+    timestamps_to_srt_block,
+)
 from youtube_whisperer.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -45,11 +48,7 @@ def recognition_result_to_srt_block(segment: SpeechRecognitionResult) -> SrtBloc
     """
     start_seconds = segment.offset / 10_000_000
     end_seconds = (segment.offset + segment.duration) / 10_000_000
-    return SrtBlock(
-        format_timestamp(start_seconds, always_include_hours=True, decimal_marker=','),
-        format_timestamp(end_seconds, always_include_hours=True, decimal_marker=','),
-        segment.text.strip().split('\n'),
-    )
+    return timestamps_to_srt_block(start_seconds, end_seconds, segment.text)
 
 
 def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:

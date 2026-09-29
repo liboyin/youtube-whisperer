@@ -55,6 +55,71 @@ def test_srtblock_to_lines():
     assert block.to_lines(1) == expected
 
 
+@pytest.mark.parametrize('seconds, expected', [
+    (0, '00:00:00,000'),
+    (0.0005, '00:00:00,000'),
+    (0.0015, '00:00:00,002'),
+    (0.0025, '00:00:00,002'),
+    (0.0035, '00:00:00,004'),
+    (0.9994, '00:00:00,999'),
+    (0.9995, '00:00:01,000'),
+    (59.9994, '00:00:59,999'),
+    (59.9995, '00:01:00,000'),
+    (3599.9994, '00:59:59,999'),
+    (3599.9995, '01:00:00,000'),
+    (3600, '01:00:00,000'),
+    (90_000, '25:00:00,000'),
+    (360_000.0015, '100:00:00,002'),
+])
+def test_format_srt_timestamp_preserves_installed_rounding_and_expected_strings(seconds, expected):
+    """Neutral timestamps match independent strings and the installed formatter's forced SRT form."""
+    from faster_whisper.utils import format_timestamp
+
+    assert testee.format_srt_timestamp(seconds) == expected
+    assert testee.format_srt_timestamp(seconds) == format_timestamp(
+        seconds, always_include_hours=True, decimal_marker=',',
+    )
+
+
+@pytest.mark.parametrize('seconds', [-1, -0.0000001])
+def test_format_srt_timestamp_rejects_negative_values_before_rounding(seconds):
+    """Even negative values that would round to zero retain the installed assertion."""
+    from faster_whisper.utils import format_timestamp
+
+    with pytest.raises(AssertionError, match='non-negative timestamp expected'):
+        format_timestamp(seconds, always_include_hours=True, decimal_marker=',')
+    with pytest.raises(AssertionError, match='non-negative timestamp expected'):
+        testee.format_srt_timestamp(seconds)
+
+
+@pytest.mark.parametrize('text, expected', [
+    (' \tFirst line\n  Second line \t\n', ['First line', '  Second line']),
+    ('\n First\n\nThird \n', ['First', '', 'Third']),
+    ('First\r\nSecond', ['First\r', 'Second']),
+    ('', ['']),
+    (' \n\t ', ['']),
+])
+def test_timestamps_to_srt_block_strips_outer_whitespace_and_splits_only_newlines(text, expected):
+    """Shared conversion preserves interior whitespace, empty lines and empty content."""
+    assert testee.timestamps_to_srt_block(0, 59.9995, text) == testee.SrtBlock(
+        '00:00:00,000', '00:01:00,000', expected,
+    )
+
+
+def test_timestamps_to_srt_block_preserves_reversed_nonnegative_timestamps():
+    """Conversion formats supplied values without adding a timestamp-order restriction."""
+    assert testee.timestamps_to_srt_block(2, 1, 'text') == testee.SrtBlock(
+        '00:00:02,000', '00:00:01,000', ['text'],
+    )
+
+
+@pytest.mark.parametrize('start, end', [(-1, 0), (0, -1)])
+def test_timestamps_to_srt_block_rejects_either_negative_timestamp(start, end):
+    """Both start and end retain the nonnegative formatting assertion."""
+    with pytest.raises(AssertionError, match='non-negative timestamp expected'):
+        testee.timestamps_to_srt_block(start, end, 'text')
+
+
 def test_yield_srt_blocks_from_lines():
     """Test that blank-line-separated SRT lines are parsed into blocks."""
     input_lines = [

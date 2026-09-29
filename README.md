@@ -33,7 +33,7 @@ youtube_whisperer/
 ├── queueing.py                 # Redis Streams: enqueue, snapshot, dead-letter
 ├── adaptors/
 │   ├── lang_code_adaptor.py    # BCP-47 / ISO 639-1 LanguageCode type
-│   └── srt_deduplicator.py     # SrtBlock serialization and SRT deduplication
+│   └── srt_deduplicator.py     # Neutral SRT formatting, serialization and deduplication
 ├── downloaders/
 │   ├── __init__.py             # download_video_and_transcript_with_default_title
 │   ├── playlist_downloader.py  # Expand playlists/channels into video URLs
@@ -161,7 +161,7 @@ Workers run as independent Docker services rather than background tasks inside t
 
 ### SRT as the output format
 
-SRT was chosen to match an existing library of subtitle files. SRT serialization and deduplication are isolated in `adaptors/srt_deduplicator.py`; each transcriber owns the small conversion from its native segment type to an `SrtBlock`. Supporting another output format (e.g. WebVTT, JSON) would mean adding a sibling serializer next to `save_segments_as_srt`.
+SRT was chosen to match an existing library of subtitle files. Engine-neutral timestamp/text conversion, SRT serialization and deduplication live in `adaptors/srt_deduplicator.py`. The public Whisper and Azure converters retain native segment handling; Azure converts its offset/duration ticks to seconds without importing Whisper for formatting. Shared formatting rounds total milliseconds before decomposition, always includes hours, uses comma milliseconds, and strips outer text whitespace before splitting on newlines. Supporting another output format (e.g. WebVTT, JSON) would mean adding a sibling serializer next to `save_segments_as_srt`.
 
 SRT saving, caption download, and in-place deduplication publish through `publish_srt_text`: complete text is written to an exclusively created sibling stage and closed before atomic publication. A failed write, close, or publication preserves the prior valid SRT; a process interrupted before publication cannot expose a partial final file. Whisper's lazy segments are fully consumed and checked before staging, and in-place deduplication reads its input before publication. Existing-output consent is obtained before expensive model/network work and reused without another prompt.
 

@@ -214,6 +214,126 @@ def test_recognition_result_to_srt_block():
     assert result == SrtBlock(start_time="00:00:01,000", end_time="00:00:03,000", content=["Hello world"])
 
 
+@pytest.mark.parametrize('offset, duration, text, expected_start, expected_end, expected_content', [
+    (5_000, 10_000, ' \nFirst\n  Second \t', '00:00:00,000', '00:00:00,002', ['First', '  Second']),
+    (10_001, 5_000, '', '00:00:00,001', '00:00:00,002', ['']),
+    (599_994_999, 1, 'text', '00:00:59,999', '00:01:00,000', ['text']),
+    (35_999_995_000, 3_564_000_020_000, ' \n\t ', '01:00:00,000', '100:00:00,002', ['']),
+    (20_000_000, -10_000_000, 'text', '00:00:02,000', '00:00:01,000', ['text']),
+])
+def test_recognition_result_to_srt_block_preserves_tick_precision_and_text(
+    offset, duration, text, expected_start, expected_end, expected_content,
+):
+    """The public Azure wrapper adds ticks before conversion and retains exact SRT formatting."""
+    segment = MockSpeechRecognitionResult(offset=offset, duration=duration, text=text)
+    assert testee.recognition_result_to_srt_block(segment) == SrtBlock(expected_start, expected_end, expected_content)
+
+
+@pytest.mark.parametrize('offset, duration', [(-1, 10_000_000), (0, -1)])
+def test_recognition_result_to_srt_block_rejects_either_negative_timestamp(offset, duration):
+    """Negative offsets and negative computed ends retain the public Azure converter assertion."""
+    with pytest.raises(AssertionError, match='non-negative timestamp expected'):
+        testee.recognition_result_to_srt_block(MockSpeechRecognitionResult(offset, duration, 'text'))
+
+
+def test_recognition_result_to_srt_block_uses_neutral_conversion():
+    """Azure forwards tick-derived seconds and unchanged text to the shared formatting owner."""
+    segment = MockSpeechRecognitionResult(10_001, 5_000, ' \ntext \t')
+    block = SrtBlock('shared start', 'shared end', ['shared content'])
+    with mock.patch.object(testee, 'timestamps_to_srt_block', return_value=block) as convert:
+        assert testee.recognition_result_to_srt_block(segment) is block
+    convert.assert_called_once_with(0.0010001, 0.0015001, segment.text)
+
+
+def test_recognition_result_to_srt_block_imports_no_whisper_or_ctranslate2(tmp_path):
+    """A fresh Azure converter import and call attempt no Whisper/CTranslate2 imports or resources."""
+    script = dedent('''
+        import builtins
+        import importlib.abc
+        import json
+        import os
+        import socket
+        import sys
+        from pathlib import Path
+        from types import ModuleType, SimpleNamespace
+        from unittest.mock import patch
+
+        import pydantic_settings
+        import redis
+
+        forbidden = ('faster_whisper', 'whisper', 'ctranslate2')
+        attempts = []
+
+        def check_import(name):
+            """Record and reject every attempt to import an unselected engine."""
+            if name.split('.')[0] in forbidden:
+                attempts.append(name)
+                raise AssertionError('unselected engine import: ' + name)
+
+        native_import = builtins.__import__
+
+        def guarded_import(name, *args, **kwargs):
+            """Trap ordinary import attempts even if a module were already cached."""
+            check_import(name)
+            return native_import(name, *args, **kwargs)
+
+        class ImportTrap(importlib.abc.MetaPathFinder):
+            """Trap importlib requests that bypass the ordinary import hook."""
+
+            def find_spec(self, fullname, path=None, target=None):
+                """Reject forbidden module loading before its package executes."""
+                check_import(fullname)
+                return None
+
+        for name in ('azure', 'azure.cognitiveservices', 'azure.cognitiveservices.speech', 'soundfile'):
+            module = ModuleType(name)
+            module.__path__ = []
+            sys.modules[name] = module
+        sys.modules['azure.cognitiveservices.speech'].SpeechRecognitionResult = SimpleNamespace
+        assert not any(name.split('.')[0] in forbidden for name in sys.modules)
+        sys.meta_path.insert(0, ImportTrap())
+
+        with (
+            patch.object(builtins, '__import__', guarded_import),
+            patch.object(pydantic_settings.BaseSettings, '__init__', side_effect=AssertionError('Settings construction')),
+            patch.object(redis.ConnectionPool, '__init__', side_effect=AssertionError('Redis pool construction')),
+            patch.object(redis.Redis, '__init__', side_effect=AssertionError('Redis client construction')),
+            patch.object(socket, 'socket', side_effect=AssertionError('network access')),
+            patch.object(Path, 'is_file', side_effect=AssertionError('filesystem data probe')),
+            patch.object(Path, 'is_dir', side_effect=AssertionError('filesystem data probe')),
+            patch.object(Path, 'exists', side_effect=AssertionError('filesystem data probe')),
+            patch.object(Path, 'open', side_effect=AssertionError('filesystem data access')),
+        ):
+            import youtube_whisperer.transcriber.azure_transcriber as testee
+            assert Path(testee.__file__).is_relative_to(Path(os.environ['PYTHONPATH']))
+            result = testee.recognition_result_to_srt_block(SimpleNamespace(
+                offset=5_000, duration=10_000, text=' \\nFirst\\n  Second \\t',
+            ))
+            assert result == testee.SrtBlock('00:00:00,000', '00:00:00,002', ['First', '  Second'])
+        assert attempts == []
+        assert not any(name.split('.')[0] in forbidden for name in sys.modules)
+        print(json.dumps({'attempts': attempts, 'start': result.start_time, 'end': result.end_time}))
+    ''')
+    environment = {
+        'HOME': str(tmp_path),
+        'TMPDIR': str(tmp_path),
+        'PYTHONPATH': str(Path(testee.__file__).parents[2]),
+        'PYTHONDONTWRITEBYTECODE': '1',
+        'WHISPER_ASSETS_DIR': str(tmp_path / 'assets'),
+        'WHISPER_MODELS_DIR': str(tmp_path / 'models'),
+        'WHISPER_USE_CUDA': 'false',
+        'WHISPER_MODEL': 'test-model',
+        'REDIS_HOST': 'format.test.invalid',
+        'REDIS_PORT': '6392',
+    }
+    result = subprocess.run(
+        [sys.executable, '-c', script], cwd=tmp_path, env=environment,
+        capture_output=True, text=True, check=False, timeout=10,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout) == {'attempts': [], 'start': '00:00:00,000', 'end': '00:00:00,002'}
+
+
 def test_transcribe_audio_file_returns_existing_output_when_overwrite_denied(mocker, tmp_path, owned_path_probes, synthetic_azure_settings):
     """Test that an existing SRT is returned without contacting Azure when overwrite is denied."""
     input_path = tmp_path / "audio.wav"

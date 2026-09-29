@@ -35,6 +35,35 @@ def test_segment_to_srt_block():
     assert srt_block.content == ['Segment']
 
 
+@pytest.mark.parametrize('start, end, text, expected_start, expected_end, expected_content', [
+    (0.0015, 59.9995, ' \nFirst\n  Second \t', '00:00:00,002', '00:01:00,000', ['First', '  Second']),
+    (3599.9995, 360_000.0015, '', '01:00:00,000', '100:00:00,002', ['']),
+    (2, 1, ' \n\t ', '00:00:02,000', '00:00:01,000', ['']),
+])
+def test_segment_to_srt_block_preserves_rounding_text_and_unrestricted_hours(
+    start, end, text, expected_start, expected_end, expected_content,
+):
+    """The public Whisper wrapper retains exact formatting for native seconds and text."""
+    segment = SimpleNamespace(start=start, end=end, text=text)
+    assert testee.segment_to_srt_block(segment) == SrtBlock(expected_start, expected_end, expected_content)
+
+
+@pytest.mark.parametrize('start, end', [(-0.0000001, 0), (0, -0.0000001)])
+def test_segment_to_srt_block_rejects_either_negative_timestamp(start, end):
+    """The public Whisper converter retains rejection of either negative native timestamp."""
+    with pytest.raises(AssertionError, match='non-negative timestamp expected'):
+        testee.segment_to_srt_block(SimpleNamespace(start=start, end=end, text='text'))
+
+
+def test_segment_to_srt_block_uses_neutral_conversion():
+    """The Whisper wrapper forwards unchanged seconds and text to the shared formatting owner."""
+    segment = SimpleNamespace(start=0.0015, end=59.9995, text=' \ntext \t')
+    block = SrtBlock('shared start', 'shared end', ['shared content'])
+    with patch.object(testee, 'timestamps_to_srt_block', return_value=block) as convert:
+        assert testee.segment_to_srt_block(segment) is block
+    convert.assert_called_once_with(segment.start, segment.end, segment.text)
+
+
 def make_logging_model() -> SimpleNamespace:
     """Return a stand-in Whisper model that echoes the resolved language and task into its info dict."""
     return SimpleNamespace(

@@ -73,6 +73,47 @@ class SrtBlock:
         return result
 
 
+def format_srt_timestamp(seconds: float) -> str:
+    """Format nonnegative seconds with forced hours and comma milliseconds.
+
+    Round total milliseconds before decomposition so ties and carries preserve
+    the converters' faster-whisper formatting contract. Hours have no upper bound.
+
+    Args:
+        seconds (float): Timestamp in seconds.
+
+    Returns:
+        str: Timestamp in HH:MM:SS,mmm form, with at least two hour digits.
+
+    Raises:
+        AssertionError: If seconds is negative.
+    """
+    assert seconds >= 0, "non-negative timestamp expected"
+    milliseconds = round(seconds * 1000.0)
+    hours, milliseconds = divmod(milliseconds, 3_600_000)
+    minutes, milliseconds = divmod(milliseconds, 60_000)
+    seconds_part, milliseconds = divmod(milliseconds, 1_000)
+    return f'{hours:02d}:{minutes:02d}:{seconds_part:02d},{milliseconds:03d}'
+
+
+def timestamps_to_srt_block(start: float, end: float, text: str) -> SrtBlock:
+    """Convert seconds and text to a block without depending on an engine.
+
+    Args:
+        start (float): Nonnegative start timestamp in seconds.
+        end (float): Nonnegative end timestamp in seconds.
+        text (str): Content whose outer whitespace is stripped before splitting
+            only on newline characters; empty text retains one empty content line.
+
+    Returns:
+        SrtBlock: Formatted timestamps and content lines.
+
+    Raises:
+        AssertionError: If either timestamp is negative.
+    """
+    return SrtBlock(format_srt_timestamp(start), format_srt_timestamp(end), text.strip().split('\n'))
+
+
 def yield_srt_blocks_from_lines(lines: Iterable[str]) -> Iterator[SrtBlock]:
     """
     Yields SrtBlock instances from an iterable of lines from an SRT file.
