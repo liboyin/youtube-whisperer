@@ -77,6 +77,8 @@ Four components cooperate:
 
 `domain.py` owns `TranscriberType` and `is_url`; models and queueing import domain values directly and construct no Settings, Redis pool, or Redis client when imported. Existing `utils.TranscriberType` and `utils.is_url` imports forward the same objects. Ordinary imports of `utils`, the API and workers also construct no settings or Redis resources. Explicit access to legacy `utils.REDIS_POOL`/`REDIS_CLIENT` creates a lazy compatibility runtime closed at process exit; legacy path exports resolve settings on each access. Existing public imports and positional transcription/download calls remain available.
 
+The worker entrypoint loads no transcription or download engine when imported, when showing CLI help, or when rejecting an invalid role. Once a role is valid, it imports only that role's worker inside the runtime's cleanup scope: Whisper loads faster-whisper/CTranslate2, Azure loads Azure Speech, and YouTube loads yt-dlp/caption support. Direct worker-module classes and the older `workers.__main__` class imports remain available; the latter resolve lazily.
+
 ## Data Flow
 
 1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper`, `azure`, or `none` to download a URL without transcribing it), a single source language (`en-us` by default).

@@ -2,12 +2,15 @@ import argparse
 import logging
 import socket
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from youtube_whisperer.config import Settings
 from youtube_whisperer.runtime import Runtime
-from youtube_whisperer.workers.azure_worker import AzureWorker
-from youtube_whisperer.workers.whisper_worker import WhisperWorker
-from youtube_whisperer.workers.youtube_worker import YouTubeWorker
+
+if TYPE_CHECKING:
+    from youtube_whisperer.workers.azure_worker import AzureWorker
+    from youtube_whisperer.workers.whisper_worker import WhisperWorker
+    from youtube_whisperer.workers.youtube_worker import YouTubeWorker
 
 
 class WorkerRole(str, Enum):
@@ -47,18 +50,68 @@ def resolve_worker_slot(slot: str | None, role_name: str, *, settings: Settings 
     return socket.gethostname()
 
 
+def _load_worker_class(role: WorkerRole) -> "type[YouTubeWorker | WhisperWorker | AzureWorker]":
+    """Import only the worker class selected by a validated role.
+
+    Args:
+        role: Validated role whose engine may be imported.
+
+    Returns:
+        The matching concrete worker class.
+
+    Raises:
+        ValueError: If a role outside this dispatch mapping is supplied.
+    """
+    match role:
+        case WorkerRole.YOUTUBE:
+            from youtube_whisperer.workers.youtube_worker import YouTubeWorker
+
+            return YouTubeWorker
+        case WorkerRole.WHISPER:
+            from youtube_whisperer.workers.whisper_worker import WhisperWorker
+
+            return WhisperWorker
+        case WorkerRole.AZURE:
+            from youtube_whisperer.workers.azure_worker import AzureWorker
+
+            return AzureWorker
+    raise ValueError(f'Unsupported worker role: {role}')
+
+
+def __getattr__(name: str) -> "type[YouTubeWorker | WhisperWorker | AzureWorker]":
+    """Forward legacy ``__main__`` worker-class imports lazily to their modules.
+
+    Args:
+        name: Previously exposed worker class name.
+
+    Returns:
+        The requested concrete worker class.
+
+    Raises:
+        AttributeError: If the name is not a supported compatibility export.
+    """
+    role_by_name = {
+        'YouTubeWorker': WorkerRole.YOUTUBE,
+        'WhisperWorker': WorkerRole.WHISPER,
+        'AzureWorker': WorkerRole.AZURE,
+    }
+    try:
+        return _load_worker_class(role_by_name[name])
+    except KeyError as exc:
+        raise AttributeError(f'module {__name__!r} has no attribute {name!r}') from exc
+
+
 def process_queue(role: WorkerRole | str = WorkerRole.WHISPER, slot: str | None = None, poll_interval_seconds: int = 5, *, settings: Settings | None = None) -> None:
     """Dispatch queue processing to the selected worker implementation.
 
     This entrypoint normalizes the requested worker role and forwards execution
     to the corresponding YouTube, Whisper, or Azure queue processor. Slot
-    routing is only applied to workers that consume slot-specific active
-    queues.
+    routing supplies each worker's consumer identity.
 
     Args:
         role: Worker role to run. May be provided as a `WorkerRole` value or a
             matching string.
-        slot: Optional active-slot identifier for Whisper or Azure workers.
+        slot: Optional consumer identifier for the selected worker.
             When omitted, the slot is resolved from environment-aware defaults.
         settings: Supplied snapshot shared by identity and worker execution.
         poll_interval_seconds: Number of seconds to wait between Redis polling
@@ -76,13 +129,8 @@ def process_queue(role: WorkerRole | str = WorkerRole.WHISPER, slot: str | None 
         raise ValueError(f'Unsupported worker role: {role}') from exc
     with Runtime(settings) as runtime:
         resolved_slot = resolve_worker_slot(slot, role.value, settings=runtime.settings)
-        match role:
-            case WorkerRole.YOUTUBE:
-                YouTubeWorker(resolved_slot, runtime=runtime).process_queue(poll_interval_seconds=poll_interval_seconds)
-            case WorkerRole.WHISPER:
-                WhisperWorker(resolved_slot, runtime=runtime).process_queue(poll_interval_seconds=poll_interval_seconds)
-            case WorkerRole.AZURE:
-                AzureWorker(resolved_slot, runtime=runtime).process_queue(poll_interval_seconds=poll_interval_seconds)
+        worker_class = _load_worker_class(role)
+        worker_class(resolved_slot, runtime=runtime).process_queue(poll_interval_seconds=poll_interval_seconds)
 
 
 def main() -> None:
