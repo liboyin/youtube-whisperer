@@ -72,7 +72,7 @@ class WhisperWorker(TranscriptionWorker):
         worker loop dead-letters the task instead of silently dropping it.
 
         Args:
-            task: The transcription task that provides language and mode settings
+            task: The transcription task that provides source-language settings
                 for the Whisper run.
             source: The concrete filesystem path to the media file that should be
                 transcribed.
@@ -85,4 +85,4 @@ class WhisperWorker(TranscriptionWorker):
                 loop so the task is dead-lettered.
         """
         validate_gpu_health_or_exit()
-        transcribe_file_with_default_model(source, task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+        transcribe_file_with_default_model(source, task.language, overwrite=OverwriteMode.NEVER)

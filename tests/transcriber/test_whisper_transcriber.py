@@ -1,4 +1,5 @@
 import builtins
+import inspect
 import logging
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -16,7 +17,6 @@ from youtube_whisperer.transcriber.rejection_policy import (
     REJECTED_SUBSTRINGS,
     RejectedTranscriptionError,
 )
-from youtube_whisperer.utils import TranscriberMode
 
 LANGUAGE = LanguageCode("zh")
 
@@ -45,50 +45,25 @@ def make_logging_model() -> SimpleNamespace:
     )
 
 
-def test_transcribe_waveform_switches_translate_to_transcribe_for_english(caplog):
-    """Test that translating an English source into English is downgraded to transcribe, as it is a no-op."""
-    model = make_logging_model()
-    language = LanguageCode("en", "en")
-
-    with caplog.at_level(logging.INFO):
-        result = list(testee.transcribe_waveform(model, np.array([1.0]), TranscriberMode.TRANSLATE, language))
-
-    assert result == ["segment"]
-    assert "{'lang': 'en', 'task': 'transcribe'}" in caplog.text
-
-
-def test_transcribe_waveform_translates_non_english_source_to_english(caplog):
-    """Test that a non-English source with an English target runs Whisper's translate task (e.g. zh->en)."""
-    model = make_logging_model()
-    language = LanguageCode("zh", "en")
-
-    with caplog.at_level(logging.INFO):
-        result = list(testee.transcribe_waveform(model, np.array([1.0]), TranscriberMode.TRANSLATE, language))
-
-    assert result == ["segment"]
-    assert "{'lang': 'zh', 'task': 'translate'}" in caplog.text
-
-
-@pytest.mark.parametrize("language", [
-    LanguageCode("zh"),          # translate requires a target; None is not English
-    LanguageCode("zh", "zh"),    # Whisper cannot translate into a non-English target
+@pytest.mark.parametrize("source, expected_iso", [
+    ("en", "en"), ("en-us", "en"), ("zh", "zh"), ("zh-cn", "zh"),
 ])
-def test_transcribe_waveform_rejects_translate_without_english_target(language):
-    """Test that translate mode is rejected unless the target is English, since Whisper only outputs English."""
-    with pytest.raises(ValueError, match="Whisper can only translate into English"):
-        list(testee.transcribe_waveform(make_logging_model(), np.array([1.0]), TranscriberMode.TRANSLATE, language))
-
-
-def test_transcribe_waveform_ignores_target_in_transcribe_mode(caplog):
-    """Test that transcribe mode outputs the source language and never rejects on the target field."""
-    model = make_logging_model()
-    language = LanguageCode("zh", "en")
-
+def test_transcribe_waveform_requests_source_language_transcription(caplog, source, expected_iso):
+    """Test that every registered source runs transcription and logs model information."""
     with caplog.at_level(logging.INFO):
-        result = list(testee.transcribe_waveform(model, np.array([1.0]), TranscriberMode.TRANSCRIBE, language))
+        result = list(testee.transcribe_waveform(make_logging_model(), np.array([1.0]), LanguageCode(source)))
 
     assert result == ["segment"]
-    assert "{'lang': 'zh', 'task': 'transcribe'}" in caplog.text
+    assert str({'lang': expected_iso, 'task': 'transcribe'}) in caplog.text
+
+
+def test_whisper_helpers_expose_source_language_signatures():
+    """Test that Python entry points retire operation arguments while retaining other parameters."""
+    assert tuple(inspect.signature(testee.transcribe_waveform).parameters) == ('model', 'waveform', 'language')
+    assert tuple(inspect.signature(testee.transcribe_waveform_with_default_model).parameters) == ('waveform', 'language')
+    assert tuple(inspect.signature(testee.transcribe_file_with_default_model).parameters) == (
+        'input_file_path', 'language', 'output_file_path', 'overwrite',
+    )
 
 
 @contextmanager
@@ -146,10 +121,10 @@ def test_transcribe_waveform_with_default_model_uses_cached_model(mocker):
     mocker.patch.object(testee, "get_default_whisper_model", return_value=model)
     mock_transcribe = mocker.patch.object(testee, "transcribe_waveform", return_value=["segment"])
 
-    result = testee.transcribe_waveform_with_default_model(waveform, TranscriberMode.TRANSCRIBE, LANGUAGE)
+    result = testee.transcribe_waveform_with_default_model(waveform, LANGUAGE)
 
     assert result == ["segment"]
-    mock_transcribe.assert_called_once_with(model, waveform, TranscriberMode.TRANSCRIBE, LANGUAGE)
+    mock_transcribe.assert_called_once_with(model, waveform, LANGUAGE)
 
 
 def test_transcribe_file_with_default_model_returns_existing_output_when_overwrite_denied(mocker, tmp_path):
@@ -208,17 +183,18 @@ def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
     segments = [make_segment("hello")]
     save_mock = mocker.patch.object(testee, "save_segments_as_srt")
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
-    mocker.patch.object(testee, "transcribe_waveform_with_default_model", return_value=segments)
+    mock_transcribe = mocker.patch.object(testee, "transcribe_waveform_with_default_model", return_value=segments)
 
     result = testee.transcribe_file_with_default_model(
         input_path,
         LANGUAGE,
         output_file_path=output_path,
         overwrite=OverwriteMode.ALWAYS,
-        mode=TranscriberMode.TRANSLATE,
     )
 
     assert result == output_path
+    mock_transcribe.assert_called_once()
+    assert mock_transcribe.call_args.args[1:] == (LANGUAGE,)
     save_mock.assert_called_once()
     assert save_mock.call_args.args[1] == output_path
     assert save_mock.call_args.kwargs == {"overwrite": OverwriteMode.ALWAYS}

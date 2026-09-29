@@ -21,34 +21,27 @@ class UnableToConvertLanguageCode(Exception):
     pass
 
 
-class MissingTargetLanguageCode(Exception):
-    pass
-
-
 @dataclass(frozen=True)
 class LanguageCode:
+    """Represent one registered source language."""
+
     source: str  # source language code (either BCP-47 or ISO 639-1)
-    target: str | None = None  # target language code for translation
 
     def __post_init__(self) -> None:
-        """Validate that the source and optional target are registered language codes.
+        """Validate that the source is a registered language code.
 
         Raises:
-            UnregisteredLanguageCode: If `source` or `target` is neither a BCP-47 nor an ISO 639-1 code.
+            UnregisteredLanguageCode: If `source` is neither a BCP-47 nor an ISO 639-1 code.
         """
         if self.source not in BCP_LANG_CODES and self.source not in ISO_LANG_CODES:
             raise UnregisteredLanguageCode(self.source)
-        if self.target is not None and self.target not in BCP_LANG_CODES and self.target not in ISO_LANG_CODES:
-            raise UnregisteredLanguageCode(self.target)
 
     def __str__(self) -> str:
-        """Render the language code as ``source`` or ``source->target``.
+        """Render the source language code.
 
         Returns:
-            str: The source code alone, or ``source->target`` when a target is set.
+            str: The registered source code.
         """
-        if self.target:
-            return f"{self.source}->{self.target}"
         return self.source
 
     @classmethod
@@ -57,7 +50,7 @@ class LanguageCode:
         Creates an instance of the class from the output of `cls.__str__`.
 
         Args:
-            text (str): A string in `source` or `source->target` form.
+            text (str): A single source code, normalized by stripping whitespace and lowercasing.
 
         Returns:
             Self: The parsed language code.
@@ -65,13 +58,12 @@ class LanguageCode:
         Raises:
             ValueError: If the input does not match the output format of `cls.__str__`.
         """
-        pattern = r"([a-z\-]+)(?:\s*->\s*([a-z\-]+))?"
+        pattern = r"([a-z\-]+)"
         match = re.fullmatch(pattern, text.strip().lower())
         if not match:
             raise ValueError(f"Unexpected input: {text}")
         source = match.group(1)
-        target = match.group(2) if match.group(2) else None
-        return cls(source=source, target=target)
+        return cls(source=source)
 
     @classmethod
     def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: GetCoreSchemaHandler) -> CoreSchema:
@@ -127,7 +119,7 @@ class LanguageCode:
         return {
             'type': 'string',
             'default': 'en-us',
-            'examples': ['en', 'en-us', 'en-us->zh-cn'],  # FastAPI uses the first value here to generate examples in the documentation UI
+            'examples': ['en', 'en-us'],  # FastAPI uses the first value here to generate examples in the documentation UI
         }
 
     def is_source_BCP(self) -> bool:
@@ -137,16 +129,6 @@ class LanguageCode:
             bool: True if the source is a BCP-47 code, False if it is ISO 639-1.
         """
         return self.source in BCP_LANG_CODES
-
-    def is_target_BCP(self) -> bool | None:
-        """Report whether the target language is a BCP-47 code.
-
-        Returns:
-            bool | None: True/False for a BCP-47/ISO 639-1 target, or `None` if no target is set.
-        """
-        if self.target is None:
-            return None
-        return self.target in BCP_LANG_CODES
 
     def get_source_as_BCP(self) -> str:
         """
@@ -176,29 +158,3 @@ class LanguageCode:
             result.append(self.get_source_as_BCP())
         result.append(self.get_source_as_ISO())
         return result
-    
-    def get_target_as_BCP(self) -> str:
-        """
-        Returns the target language as a BCP-47 code.
-
-        Raises:
-            MissingTargetLanguageCode: If no target language is set.
-            UnableToConvertLanguageCode: If the target language is not a BCP-47 code.
-        """
-        if not self.target:
-            raise MissingTargetLanguageCode
-        if self.is_target_BCP():
-            return self.target
-        raise UnableToConvertLanguageCode(self.target)
-    
-    def get_target_as_ISO(self) -> str:
-        """Returns the target language as an ISO 639-1 code.
-            
-        Raises:
-            MissingTargetLanguageCode: If no target language is set.
-        """
-        if not self.target:
-            raise MissingTargetLanguageCode
-        if self.is_target_BCP():
-            return self.target.split('-')[0]
-        return self.target

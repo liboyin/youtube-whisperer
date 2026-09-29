@@ -8,7 +8,7 @@ import redis
 import youtube_whisperer.workers.common as testee
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.models import Task
-from youtube_whisperer.utils import TranscriberMode, TranscriberType
+from youtube_whisperer.utils import TranscriberType
 
 
 @pytest.fixture
@@ -27,7 +27,6 @@ def test_yield_task(mock_redis, mocker):
         source=task_dict['source'],
         language=LanguageCode(task_dict['language']),
         transcriber=TranscriberType.WHISPER,
-        mode=TranscriberMode.TRANSCRIBE,
     )
 
     # > new message scrape yields task.
@@ -279,14 +278,12 @@ def test_model_copy_preserves_non_source_fields():
         source='https://example.com/playlist',
         language='en',
         transcriber=TranscriberType.AZURE,
-        mode=TranscriberMode.TRANSLATE,
     )
     result = task.model_copy(update={'source': 'https://example.com/video'})
     assert result == Task(
         source='https://example.com/video',
         language='en',
         transcriber=TranscriberType.AZURE,
-        mode=TranscriberMode.TRANSLATE,
     )
 
 

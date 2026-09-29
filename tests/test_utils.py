@@ -98,6 +98,11 @@ with patch.object(socket, 'socket', side_effect=AssertionError('network access')
     assert result.returncode == 0, result.stderr
 
 
+def test_removed_transcriber_mode_is_unavailable():
+    """Test that the retired operation enum cannot be imported by Python callers."""
+    assert not hasattr(testee, 'TranscriberMode')
+
+
 def test_transcriber_type_values():
     """Test that the transcriber enum exposes the supported transcriber names, including download-only `none`."""
     assert testee.TranscriberType.values() == ('whisper', 'azure', 'none')
@@ -107,11 +112,6 @@ def test_transcriber_type_rejects_legacy_local_alias():
     """Test that the legacy local transcriber alias is rejected."""
     with pytest.raises(ValueError, match="'local' is not a valid TranscriberType"):
         testee.TranscriberType('local')
-
-
-def test_transcriber_mode_values():
-    """Test that the transcriber mode enum exposes the supported mode names."""
-    assert testee.TranscriberMode.values() == ('transcribe', 'translate')
 
 
 @pytest.mark.parametrize("input_text, expected", [

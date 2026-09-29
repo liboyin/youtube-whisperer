@@ -7,7 +7,7 @@ from pathlib_extensions import OverwriteMode
 import youtube_whisperer.workers.whisper_worker as testee
 from youtube_whisperer.models import Task
 from youtube_whisperer.transcriber.rejection_policy import RejectedTranscriptionError
-from youtube_whisperer.utils import TranscriberMode, TranscriberType
+from youtube_whisperer.utils import TranscriberType
 
 
 @pytest.fixture
@@ -76,13 +76,13 @@ def test_dispatch_task_for_whisper_transcriber(mocker, worker):
     """Test dispatching to the Whisper transcriber."""
     mock_validate_gpu = mocker.patch.object(testee, 'validate_gpu_health_or_exit')
     mock_transcribe = mocker.patch.object(testee, 'transcribe_file_with_default_model')
-    task = Task(source='/path.mp4', transcriber=TranscriberType.WHISPER, mode=TranscriberMode.TRANSCRIBE)
+    task = Task(source='/path.mp4', transcriber=TranscriberType.WHISPER)
     source_path = Path('/path.mp4')
 
     worker.dispatch_task(task, source_path)
 
     mock_validate_gpu.assert_called_once()
-    mock_transcribe.assert_called_once_with(source_path, task.language, mode=task.mode, overwrite=OverwriteMode.NEVER)
+    mock_transcribe.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER)
 
 
 def test_dispatch_task_propagates_transcription_failure(mocker, worker):

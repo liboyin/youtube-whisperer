@@ -8,7 +8,7 @@ from pathlib_extensions import OverwriteMode
 import youtube_whisperer.workers.common as common_testee
 import youtube_whisperer.workers.youtube_worker as testee
 from youtube_whisperer.models import Task
-from youtube_whisperer.utils import TranscriberMode, TranscriberType
+from youtube_whisperer.utils import TranscriberType
 
 PLAYLIST_URL = 'https://example.com/playlist'
 VIDEO_1 = 'https://example.com/video-1'
@@ -24,12 +24,11 @@ def client():
 
 @pytest.fixture
 def playlist_task():
-    """Provide a playlist task requesting Azure translation follow-ups."""
+    """Provide a playlist task requesting Azure transcription follow-ups."""
     return Task(
         source=PLAYLIST_URL,
         language='en',
         transcriber=TranscriberType.AZURE,
-        mode=TranscriberMode.TRANSLATE,
     )
 
 

@@ -3,61 +3,63 @@ import pytest
 import youtube_whisperer.adaptors.lang_code_adaptor as testee
 
 
-def test_init():
-    """Test that a LanguageCode defaults target to None and stores explicit source/target codes."""
-    assert testee.LanguageCode(source='en') == testee.LanguageCode(source='en', target=None)
-    assert testee.LanguageCode(source='en-us') == testee.LanguageCode(source='en-us', target=None)
-    assert testee.LanguageCode(source='en', target='zh').target == 'zh'
-    assert testee.LanguageCode(source='en', target='zh-cn').target == 'zh-cn'
+@pytest.mark.parametrize('source', ['en', 'en-us', 'zh', 'zh-cn'])
+def test_init_stores_registered_source(source):
+    """Test that construction retains every registered source unchanged."""
+    assert testee.LanguageCode(source=source).source == source
 
 
-def test_init_invalid():
-    """Test that unregistered or empty source/target codes are rejected."""
+def test_init_rejects_removed_target_argument():
+    """Test that retired target parameters cannot silently preserve translation calls."""
+    with pytest.raises(TypeError):
+        testee.LanguageCode('en', 'zh')
+    with pytest.raises(TypeError):
+        testee.LanguageCode('en', target='zh')
+
+
+def test_removed_target_api_is_unavailable():
+    """Test that the retired target state, helpers, and exception are absent."""
+    language = testee.LanguageCode('en')
+    for name in ['target', 'is_target_BCP', 'get_target_as_BCP', 'get_target_as_ISO']:
+        assert not hasattr(language, name)
+    assert not hasattr(testee, 'MissingTargetLanguageCode')
+
+
+@pytest.mark.parametrize('source', ['', 'invalid', 'EN', ' en '])
+def test_init_rejects_unregistered_or_unnormalized_source(source):
+    """Test that direct construction retains strict whitelist validation."""
     with pytest.raises(testee.UnregisteredLanguageCode):
-        testee.LanguageCode(source='')
-    with pytest.raises(testee.UnregisteredLanguageCode):
-        testee.LanguageCode(source='invalid')
-    with pytest.raises(testee.UnregisteredLanguageCode):
-        testee.LanguageCode(source='en', target='')
-    with pytest.raises(testee.UnregisteredLanguageCode):
-        testee.LanguageCode(source='en', target='invalid')
+        testee.LanguageCode(source=source)
 
 
-def test_str():
-    """Test that str renders 'source' alone and 'source->target' with a target."""
-    lang_code_source_only = testee.LanguageCode(source='en')
-    assert str(lang_code_source_only) == 'en'
-    lang_code_with_target = testee.LanguageCode(source='en', target='zh')
-    assert str(lang_code_with_target) == 'en->zh'
+def test_str_renders_source():
+    """Test that string rendering contains the source alone."""
+    assert str(testee.LanguageCode(source='en')) == 'en'
 
 
-def test_from_str():
-    """Test that from_str parses 'source[->target]' and rejects malformed or unregistered input."""
-    lang_code = testee.LanguageCode.from_str('en')
-    assert lang_code == testee.LanguageCode('en')
-    lang_code = testee.LanguageCode.from_str('en->zh')
-    assert lang_code == testee.LanguageCode('en', 'zh')
-    lang_code = testee.LanguageCode.from_str('  en-us  ->  zh-cn  ')
-    assert lang_code == testee.LanguageCode('en-us', 'zh-cn')
-    # Test invalid format
-    with pytest.raises(ValueError):
-        testee.LanguageCode.from_str('en<-zh')
-    # Test invalid language code
+@pytest.mark.parametrize('text, source', [('en', 'en'), ('  EN-US  ', 'en-us'), ('ZH', 'zh'), (' zh-cn ', 'zh-cn')])
+def test_from_str_normalizes_single_source(text, source):
+    """Test that parsing strips surrounding whitespace and normalizes letter case."""
+    assert testee.LanguageCode.from_str(text) == testee.LanguageCode(source)
+
+
+@pytest.mark.parametrize('text', ['en->zh', 'en->en', '  en-us  ->  zh-cn  ', 'en->xx', 'en<-zh', '', 'en_us'])
+def test_from_str_rejects_arrows_and_malformed_input(text):
+    """Test that parsing cannot silently turn a translation request into transcription."""
+    with pytest.raises(ValueError, match='Unexpected input'):
+        testee.LanguageCode.from_str(text)
+
+
+def test_from_str_rejects_unregistered_source():
+    """Test that well-formed unsupported source codes retain the whitelist exception."""
     with pytest.raises(testee.UnregisteredLanguageCode):
-        testee.LanguageCode.from_str('en->xx')
+        testee.LanguageCode.from_str('fr')
 
 
 def test_is_source_bcp():
     """Test that BCP-47 sources are distinguished from ISO 639-1 sources."""
     assert testee.LanguageCode('en-us').is_source_BCP() is True
     assert testee.LanguageCode('en').is_source_BCP() is False
-
-
-def test_is_target_bcp():
-    """Test that target BCP detection returns None when no target is set."""
-    assert testee.LanguageCode('en', 'zh-cn').is_target_BCP() is True
-    assert testee.LanguageCode('en', 'zh').is_target_BCP() is False
-    assert testee.LanguageCode('en').is_target_BCP() is None
 
 
 def test_get_source_as_bcp():
@@ -77,25 +79,3 @@ def test_get_source_as_bcp_and_iso():
     """Test that both BCP and ISO forms are returned for a BCP source, ISO only otherwise."""
     assert testee.LanguageCode('en-us').get_source_as_BCP_and_ISO() == ['en-us', 'en']
     assert testee.LanguageCode('en').get_source_as_BCP_and_ISO() == ['en']
-
-
-def test_get_target_as_bcp():
-    """Test that a BCP target is returned while missing or ISO-only targets raise."""
-    # No target
-    with pytest.raises(testee.MissingTargetLanguageCode):
-        testee.LanguageCode('en').get_target_as_BCP()
-    # BCP target
-    assert testee.LanguageCode('en', 'zh-cn').get_target_as_BCP() == 'zh-cn'
-    # ISO target
-    with pytest.raises(testee.UnableToConvertLanguageCode):
-        testee.LanguageCode('en', 'zh').get_target_as_BCP()
-
-def test_get_target_as_iso():
-    """Test that a target is downcast to ISO 639-1 while a missing target raises."""
-    # No target
-    with pytest.raises(testee.MissingTargetLanguageCode):
-        testee.LanguageCode('en').get_target_as_ISO()
-    # BCP target
-    assert testee.LanguageCode('en', 'zh-cn').get_target_as_ISO() == 'zh'
-    # ISO target
-    assert testee.LanguageCode('en', 'zh').get_target_as_ISO() == 'zh'

@@ -8,7 +8,6 @@ from redis import StrictRedis
 
 import youtube_whisperer.api.app as testee
 from youtube_whisperer.models import DeadLetter, Task, TaskQueues
-from youtube_whisperer.utils import TranscriberMode
 
 
 @pytest.fixture
@@ -86,14 +85,53 @@ def test_resolve_filesystem_tasks_expands_globs(mocker):
 
 def test_model_copy_preserves_non_source_fields():
     """Test that copying a task with a new source preserves its other fields."""
-    pattern = Task(source='https://example.com/playlist', language='en', mode=TranscriberMode.TRANSLATE)
+    pattern = Task(source='https://example.com/playlist', language='zh-cn', transcriber='azure')
 
     result = pattern.model_copy(update={'source': 'https://example.com/video1'})
 
     assert result.source == 'https://example.com/video1'
     assert result.language == pattern.language
     assert result.transcriber == pattern.transcriber
-    assert result.mode == pattern.mode
+
+
+@pytest.mark.parametrize('transcriber', ['whisper', 'azure', 'none'])
+@pytest.mark.parametrize('mode', ['transcribe', 'translate', 'unknown', None, 0, [], {}])
+def test_add_tasks_rejects_removed_mode_without_enqueueing(client, mocker, transcriber, mode):
+    """Test that every supplied operation field produces 422 before either queue submission."""
+    youtube_enqueue = mocker.patch.object(testee, 'queue_youtube_task')
+    transcription_enqueue = mocker.patch.object(testee, 'queue_transcription_tasks')
+
+    response = client.post('/tasks', json=[{
+        'source': 'https://example.com/video', 'transcriber': transcriber, 'mode': mode,
+    }])
+
+    assert response.status_code == 422
+    assert 'mode is no longer supported' in response.json()['detail'][0]['msg']
+    youtube_enqueue.assert_not_called()
+    transcription_enqueue.assert_not_called()
+
+
+@pytest.mark.parametrize('language', ['en->en', 'zh->en', 'en-us->zh-cn', 'en -> zh'])
+def test_add_tasks_rejects_arrow_languages_without_enqueueing(client, mocker, language):
+    """Test that HTTP translation-language forms are rejected before queue submission."""
+    youtube_enqueue = mocker.patch.object(testee, 'queue_youtube_task')
+    transcription_enqueue = mocker.patch.object(testee, 'queue_transcription_tasks')
+
+    response = client.post('/tasks', json=[{'source': 'https://example.com/video', 'language': language}])
+
+    assert response.status_code == 422
+    youtube_enqueue.assert_not_called()
+    transcription_enqueue.assert_not_called()
+
+
+def test_openapi_documents_source_language_without_mode_or_targets(client):
+    """Test that the HTTP task schema cannot advertise the removed operation or arrow examples."""
+    schemas = client.get('/openapi.json').json()['components']['schemas']
+    task_schemas = [schema for name, schema in schemas.items() if name in {'Task', 'Task-Input', 'Task-Output'}]
+    assert task_schemas
+    for schema in task_schemas:
+        assert set(schema['properties']) == {'source', 'transcriber', 'language'}
+        assert schema['properties']['language']['examples'] == ['en', 'en-us']
 
 
 def test_add_tasks_routes_youtube_and_whisper_work(client, mocker):

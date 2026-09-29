@@ -8,7 +8,6 @@
 
 - **Download:** YouTube videos, playlists, and channels, plus existing transcripts in a user-specified language.
 - **Transcribe:** Generate SRT subtitle files from filesystem video/audio files.
-- **Translate:** Whisper can translate a non-English source into English (e.g. `zh->en`); English is the only supported target.
 - **Whisper transcriber:** `faster-whisper` on an NVIDIA GPU or CPU. Default model is `large-v3` (~9 GB RAM/VRAM). Runs synchronously.
 - **Cloud transcriber:** Azure AI Speech Services, tracked synchronously per worker.
 - **Task queue:** Redis Streams with a shared consumer group for assignment, crash recovery, orphan recovery, and dead-lettering.
@@ -76,7 +75,7 @@ Four components cooperate:
 
 ## Data Flow
 
-1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper`, `azure`, or `none` to download a URL without transcribing it), a language, and a `mode` (`transcribe` or `translate`).
+1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper`, `azure`, or `none` to download a URL without transcribing it), a single source language (`en-us` by default).
 2. The API routes URL tasks to `stream:youtube`. Filesystem glob patterns are expanded immediately and the concrete file paths are pushed to `stream:whisper` or `stream:azure`.
 3. The YouTube worker expands playlist/channel URLs into individual video URLs, then handles each video on its own: it downloads the media and tries to fetch an existing transcript.
 4. If a transcript is already present (or the transcriber is `none`), that video is complete and no follow-up transcription task is queued.
@@ -129,9 +128,13 @@ For non-WAV input, the Azure worker reuses an existing sidecar WAV or calls `sav
 
 The project started as a privacy-focused transcriber using Whisper. Azure Speech was added later for two reasons: (1) transcribing public content where on-device privacy guarantees are unnecessary, and (2) working around occasional Whisper failures on non-English audio. Azure was chosen as the most cost-effective option in the Sydney, Australia region.
 
-### Translation is Whisper-only and English-only
+### Transcription requests and upgrades
 
-Each task carries a `mode` (`transcribe` or `translate`). Translation is currently supported only on the Whisper engine, which can translate any supported source language **into English only** — so translate mode requires an English target (e.g. `zh->en`). A translate request with a missing or non-English target (e.g. `en->zh`) is rejected in `transcriber/whisper_transcriber.py` and the task is dead-lettered. Translating an English source into English (`en->en`) is a no-op and falls back to transcription. Azure ignores `mode` and always transcribes; multi-target translation via Azure Speech Translation is not wired up.
+Both engines transcribe speech in the supplied source language. Tasks contain `source`, `transcriber`, and `language`; there is no operation selector or target language. Every supplied HTTP `mode` field, including `transcribe`, returns 422 before queue submission. Arrow-language forms such as `zh->en` and `en->en` also return 422.
+
+For callers upgrading from translation support, omit `mode` and supply one source language. The Python `TranscriberMode` enum, `LanguageCode.target`, target conversion methods, and `MissingTargetLanguageCode` exception have been removed. Whisper waveform helpers now accept `(model, waveform, language)` and `(waveform, language)`; the file helper retains `(input_file_path, language, output_file_path=None, overwrite=...)` without a mode argument. Source-language conversion methods and other transcription APIs remain available.
+
+Keep old producers from submitting work during the version switch, and confirm that no legacy queue or dead-letter payloads have appeared since the user reported those stores empty. No legacy-payload migration reader is provided; unexpected persisted payloads require manual repair under the existing queue policy. Existing media and SRT files remain untouched and eligible for the same completion/reuse checks, including SRTs created by past translations.
 
 ### Known-bad Whisper output rejection
 
@@ -139,7 +142,7 @@ Some Whisper runs occasionally emit a known nonsense phrase instead of a real tr
 
 ### Language-code whitelist
 
-Language codes are validated by `LanguageCode` in `adaptors/lang_code_adaptor.py` against a small whitelist: BCP-47 `en-us` and `zh-cn` (used by Azure) plus their ISO 639-1 forms `en` and `zh` (used by Whisper). A `source` or `source->target` request outside this set is rejected. To support another language, add its BCP-47 code to `BCP_LANG_CODES` (its ISO form is derived automatically).
+Language codes are validated by `LanguageCode` in `adaptors/lang_code_adaptor.py` against a small whitelist: BCP-47 `en-us` and `zh-cn` (used by Azure) plus their ISO 639-1 forms `en` and `zh` (used by Whisper). A source-language request outside this set is rejected; target-language arrows are not accepted. To support another language, add its BCP-47 code to `BCP_LANG_CODES` (its ISO form is derived automatically).
 
 ### Filenames are truncated
 

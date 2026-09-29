@@ -1,3 +1,4 @@
+import json
 from unittest.mock import call
 
 import pytest
@@ -102,6 +103,9 @@ def test_queue_youtube_task_pushes_json_payload(mocker, mock_redis):
     testee.queue_youtube_task(mock_redis, task)
 
     mock_redis.xadd.assert_called_once_with(testee.YOUTUBE_STREAM, {'payload': task.model_dump_json()})
+    assert json.loads(mock_redis.xadd.call_args.args[1]['payload']) == {
+        'source': 'https://youtube.com/watch?v=123', 'transcriber': 'whisper', 'language': 'en',
+    }
 
 
 def test_queue_transcription_tasks_uses_pipeline(mocker, mock_redis):
@@ -122,6 +126,10 @@ def test_queue_transcription_tasks_uses_pipeline(mocker, mock_redis):
         call(testee.AZURE_STREAM, {'payload': azure_task.model_dump_json()}),
     ]
     mock_pipeline.execute.assert_called_once()
+    assert [json.loads(entry.args[1]['payload']) for entry in mock_pipeline.xadd.call_args_list] == [
+        {'source': '/tmp/whisper.wav', 'transcriber': 'whisper', 'language': 'en'},
+        {'source': '/tmp/azure.wav', 'transcriber': 'azure', 'language': 'en'},
+    ]
 
 
 def test_queue_dead_letter_serializes_entry(mock_redis):
@@ -132,6 +140,10 @@ def test_queue_dead_letter_serializes_entry(mock_redis):
 
     assert result == DeadLetter(task=task, queue='stream:whisper', error='boom')
     mock_redis.rpush.assert_called_once_with(testee.DEAD_LETTER_QUEUE, result.model_dump_json())
+    assert json.loads(mock_redis.rpush.call_args.args[1]) == {
+        'task': {'source': '/tmp/audio.wav', 'transcriber': 'whisper', 'language': 'en'},
+        'queue': 'stream:whisper', 'error': 'boom',
+    }
 
 
 def test_clear_task_queues_returns_snapshot_and_deletes_known_queues(mocker, mock_redis):

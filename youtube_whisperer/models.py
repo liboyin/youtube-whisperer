@@ -1,33 +1,50 @@
-from pydantic import BaseModel, field_validator
+from collections.abc import Mapping
+
+from pydantic import BaseModel, field_validator, model_validator
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.utils import TranscriberMode, TranscriberType
+from youtube_whisperer.utils import TranscriberType
 
 
 class Task(BaseModel):
-    """
-    source: str (required)
-        At input time, source can be a URL of a YouTube video or a playlist, or a glob pattern for filesystem files.
-        After resolution, it will be a concrete URL of a YouTube video or a filesystem file path.
-        It is required: there is no default, so `POST /tasks` must specify an explicit source per task.
+    """Describe media download or source-language transcription work.
 
-    transcriber: TranscriberType
-        `whisper` for faster-whisper, `azure` for Azure Speech Recognition API, or `none` to download
-        a YouTube source without transcribing it. Defaults to `whisper`. `none` only applies to URL
-        sources; a filesystem source with `none` is not actionable and is reported as failed.
+    A supplied obsolete ``mode`` field is rejected; other unknown fields retain
+    the existing ignored-field behavior.
 
-    language: LanguageCode
-        The output language of transcription/translation. Must follow BCP-47 (works for Azure and Whisper) or ISO 639-1 (works for Whisper only).
-
-    mode: TranscriberMode
-        Whether to transcribe (output in the source language) or translate. Whisper can only
-        translate into English, so translate mode requires an English target (e.g. `zh->en`);
-        any other target is rejected when the task is processed.
+    Attributes:
+        source: Required YouTube video/playlist URL or filesystem glob at input;
+            after resolution, a concrete video URL or filesystem file path.
+            Surrounding whitespace is stripped and blank sources are rejected.
+        transcriber: ``whisper`` (the default), ``azure``, or ``none`` for a
+            download-only URL task. Filesystem sources with ``none`` are not
+            actionable and are reported as failed.
+        language: Registered source language, defaulting to ``en-us``. BCP-47
+            codes work with both engines; ISO 639-1 codes work with Whisper only.
     """
     source: str
     transcriber: TranscriberType = TranscriberType.WHISPER
     language: LanguageCode = LanguageCode('en-us')  # validation is handled by LanguageCode.__get_pydantic_core_schema__
-    mode: TranscriberMode = TranscriberMode.TRANSCRIBE
+
+    @model_validator(mode='before')
+    @classmethod
+    def reject_removed_mode(cls, data: object) -> object:
+        """Reject obsolete operation selection before validating task fields.
+
+        Other unknown fields retain Pydantic's existing ignored-field behavior.
+
+        Args:
+            data: The incoming task mapping or an already constructed task.
+
+        Returns:
+            The unchanged input when it does not contain the removed field.
+
+        Raises:
+            ValueError: If the input supplies any value for ``mode``.
+        """
+        if isinstance(data, Mapping) and 'mode' in data:
+            raise ValueError('mode is no longer supported; omit it to transcribe the source language')
+        return data
 
     @field_validator('source')
     def validate_source(cls, x: str) -> str:

@@ -120,7 +120,7 @@ def fetch_matching_transcript(transcripts: TranscriptList, language: LanguageCod
 
 class TranscriptDownloader:
     def __init__(self, url: str, language: LanguageCode) -> None:
-        """Bind a transcript downloader to a single video URL and target language.
+        """Bind a transcript downloader to a single video URL and requested source language.
 
         Args:
             url (str): The YouTube video URL whose transcript should be downloaded.
