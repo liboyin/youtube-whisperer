@@ -3,6 +3,7 @@ This file owns the working principles for this repository. All agents MUST follo
 # Document Boundaries
 
 - **AGENTS.md:** concise working principles and required standards.
+- **[Grouped task execution skill](.agents/skills/grouped-task-execution/SKILL.md):** the recommended workflow for selecting and executing related TODO tasks and reviewing the integrated group.
 - **[Adversarial review skill](.agents/skills/adversarial-review/SKILL.md):** how to conduct review, including dispatch, snapshots, investigation, triage, and reporting.
 - **[TODO.md](TODO.md):** future work, accepted decisions, dependencies, execution boundaries, and its own maintenance rules.
 - **[README.md](README.md):** current architecture, dataflow, design assumptions, and build, run, and test procedures.
@@ -18,6 +19,7 @@ Link to the owning document instead of duplicating its procedure. Operational in
 - Accepted decisions and user authorization persist. Do not ask again about settled choices. Document superseding decisions and their reasoning before committing the affected change.
 - Non-material assumptions MAY be made when repository evidence supports them and they preserve the requested outcome. Name the assumption, evidence, and effect in the handoff.
 - Isolated subtasks with small, bounded results SHOULD use subagents. The main agent remains accountable for integration and verification.
+- For a group of related TODO tasks, follow the recommended [grouped task execution workflow](.agents/skills/grouped-task-execution/SKILL.md), unless the user specifies another approach.
 
 # Design and Documentation
 
