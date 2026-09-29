@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pathlib_extensions import prepare_input_dir
 from redis import StrictRedis
 
+from youtube_whisperer.domain import TranscriberType, is_url
 from youtube_whisperer.models import AddTasksResponse, DeadLetter, Task, TaskQueues
 from youtube_whisperer.queueing import (
     DEAD_LETTER_QUEUE,
@@ -23,8 +24,6 @@ from youtube_whisperer.queueing import (
 from youtube_whisperer.utils import (
     REDIS_CLIENT,
     WHISPER_ASSETS_DIR,
-    TranscriberType,
-    is_url,
 )
 
 logger = logging.getLogger(__name__)

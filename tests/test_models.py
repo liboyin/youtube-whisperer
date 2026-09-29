@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 import youtube_whisperer.models as testee
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.utils import TranscriberType
+from youtube_whisperer.domain import TranscriberType
 
 
 def test_task_requires_explicit_source():

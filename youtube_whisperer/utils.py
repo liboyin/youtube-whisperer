@@ -1,9 +1,10 @@
-import re
-from enum import Enum
-
 import redis
 
+from youtube_whisperer import domain
 from youtube_whisperer.config import Settings
+
+TranscriberType = domain.TranscriberType
+is_url = domain.is_url
 
 
 def create_redis_pool(settings: Settings) -> redis.ConnectionPool:
@@ -34,31 +35,3 @@ WHISPER_ASSETS_DIR = _settings.whisper_assets_dir
 WHISPER_MODELS_DIR = _settings.whisper_models_dir
 REDIS_POOL = create_redis_pool(_settings)
 REDIS_CLIENT = redis.StrictRedis(connection_pool=REDIS_POOL)
-
-
-class TranscriberType(str, Enum):
-    WHISPER = 'whisper'
-    AZURE = 'azure'
-    NONE = 'none'  # Download only: skip transcription (see YouTubeWorker.process_task).
-
-    @classmethod
-    def values(cls) -> tuple[str, ...]:
-        """Return the string value of every transcriber type.
-
-        Returns:
-            tuple[str, ...]: The value of each member, e.g. for argparse choices.
-        """
-        return tuple(transcriber.value for transcriber in cls)
-
-
-def is_url(text: str) -> bool:
-    """
-    Checks if a string is a valid URL.
-
-    Args:
-        text (str): The input text.
-
-    Returns:
-        bool: True if the input text is a valid URL, False otherwise.
-    """
-    return bool(re.match(r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)", text))

@@ -103,6 +103,14 @@ def test_removed_transcriber_mode_is_unavailable():
     assert not hasattr(testee, 'TranscriberMode')
 
 
+def test_domain_exports_forward_the_same_objects():
+    """Test that the established utils import paths retain canonical domain identities."""
+    from youtube_whisperer import domain
+
+    assert testee.TranscriberType is domain.TranscriberType
+    assert testee.is_url is domain.is_url
+
+
 def test_transcriber_type_values():
     """Test that the transcriber enum exposes the supported transcriber names, including download-only `none`."""
     assert testee.TranscriberType.values() == ('whisper', 'azure', 'none')

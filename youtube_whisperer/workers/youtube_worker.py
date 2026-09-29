@@ -4,6 +4,7 @@ import logging
 from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
+from youtube_whisperer.domain import TranscriberType
 from youtube_whisperer.downloaders import (
     download_video_and_transcript_with_default_title,
 )
@@ -14,7 +15,7 @@ from youtube_whisperer.queueing import (
     queue_dead_letter,
     queue_transcription_tasks,
 )
-from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType
+from youtube_whisperer.utils import REDIS_CLIENT
 from youtube_whisperer.workers.common import BaseWorker
 
 logger = logging.getLogger(__name__)

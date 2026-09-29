@@ -3,8 +3,8 @@ from typing import cast
 import redis
 from redis import StrictRedis
 
+from youtube_whisperer.domain import TranscriberType
 from youtube_whisperer.models import DeadLetter, Task, TaskQueues
-from youtube_whisperer.utils import TranscriberType
 
 YOUTUBE_STREAM = 'stream:youtube'
 WHISPER_STREAM = 'stream:whisper'

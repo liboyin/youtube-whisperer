@@ -8,6 +8,7 @@ import redis
 from redis import StrictRedis
 
 from youtube_whisperer.config import Settings
+from youtube_whisperer.domain import TranscriberType, is_url
 from youtube_whisperer.models import Task
 from youtube_whisperer.queueing import (
     WORKERS_GROUP,
@@ -16,7 +17,7 @@ from youtube_whisperer.queueing import (
     get_stream_name,
     queue_dead_letter,
 )
-from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType, is_url
+from youtube_whisperer.utils import REDIS_CLIENT
 
 logger = logging.getLogger(__name__)
 

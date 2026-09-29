@@ -3,10 +3,11 @@ from pathlib import Path
 from pathlib_extensions import OverwriteMode
 from redis import StrictRedis
 
+from youtube_whisperer.domain import TranscriberType
 from youtube_whisperer.models import Task
 from youtube_whisperer.transcriber.azure_transcriber import transcribe_audio_file
 from youtube_whisperer.transcriber.waveform_loader import save_as_wav_file
-from youtube_whisperer.utils import REDIS_CLIENT, TranscriberType
+from youtube_whisperer.utils import REDIS_CLIENT
 from youtube_whisperer.workers.common import TranscriptionWorker
 
 

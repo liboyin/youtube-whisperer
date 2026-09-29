@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from pydantic import BaseModel, field_validator, model_validator
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
-from youtube_whisperer.utils import TranscriberType
+from youtube_whisperer.domain import TranscriberType
 
 
 class Task(BaseModel):

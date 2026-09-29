@@ -27,8 +27,9 @@
 ```
 youtube_whisperer/
 ├── config.py                   # Pydantic Settings loaded from environment / .env
+├── domain.py                   # Resource-free transcriber enum and URL classifier
 ├── models.py                   # Pydantic domain + request/response models (Task, DeadLetter, ...)
-├── utils.py                    # Shared enums, pooled Redis client, URL helper
+├── utils.py                    # Configured Redis resources/paths, compatible domain exports
 ├── queueing.py                 # Redis Streams: enqueue, snapshot, dead-letter
 ├── adaptors/
 │   ├── lang_code_adaptor.py    # BCP-47 / ISO 639-1 LanguageCode type
@@ -72,6 +73,8 @@ Four components cooperate:
 2. **YouTube worker** — Expands playlists and channels, then processes each expanded video independently: it downloads video/audio, attempts a transcript download, and enqueues a follow-up filesystem transcription task (for the requested transcriber) as soon as that video turns out to still be missing an SRT. A `none` transcriber requests download only, so no follow-up transcription task is ever enqueued.
 3. **Transcription workers** — The Whisper and Azure workers consume their Redis streams via a shared consumer group and write SRT files.
 4. **Redis** — Stores the streams, tracks each consumer's Pending Entries List (PEL), and holds the dead-letter list.
+
+`domain.py` owns `TranscriberType` and `is_url`; models and queueing import domain values directly and construct no Settings, Redis pool, or Redis client when imported. Existing `utils.TranscriberType` and `utils.is_url` imports forward the same objects. Importing `utils` still creates its configured paths and shared Redis resources; explicit runtime ownership and settings snapshots remain pending under [NB25](TODO.md#nb25--domain-imports-and-configuration-lack-an-explicit-runtime-owner).
 
 ## Data Flow
 
