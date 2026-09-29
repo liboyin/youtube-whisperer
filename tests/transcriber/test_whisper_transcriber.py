@@ -1,6 +1,8 @@
+import builtins
 import logging
 from contextlib import contextmanager
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -220,6 +222,70 @@ def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
     save_mock.assert_called_once()
     assert save_mock.call_args.args[1] == output_path
     assert save_mock.call_args.kwargs == {"overwrite": OverwriteMode.ALWAYS}
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_transcribe_file_with_default_model_late_rejection_preserves_final_and_retry(mocker, tmp_path, existing):
+    """A late rejected Whisper segment preserves prior output and complete retry remains possible."""
+    input_path = tmp_path / "audio.wav"
+    output = tmp_path / "audio.srt"
+    if existing:
+        output.write_text("original")
+    mocker.patch.object(testee, 'load_whisper_waveform_from_file', return_value=np.array([1.0], dtype=np.float32))
+    consumed = []
+
+    def segments():
+        """Yield a valid segment followed by a rejected segment without real model access."""
+        consumed.append("good")
+        yield SimpleNamespace(start=0.0, end=1.0, text="Good")
+        consumed.append("bad")
+        yield SimpleNamespace(start=2.0, end=3.0, text=REJECTED_SUBSTRINGS[0])
+
+    transcribe = mocker.patch.object(testee, 'transcribe_waveform_with_default_model', return_value=segments())
+    with patch.object(testee.Path, "open", side_effect=AssertionError("premature write")) as opened, pytest.raises(RejectedTranscriptionError):
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwriteMode.ALWAYS)
+    opened.assert_not_called()
+    assert consumed == ["good", "bad"]
+    assert output.read_text() == "original" if existing else not output.exists()
+    assert list(tmp_path.iterdir()) == ([output] if existing else [])
+    transcribe.return_value = iter([SimpleNamespace(start=0.0, end=1.0, text="Good"), SimpleNamespace(start=2.0, end=3.0, text="Done")])
+    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwriteMode.ALWAYS) == output
+    assert output.read_text() == "1\n00:00:00,000 --> 00:00:01,000\nGood\n\n2\n00:00:02,000 --> 00:00:03,000\nDone\n"
+    assert list(tmp_path.iterdir()) == [output]
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_transcribe_file_with_default_model_publication_failure_preserves_final_and_retry(mocker, tmp_path, existing):
+    """Whisper uses atomic publication and retries after a failed final replacement."""
+    input_path = tmp_path / "audio.wav"
+    output = tmp_path / "audio.srt"
+    if existing:
+        output.write_text("original")
+    mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
+    mocker.patch.object(testee, "transcribe_waveform_with_default_model", side_effect=lambda *args: iter([SimpleNamespace(start=0.0, end=1.0, text="Good")]))
+    with patch.object(testee.Path, "replace", side_effect=OSError("failed publication")), pytest.raises(OSError, match="failed publication"):
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwriteMode.ALWAYS)
+    assert output.read_text() == "original" if existing else not output.exists()
+    assert list(tmp_path.iterdir()) == ([output] if existing else [])
+    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwriteMode.ALWAYS) == output
+    assert output.read_text() == "1\n00:00:00,000 --> 00:00:01,000\nGood\n"
+    assert list(tmp_path.iterdir()) == [output]
+
+
+@pytest.mark.parametrize("approved", [False, True])
+def test_transcribe_file_with_default_model_existing_prompt_is_decided_once(mocker, tmp_path, approved):
+    """Existing-output consent occurs once before audio/model work and is reused for saving."""
+    input_path = tmp_path / "audio.wav"
+    output = tmp_path / "audio.srt"
+    output.write_text("original")
+    stdin = mocker.patch.object(builtins, "input", return_value="y" if approved else "n")
+    load = mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
+    transcribe = mocker.patch.object(testee, "transcribe_waveform_with_default_model", return_value=iter([SimpleNamespace(start=0.0, end=1.0, text="Good")]))
+    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output) == output
+    stdin.assert_called_once_with(f"Path '{output}' already exists. Overwrite? (y/N): ")
+    assert load.call_count == int(approved)
+    assert transcribe.call_count == int(approved)
+    assert output.read_text() == ("1\n00:00:00,000 --> 00:00:01,000\nGood\n" if approved else "original")
 
 
 def test_transcribe_file_with_default_model_propagates_error(mocker, tmp_path):

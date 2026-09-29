@@ -104,6 +104,9 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
     """
     Transcribe a waveform file using default model parameters and save the output to an SRT file.
 
+    Existing-output consent is obtained before model work and reused for saving;
+    complete lazy recognition and rejection finish before SRT publication.
+
     Args:
         input_file_path (Path): Input waveform file path.
         language (LanguageCode): Whisper's output language.
@@ -121,8 +124,11 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
             so callers (e.g. the worker loop) can dead-letter the task instead of silently dropping it.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
-    if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
-        return output_file_path
+    if output_file_path.is_file():
+        if not overwrite_existing_path(output_file_path, overwrite):
+            return output_file_path
+        if overwrite == OverwriteMode.PROMPT:
+            overwrite = OverwriteMode.ALWAYS
     waveform = load_whisper_waveform_from_file(input_file_path)
     if len(waveform) == 0:
         logger.warning("Skipping %s because empty waveform is loaded", input_file_path)

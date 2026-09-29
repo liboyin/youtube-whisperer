@@ -1,7 +1,10 @@
 import logging
+import os
+import stat
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
 from pathlib_extensions import (
     OverwriteMode,
@@ -144,9 +147,64 @@ def convert_srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
     return '\n'.join(yield_lines_from_srt_blocks(blocks))
 
 
+def publish_srt_text(file_path: Path, text: str, overwrite: OverwriteMode = OverwriteMode.ALWAYS) -> None:
+    """Publish complete SRT text after writing and closing an owned sibling stage.
+
+    Callers own overwrite preflight and prompts. NEVER and RENAME preserve even
+    a completed file created while staging; other modes replace an approved target.
+    A publication collision is skipped only if the destination is a file,
+    including a symlink to a file; other collisions propagate FileExistsError.
+    Existing symlinks are followed and mode bits retained. Inode replacement can
+    change ownership, ACLs, and extended attributes; hardlinked aliases keep old
+    contents. Abrupt process exit can leave a stage, but never partial final text.
+    This does not promise power-loss durability or scavenge abandoned stages.
+
+    Args:
+        file_path (Path): Final SRT path, with parents created as needed.
+        text (str): Fully materialized text, preserved with ordinary text I/O.
+        overwrite (OverwriteMode): Preflight policy; defaults to authorized replacement.
+
+    Raises:
+        OSError: If staging, closing, mode preservation, or publication fails,
+            including unsupported hard-link publication. Owned stages are removed
+            on unwinding; exclusive-creation collisions are never removed.
+    """
+    target = prepare_output_file(file_path).resolve()
+    prepare_output_file(target)
+    try:
+        mode = stat.S_IMODE(target.stat().st_mode)
+    except FileNotFoundError:
+        mode = None
+    stage = target.parent / f'.srt-{uuid4().hex}.tmp'
+    owned = False
+    try:
+        # Exclusive text creation uses 0666 filtered by umask without mutating it.
+        stream = stage.open('x')
+        owned = True
+        with stream as writer:
+            writer.write(text)
+        if mode is not None:
+            stage.chmod(mode)
+        if overwrite in (OverwriteMode.NEVER, OverwriteMode.RENAME):
+            try:
+                os.link(stage, target)
+            except FileExistsError:
+                if target.is_file():
+                    return
+                raise
+        else:
+            stage.replace(target)
+    finally:
+        if owned:
+            stage.unlink(missing_ok=True)
+
+
 def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicate: bool = True, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
     """
-    Write an iterable of SrtBlock objects to an SRT file.
+    Serialize all SrtBlocks before publishing complete SRT text atomically.
+
+    Declined overwrites avoid lazy consumption. Serialization and rejection finish
+    before staging, preserving the previous output if they raise.
 
     Args:
         blocks (Iterable[SrtBlock]): SrtBlock objects to write, typically produced by mapping a transcriber-specific converter over recognition results.
@@ -159,12 +217,15 @@ def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicat
     file_path = prepare_output_file(file_path)
     if deduplicate:
         blocks = yield_deduplicated_srt_blocks(blocks)
-    file_path.write_text(convert_srt_blocks_to_str(blocks))
+    publish_srt_text(file_path, convert_srt_blocks_to_str(blocks), overwrite=overwrite)
 
 
 def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
     """
-    Deduplicates the contents of an SRT file and writes the deduplicated content to a new file.
+    Read and deduplicate an SRT file before atomically publishing complete text.
+
+    In-place deduplication fully reads and closes input before staging output;
+    publication failure preserves the prior file.
 
     Args:
         input_file_path (Path): The path to the input SRT file.
@@ -183,5 +244,5 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
     with prepare_input_file(input_file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
-    output_file_path.write_text(convert_srt_blocks_to_str(blocks))
+    publish_srt_text(output_file_path, convert_srt_blocks_to_str(blocks), overwrite=overwrite)
     return output_file_path

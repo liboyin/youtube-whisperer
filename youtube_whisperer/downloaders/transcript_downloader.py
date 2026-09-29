@@ -6,7 +6,6 @@ from urllib.parse import parse_qs, urlparse
 from pathlib_extensions import (
     OverwriteMode,
     overwrite_existing_path,
-    prepare_output_file,
     replace_os_reserved_chars,
     truncate_filename,
 )
@@ -20,6 +19,7 @@ from youtube_transcript_api import (
 from youtube_transcript_api.formatters import SRTFormatter
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
+from youtube_whisperer.adaptors.srt_deduplicator import publish_srt_text
 from youtube_whisperer.downloaders.utils import get_video_title
 from youtube_whisperer.utils import WHISPER_ASSETS_DIR
 
@@ -154,7 +154,10 @@ class TranscriptDownloader:
     
     def download_as_srt_file(self, output_file_path: Path, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> bool:
         """
-        Downloads the transcript of a YouTube video as an SRT file.
+        Download captions and publish complete SRT text after closing a sibling stage.
+
+        Declined overwrites avoid the caption request. Publication preserves prior
+        valid output on failure and keeps any competing output under NEVER/RENAME.
 
         Args:
             output_file_path (Path): The path where the SRT file will be saved.
@@ -169,7 +172,7 @@ class TranscriptDownloader:
         if srt_text is None:
             return False
         logger.info("About to write to SRT file: %s", output_file_path)
-        prepare_output_file(output_file_path).write_text(srt_text)
+        publish_srt_text(output_file_path, srt_text, overwrite=overwrite)
         return True
     
     def download_as_srt_file_with_default_title(self, target_dir: Path = WHISPER_ASSETS_DIR, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:

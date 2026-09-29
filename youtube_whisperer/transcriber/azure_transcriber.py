@@ -58,7 +58,8 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
 
     This function blocks until Azure recognition completes, fails, or times
     out. The synchronous behavior keeps queue state aligned with actual task
-    completion in the Azure worker.
+    completion in the Azure worker. Existing-output consent is obtained before
+    recognition and reused for final saving without another prompt.
 
     Args:
         input_file_path (Path): The path to the audio file to transcribe.
@@ -70,8 +71,11 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
         Path | None: Output SRT file path, or `None` if transcription failed.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
-    if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
-        return output_file_path
+    if output_file_path.is_file():
+        if not overwrite_existing_path(output_file_path, overwrite):
+            return output_file_path
+        if overwrite == OverwriteMode.PROMPT:
+            overwrite = OverwriteMode.ALWAYS
     settings = Settings()
     speech_config = speechsdk.SpeechConfig(subscription=settings.azure_speech_api_key, region=settings.azure_service_region)
     speech_config.speech_recognition_language = language.get_source_as_BCP()

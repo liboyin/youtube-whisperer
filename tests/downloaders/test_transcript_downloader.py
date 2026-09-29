@@ -1,5 +1,4 @@
-from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pathlib_extensions import OverwriteMode
@@ -148,25 +147,63 @@ def test_download_as_srt_text_no_transcript(mocker, downloader):
 
 
 def test_download_as_srt_file_success(mocker, tmp_path, downloader):
-    """Test successful SRT file creation."""
-    mock_srt_text = "1\n00:00:00,000 --> 00:00:02,000\nHello world\n\n"
-    output_path = tmp_path / "output.srt"
-    mocker.patch.object(downloader, 'download_as_srt_text', return_value=mock_srt_text)
-    mocker.patch.object(testee, 'overwrite_existing_path', return_value=True)
-    mock_path_instance = MagicMock()
-    mock_prepare_output_file = mocker.patch.object(testee, 'prepare_output_file', return_value=mock_path_instance)
-    mocker.patch.object(Path, 'is_file', return_value=False)
-    result = downloader.download_as_srt_file(output_path, OverwriteMode.ALWAYS)
-    assert result is True
-    downloader.download_as_srt_text.assert_called_once_with()
-    mock_prepare_output_file.assert_called_once_with(output_path)
-    mock_path_instance.write_text.assert_called_once_with(mock_srt_text)
+    """Caption saving writes exact text to the real owned output path."""
+    srt_text = "1\n00:00:00,000 --> 00:00:02,000\n字幕\n\n"
+    output = tmp_path / "nested" / "output.srt"
+    download = mocker.patch.object(downloader, 'download_as_srt_text', return_value=srt_text)
+    original_open = testee.Path.open
+
+    def checked_open(path, mode='r', *args, **kwargs):
+        """Verify owned parent preparation before delegating real exclusive stage creation."""
+        if mode == 'x':
+            assert path.parent.is_dir(), "SRT parent must exist before staging"
+        return original_open(path, mode, *args, **kwargs)
+
+    with patch.object(testee.Path, 'open', checked_open):
+        assert downloader.download_as_srt_file(output, OverwriteMode.ALWAYS) is True
+    assert output.read_text() == srt_text
+    assert list(output.parent.iterdir()) == [output]
+    download.assert_called_once_with()
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_download_as_srt_file_preserves_final_on_publication_failure_and_retry(mocker, tmp_path, downloader, existing):
+    """Caption publication failure leaves final output unchanged and retry saves complete text."""
+    output = tmp_path / "output.srt"
+    if existing:
+        output.write_text("original")
+    mocker.patch.object(downloader, 'download_as_srt_text', return_value="complete\n\n")
+    with patch.object(testee.Path, 'replace', side_effect=OSError("injected publication failure")), pytest.raises(OSError, match="injected publication failure"):
+        downloader.download_as_srt_file(output, OverwriteMode.ALWAYS)
+    assert output.read_text() == "original" if existing else not output.exists()
+    assert list(tmp_path.iterdir()) == ([output] if existing else [])
+    assert downloader.download_as_srt_file(output, OverwriteMode.NEVER if not existing else OverwriteMode.ALWAYS) is True
+    assert output.read_text() == "complete\n\n"
+
+
+@pytest.mark.parametrize("existing", [False, True])
+@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+def test_download_as_srt_file_never_preserves_competitor_and_avoids_denied_download(mocker, tmp_path, downloader, existing, overwrite):
+    """Denied captions avoid network work and a competitor appearing during download wins."""
+    output = tmp_path / "output.srt"
+    if existing:
+        output.write_text("original")
+
+    def competing_download():
+        """Create competing output while a synthetic caption fetch is in progress."""
+        output.write_text("competing")
+        return "candidate"
+
+    download = mocker.patch.object(downloader, 'download_as_srt_text', side_effect=competing_download)
+    assert downloader.download_as_srt_file(output, overwrite) is True
+    assert output.read_text() == ("original" if existing else "competing")
+    assert download.call_count == (0 if existing else 1)
+    assert list(tmp_path.iterdir()) == [output]
 
 
 def test_download_as_srt_file_no_transcript(mocker, tmp_path, downloader):
     """Test when no transcript is available."""
     output_path = tmp_path / "output.srt"
-    mocker.patch.object(Path, 'is_file', return_value=False)
     mocker.patch.object(downloader, 'download_as_srt_text', return_value=None)
     result = downloader.download_as_srt_file(output_path, OverwriteMode.ALWAYS)
     assert result is False
