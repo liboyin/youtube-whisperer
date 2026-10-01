@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from redis import StrictRedis
 
 import youtube_whisperer.api.app as testee
+import youtube_whisperer.workers.common as worker_testee
 from youtube_whisperer.models import DeadLetter, Task, TaskQueues
 
 
@@ -122,6 +123,25 @@ def test_resolve_filesystem_tasks_retains_files_and_file_symlinks(tmp_path, owne
 
     assert {task.source for task in result} == {str(regular), str(arbitrary), str(alias)}
     assert all(task.language == pattern.language and task.transcriber == pattern.transcriber for task in result)
+
+
+@pytest.mark.parametrize('absolute_pattern', [False, True])
+def test_resolve_filesystem_tasks_anchors_paths_preserving_aliases_and_order(tmp_path, monkeypatch, mocker, absolute_pattern):
+    """Relative and absolute matches preserve spaces, symlink spelling, metadata, and glob order."""
+    monkeypatch.chdir(tmp_path)
+    media = tmp_path / 'original file.custom'
+    media.write_text('original')
+    alias = tmp_path / 'alias file.custom'
+    alias.symlink_to(media)
+    paths = [alias, media]
+    matches = [str(path) if absolute_pattern else path.name for path in paths]
+    pattern = Task(source=str(tmp_path / '*.custom') if absolute_pattern else '*.custom', language='zh-cn', transcriber='azure')
+    glob = mocker.patch.object(testee.glob, 'glob', return_value=matches)
+
+    result = testee.resolve_filesystem_tasks(pattern)
+
+    assert result == [pattern.model_copy(update={'source': str(path)}) for path in paths]
+    glob.assert_called_once_with(pattern.source)
 
 
 @pytest.mark.parametrize('matches_directory', [True, False])
@@ -265,6 +285,48 @@ def test_add_tasks_mixed_matches_queue_only_files(client, mocker, tmp_path, owne
     assert response.json() == {'successful': [resolved.model_dump(mode='json')], 'failed': []}
     youtube_enqueue.assert_not_called()
     transcription_enqueue.assert_called_once_with(ANY, [resolved])
+
+
+def test_add_tasks_binds_worker_to_api_file_across_working_directories(client, mock_redis_client, tmp_path, monkeypatch):
+    """Actual queued payload dispatch reads the API file despite a same-named worker-directory decoy."""
+    api_dir = tmp_path / 'api'
+    worker_dir = tmp_path / 'worker'
+    api_dir.mkdir()
+    worker_dir.mkdir()
+    filename = 'audio with spaces.custom'
+    media = api_dir / filename
+    media.write_text('intended API contents')
+    (worker_dir / filename).write_text('wrong worker contents')
+    monkeypatch.chdir(api_dir)
+
+    response = client.post('/tasks', json=[{'source': f'  {filename}  ', 'language': 'zh-cn', 'transcriber': 'azure'}])
+
+    expected = Task(source=str(media), language='zh-cn', transcriber='azure')
+    assert response.status_code == 201
+    assert response.json() == {'successful': [expected.model_dump(mode='json')], 'failed': []}
+    queued = mock_redis_client.pipeline.return_value.xadd.call_args_list
+    assert len(queued) == 1
+    stream, fields = queued[0].args
+    assert stream == 'stream:azure'
+    task = Task.model_validate_json(fields['payload'])
+    assert task == expected
+    observed = []
+
+    class ReadingWorker(worker_testee.TranscriptionWorker):
+        """Read owned media contents through the common worker dispatch contract."""
+
+        def dispatch_task(self, task: Task, source: Path) -> None:
+            """Capture the dispatched task, path, and actual file contents."""
+            observed.append((task, source, source.read_text()))
+
+    worker = ReadingWorker(expected.transcriber, 'owned-reader', client=mock_redis_client)
+    try:
+        monkeypatch.chdir(worker_dir)
+        worker.process_task(task)
+    finally:
+        worker.runtime.close()
+    assert observed == [(expected, media, 'intended API contents')]
+    mock_redis_client.close.assert_not_called()
 
 
 def test_add_tasks_propagates_queueing_failure(mocker):

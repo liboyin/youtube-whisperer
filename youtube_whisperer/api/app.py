@@ -98,9 +98,9 @@ async def get_tasks(redis_client: RedisClientDep) -> TaskQueues:
 
 
 def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
-    """
-    Resolve a filesystem task pattern into concrete file tasks in glob order.
+    """Resolve a filesystem pattern into absolute file tasks in glob order.
 
+    Paths are anchored to the API working directory without resolving symlink aliases.
     File symlinks are retained; directories and other non-file matches are skipped.
 
     Args:
@@ -110,7 +110,7 @@ def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
         list[Task]: One copy of `pattern` per matched file, with `source` set to that file path.
     """
     return [
-        pattern.model_copy(update={'source': str(path)})
+        pattern.model_copy(update={'source': str(Path(path).absolute())})
         for path in glob.glob(os.path.expanduser(pattern.source))
         if Path(path).is_file()
     ]
