@@ -4,6 +4,43 @@ from pathlib_extensions import OverwriteMode
 import youtube_whisperer.downloaders.video_downloader as testee
 
 
+@pytest.mark.parametrize('cookies_available', [False, True])
+def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(cookies_available, youtube_dl_factory, mocker, monkeypatch, tmp_path):
+    """Each operation retains exact defaults and uses lazy cached owned discovery."""
+    monkeypatch.setenv('HOME', str(tmp_path))
+    detector = testee.is_firefox_cookies_available
+    detector.cache_clear()
+    created = youtube_dl_factory(testee, cookies_available=cookies_available, extract_info_result=None)
+    discovery = mocker.patch.object(testee, 'is_firefox_cookies_available', wraps=detector)
+    cookies = tmp_path / '.mozilla' / 'firefox' / 'owned' / 'cookies.sqlite'
+    if cookies_available:
+        cookies.parent.mkdir(parents=True)
+        cookies.write_text('owned')
+    try:
+        assert detector.cache_info().misses == 0
+        discovery.assert_not_called()
+        testee.download_video('url', tmp_path / 'video.mp4', OverwriteMode.ALWAYS)
+        expected = {'verbose': True, 'js_runtimes': {'deno': {}}, 'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]', 'outtmpl': str(tmp_path / 'video.mp4')}
+        if cookies_available:
+            expected['cookiesfrombrowser'] = ('firefox',)
+        assert created.instances[0].options == expected
+        if cookies_available:
+            cookies.unlink()
+        else:
+            cookies.parent.mkdir(parents=True)
+            cookies.write_text('owned')
+        testee.download_video('url', tmp_path / 'video.mp4', OverwriteMode.ALWAYS)
+        assert created.instances[1].options == expected
+        assert discovery.call_count == 2
+        assert detector.cache_info().misses == 1
+        assert detector.cache_info().hits == 1
+        assert created.instances[0].options is not created.instances[1].options
+        assert created.instances[0].options['js_runtimes'] is not created.instances[1].options['js_runtimes']
+        assert [instance.download_calls for instance in created.instances] == [[['url']], [['url']]]
+    finally:
+        detector.cache_clear()
+
+
 def test_download_video_returns_early_when_existing_file_should_not_be_overwritten(mocker, tmp_path):
     """Test that an existing file is not re-downloaded when overwrite is denied."""
     target_path = tmp_path / "video.mp4"

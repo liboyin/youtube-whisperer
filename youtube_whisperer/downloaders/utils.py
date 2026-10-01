@@ -7,6 +7,24 @@ import yt_dlp
 logger = logging.getLogger(__name__)
 
 
+def build_youtube_dl_options(cookies_available: bool) -> dict[str, object]:
+    """Build independent baseline options without discovering browser profiles.
+
+    Args:
+        cookies_available: Whether the caller's cookie discovery found Firefox cookies.
+
+    Returns:
+        A fresh options dictionary with a fresh nested Deno runtime mapping.
+    """
+    options: dict[str, object] = {
+        'verbose': True,
+        'js_runtimes': {'deno': {}},
+    }
+    if cookies_available:
+        options['cookiesfrombrowser'] = ('firefox',)
+    return options
+
+
 def get_video_title(url: str) -> str:
     """
     Retrieves the title of a video given its URL.
@@ -17,13 +35,8 @@ def get_video_title(url: str) -> str:
     Returns:
         str: The title of the video.
     """
-    ydl_opts = {
-        'simulate': True,
-        'verbose': True,
-        'js_runtimes': {'deno': {}},
-    }
-    if is_firefox_cookies_available():
-        ydl_opts['cookiesfrombrowser'] = ('firefox',)
+    ydl_opts = build_youtube_dl_options(is_firefox_cookies_available())
+    ydl_opts['simulate'] = True
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=False)['title']
 

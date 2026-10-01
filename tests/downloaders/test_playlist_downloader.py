@@ -6,6 +6,43 @@ from pathlib_extensions import OverwriteMode
 import youtube_whisperer.downloaders.playlist_downloader as testee
 
 
+@pytest.mark.parametrize('cookies_available', [False, True])
+def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(cookies_available, youtube_dl_factory, mocker, monkeypatch, tmp_path):
+    """Each operation retains exact defaults and uses lazy cached owned discovery."""
+    monkeypatch.setenv('HOME', str(tmp_path))
+    detector = testee.is_firefox_cookies_available
+    detector.cache_clear()
+    created = youtube_dl_factory(testee, cookies_available=cookies_available, extract_info_result={'id': 'video'})
+    discovery = mocker.patch.object(testee, 'is_firefox_cookies_available', wraps=detector)
+    cookies = tmp_path / '.mozilla' / 'firefox' / 'owned' / 'cookies.sqlite'
+    if cookies_available:
+        cookies.parent.mkdir(parents=True)
+        cookies.write_text('owned')
+    try:
+        assert detector.cache_info().misses == 0
+        discovery.assert_not_called()
+        testee.extract_flat_info('url')
+        expected = {'verbose': True, 'js_runtimes': {'deno': {}}, 'extract_flat': True}
+        if cookies_available:
+            expected['cookiesfrombrowser'] = ('firefox',)
+        assert created.instances[0].options == expected
+        if cookies_available:
+            cookies.unlink()
+        else:
+            cookies.parent.mkdir(parents=True)
+            cookies.write_text('owned')
+        testee.extract_flat_info('url')
+        assert created.instances[1].options == expected
+        assert discovery.call_count == 2
+        assert detector.cache_info().misses == 1
+        assert detector.cache_info().hits == 1
+        assert created.instances[0].options is not created.instances[1].options
+        assert created.instances[0].options['js_runtimes'] is not created.instances[1].options['js_runtimes']
+        assert [instance.extract_info_calls for instance in created.instances] == [[('url', False)], [('url', False)]]
+    finally:
+        detector.cache_clear()
+
+
 def test_extract_flat_info_includes_firefox_cookies_when_available(youtube_dl_factory):
     """Test that flat extraction requests Firefox cookies and flat mode when cookies are available."""
     created = youtube_dl_factory(testee, cookies_available=True, extract_info_result={"entries": [{"id": "abc"}]})

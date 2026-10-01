@@ -11,6 +11,7 @@ from pathlib_extensions import (
 
 from youtube_whisperer.config import Settings
 from youtube_whisperer.downloaders.utils import (
+    build_youtube_dl_options,
     get_video_title,
     is_firefox_cookies_available,
 )
@@ -28,14 +29,11 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
     if target_path.is_file() and not overwrite_existing_path(target_path, overwrite):
         return
     prepare_output_file(target_path)
-    ydl_opts = {
+    ydl_opts = build_youtube_dl_options(is_firefox_cookies_available())
+    ydl_opts.update({
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
         'outtmpl': str(target_path),
-        'verbose': True,
-        'js_runtimes': {'deno': {}},
-    }
-    if is_firefox_cookies_available():
-        ydl_opts['cookiesfrombrowser'] = ('firefox',)
+    })
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 

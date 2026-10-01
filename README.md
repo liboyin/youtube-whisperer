@@ -40,7 +40,7 @@ youtube_whisperer/
 │   ├── playlist_downloader.py  # Expand playlists/channels into video URLs
 │   ├── transcript_downloader.py# Fetch an existing YouTube transcript as SRT
 │   ├── video_downloader.py     # Download video/audio via yt-dlp
-│   └── utils.py                # Video title lookup, Firefox cookie detection
+│   └── utils.py                # Shared yt-dlp defaults, title lookup, Firefox cookie detection
 ├── transcriber/
 │   ├── whisper_transcriber.py  # faster-whisper transcription (process-wide cached model)
 │   ├── azure_transcriber.py    # Azure Speech transcription

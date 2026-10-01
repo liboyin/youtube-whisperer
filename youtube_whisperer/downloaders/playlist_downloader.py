@@ -6,7 +6,10 @@ import yt_dlp
 from pathlib_extensions import OverwriteMode
 
 from youtube_whisperer.config import Settings
-from youtube_whisperer.downloaders.utils import is_firefox_cookies_available
+from youtube_whisperer.downloaders.utils import (
+    build_youtube_dl_options,
+    is_firefox_cookies_available,
+)
 from youtube_whisperer.downloaders.video_downloader import (
     download_video_with_default_title,
 )
@@ -24,13 +27,8 @@ def extract_flat_info(url: str) -> dict[str, Any] | None:
     Returns:
         dict[str, Any] | None: The yt-dlp info dict, or ``None`` if extraction yielded nothing.
     """
-    ydl_opts: dict[str, Any] = {
-        'extract_flat': True,
-        'verbose': True,
-        'js_runtimes': {'deno': {}},
-    }
-    if is_firefox_cookies_available():
-        ydl_opts['cookiesfrombrowser'] = ('firefox',)
+    ydl_opts = build_youtube_dl_options(is_firefox_cookies_available())
+    ydl_opts['extract_flat'] = True
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=False)
 
