@@ -13,8 +13,8 @@ Return a reviewer-triaged report without changing the repository. The reviewer M
 
 2. **Dispatch one reviewer.** Tell it to read this skill but execute only step 3 and return the defined report; the main agent owns steps 1, 2, and 4. Launch the reviewer agent without inherited conversation history using the applicable supported harness:
 
-   - **Codex:** spawn the reviewer as a native subagent with `spawn_agent`, using `fork_turns: "none"` and explicit `model: "gpt-6-sol"` and `reasoning_effort: "high"` overrides. Native subagents inherit the current Full Access environment; no sandbox configuration is required.
-   - **Claude Code with the Codex plugin:** dispatch the reviewer with `/codex:rescue --fresh --write --model gpt-6-sol --effort high <review prompt>` or a fresh underlying companion `task` command with the same model and effort. Never use `--resume` or `--resume-last`.
+   - **Codex:** spawn the reviewer as a native subagent with `spawn_agent`, using `fork_turns: "none"` and explicit `model: "gpt-6.1-sol"` and `reasoning_effort: "high"` overrides. Native subagents inherit the current Full Access environment; no sandbox configuration is required.
+   - **Claude Code with the Codex plugin:** dispatch the reviewer with `/codex:rescue --fresh --write --model gpt-6.1-sol --effort high <review prompt>` or a fresh underlying companion `task` command with the same model and effort. Never use `--resume` or `--resume-last`.
 
    Track any background reviewer invocation through completion and capture its exit status and report before dispositioning findings; starting the task is not evidence that review completed.
 
@@ -32,7 +32,7 @@ Return a reviewer-triaged report without changing the repository. The reviewer M
 
    A scratch copy does not itself satisfy AGENTS' test-ownership rules: focused tests and mutation runs also need test-owned paths, settings, and service doubles. Do not copy `.env`, browser profiles, media libraries, or model caches into the scratch copy, or run it against those resources through inherited configuration.
 
-   **Sandbox fallback.** A container that forbids unprivileged user namespaces cannot start the reviewer's `bwrap` sandbox: every command fails and it returns `Review blocked` having inspected nothing. Confirm that first, for example that `unshare --user true` fails for root too, so an ordinary scratch-copy failure is not mistaken for it. The companion pins its sandbox mode in source, so no plugin flag reaches it and the reviewer must be driven through the CLI the plugin itself drives: `codex exec --dangerously-bypass-approvals-and-sandbox --model gpt-6-sol -c model_reasoning_effort="high"`. That run is fresh unless resumed and has no `--effort` flag; add `--skip-git-repo-check` when its working directory is outside a repository, and bypassing the sandbox already grants what `--write` would.
+   **Sandbox fallback.** A container that forbids unprivileged user namespaces cannot start the reviewer's `bwrap` sandbox: every command fails and it returns `Review blocked` having inspected nothing. Confirm that first, for example that `unshare --user true` fails for root too, so an ordinary scratch-copy failure is not mistaken for it. The companion pins its sandbox mode in source, so no plugin flag reaches it and the reviewer must be driven through the CLI the plugin itself drives: `codex exec --dangerously-bypass-approvals-and-sandbox --model gpt-6.1-sol -c model_reasoning_effort="high"`. That run is fresh unless resumed and has no `--effort` flag; add `--skip-git-repo-check` when its working directory is outside a repository, and bypassing the sandbox already grants what `--write` would.
 
    Disabling the sandbox removes the reviewer's containment and lets it write wherever the user can, so the main agent MUST explain that and obtain explicit user confirmation first; the authorization then persists under AGENTS' Scope and Decisions. The step 1 snapshot and step 4 comparison become the only detection of repository mutation, so the main agent MUST compare them before trusting the report. Prefer removing the cause, since a container permitted to create user namespaces runs the documented dispatch unchanged; this SHOULD NOT become the default path.
 
@@ -46,7 +46,7 @@ Return a reviewer-triaged report without changing the repository. The reviewer M
 
    The reviewer MAY ask for further information when missing context could affect a finding or verdict. Reply with the minimum factual context and record the exchange under **Assumptions**.
 
-   If `gpt-6-sol` or the applicable dispatch mechanism is still unavailable after that install attempt, stop and ask the user. Do not substitute or issue a verdict.
+   If `gpt-6.1-sol` or the applicable dispatch mechanism is still unavailable after that install attempt, stop and ask the user. Do not substitute or issue a verdict.
 
 3. **Review.** The reviewer:
 
