@@ -170,10 +170,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 **Severity: Medium. Validated — source inspection.** [API endpoints](youtube_whisperer/api/app.py):77–240 are `async def` but call synchronous Redis/glob/directory/deletion operations directly. Slow Redis or a large traversal stalls unrelated requests in the configured single-process uvicorn service; the shared Redis pool deliberately has no read timeout for workers. **Outcome:** preserve responsiveness while blocking dependencies wait. **Acceptance:** hold one dependency behind an explicit barrier and verify an independent request completes; release and quiesce all work. **Dependencies:** preserve worker blocking-read semantics; do not impose a short shared socket timeout as a mechanical fix.
 
-#### NB16 — Filesystem glob resolution queues directories as files
-
-**Severity: Medium. Validated — source and owned-directory reproduction.** [resolve_filesystem_tasks](youtube_whisperer/api/app.py):97 turns every glob match into a task without checking file type. Mixed or directory-only patterns report directories as successful submissions and send them to transcription. **Outcome:** enqueue file candidates while preserving unmatched-pattern reporting. **Acceptance:** regular file, directory, mixed, and directory-only fixtures; no host filesystem access. **Dependencies:** none. This finding does not authorize an extension whitelist or restrict the accepted arbitrary-glob trust model.
-
 #### NB17 — Non-string language input escapes validation as TypeError
 
 **Severity: Medium. Validated — isolated Pydantic TypeAdapter reproduction and API exception-path inspection.** [LanguageCode deserialization](youtube_whisperer/adaptors/lang_code_adaptor.py):112 raises `TypeError` for numeric, null, or collection input. Current Pydantic propagates that error instead of turning it into validation failure; the API's general handler therefore produces 500 for malformed client input. The same reproduction gives `ValidationError` for unsupported string `fr`. **Outcome:** invalid language types produce the normal client-validation response. **Acceptance:** numeric/null/list/object inputs return 422 without enqueueing; registered strings and LanguageCode instances remain accepted. **Dependencies:** none; preserve the language whitelist.
@@ -196,7 +192,7 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 #### NB22 — Relative task paths change meaning in a worker's working directory
 
-**Severity: Medium. Validated — source inspection; requested under D13.** [Filesystem resolution](youtube_whisperer/api/app.py):97 retains relative glob results; [TranscriptionWorker](youtube_whisperer/workers/common.py):245 interprets them with `Path(task.source)` in the worker process. API and worker launches from different directories therefore target different files or fail despite successful resolution. Compose currently shares its working directory, so that deployment masks the defect. **Outcome:** enqueue absolute paths to the actual API-resolved files. **Acceptance:** API resolution in one owned directory followed by worker processing in another uses the same intended file; absolute sources, whitespace handling, and metadata are preserved. **Dependencies:** D13; coordinate file filtering with NB16 without introducing a new path-access restriction.
+**Severity: Medium. Validated — source inspection; requested under D13; revalidated at fe1e939 by source inspection.** Filesystem expansion retains relative glob results, while the transcription worker constructs `Path(task.source)` in its own process. Launching the API and workers from different directories therefore changes the file selected. **Execution boundary:** [NB22 boundary](#nb22-execution-boundary).
 
 #### NB23 — Empty Whisper input is acknowledged without output or a dead letter
 
@@ -274,13 +270,19 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 ## Ready for implementation
 
+### NB22 execution boundary
+
+**Intent:** bind filesystem tasks to the files selected in the API process regardless of worker working directory, under D13. **Dependencies:** validated NB16 filtering; preserve its file-only behavior. **Direction:** make admitted paths absolute without resolving symlinks, preserving the existing filename alias and returned glob order. This non-material implementation assumption uses absolute paths to satisfy D13 while retaining the current symlink spelling; canonical identity or changing symlink semantics is outside scope. **Non-goals:** no access-root restriction, cross-host path mapping, wire-schema change, worker-processing rewrite, NB29 extraction, or queue-policy change. **Validation:** owned relative/absolute patterns, home expansion, surrounding request whitespace, internal filename spaces, metadata and result ordering; submit from an owned API directory and dispatch from another owned directory containing a same-named decoy, asserting the intended file contents and path. Demonstrate isolated revert, plausible-regression, and over-restriction mutants fail, then run AGENTS' full gates and fresh review including the complete group. **Done:** every admitted filesystem source is absolute, another worker working directory cannot substitute a decoy, absolute inputs and compatible symlink spelling remain accepted, documentation matches, and checks plus group review pass.
+
 NB4 is ready as written. NB2 and NB3 need their investigation gates cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
 
-Other new entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming must be settled before its dependent implementation; playlist continuation is settled by D17. D13–D16 settle the product outcomes for NB22–NB24 and N8; N7 is resolved, and N8's documentation boundary can proceed independently under AGENTS' documentation-only exemption. Expand NB22–NB24's implementation boundaries before changing code.
+Other new entries are compact findings unless linked to an execution boundary above: expand each boundary first and honor its explicit product-policy dependencies. Naming must be settled before its dependent implementation; playlist continuation is settled by D17. D13–D16 settle the product outcomes for NB22–NB24 and N8; N7 is resolved, and N8's documentation boundary can proceed independently under AGENTS' documentation-only exemption. Expand NB23–NB24's implementation boundaries before changing code.
 
 D18–D21 settle the compatibility, resource ownership, settings lifetime, and worker-identity choices. NB25–NB26 are implemented; expand the remaining NB27 boundary before changing code; retain existing Python entry points and all previously accepted product behavior except the translation interfaces explicitly removed under D23/D24.
 
 ## Deferred, accepted, and completed dispositions
+
+- NB16 implements file-only filesystem glob expansion, preserving file symlinks, arbitrary extensions, glob order, and failed-pattern reporting. README's [data flow](README.md#data-flow) owns the current behavior; NB22 builds on this filtering.
 
 - N7 is closed by NB25's [README configuration](README.md#configuration): direct Python/API/worker launches use exported environment variables, while Compose injects `.env` into application services under D14. N8's fresh-Compose file-creation instructions remain pending.
 

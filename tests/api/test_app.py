@@ -84,16 +84,55 @@ def test_get_tasks_propagates_queue_lookup_failure(mocker):
         asyncio.run(testee.get_tasks(redis_client=redis_client))
 
 
-def test_resolve_filesystem_tasks_expands_globs(mocker):
-    """Test that filesystem task expansion expands glob patterns and preserves metadata."""
-    pattern = Task(source='/tmp/*.wav', language='en')
-    mock_glob = mocker.patch.object(testee.glob, 'glob', return_value=['/tmp/one.wav', '/tmp/two.wav'])
+def test_resolve_filesystem_tasks_expands_globs(mocker, monkeypatch, tmp_path, owned_path_probes):
+    """Filesystem expansion preserves home expansion, supplied glob order, and task metadata."""
+    monkeypatch.setenv('HOME', str(tmp_path))
+    first = tmp_path / 'one.wav'
+    second = tmp_path / 'two.wav'
+    first.touch()
+    second.touch()
+    pattern = Task(source='~/*.wav', language='zh-cn', transcriber='azure')
+    mock_glob = mocker.patch.object(testee.glob, 'glob', return_value=[str(second), str(first)])
 
-    result = testee.resolve_filesystem_tasks(pattern)
+    with owned_path_probes():
+        result = testee.resolve_filesystem_tasks(pattern)
 
-    assert [task.source for task in result] == ['/tmp/one.wav', '/tmp/two.wav']
-    assert all(task.language == pattern.language for task in result)
-    mock_glob.assert_called_once_with('/tmp/*.wav')
+    assert result == [pattern.model_copy(update={'source': str(path)}) for path in (second, first)]
+    mock_glob.assert_called_once_with(str(tmp_path / '*.wav'))
+
+
+def test_resolve_filesystem_tasks_retains_files_and_file_symlinks(tmp_path, owned_path_probes):
+    """Mixed glob matches retain arbitrary file extensions and file symlinks while rejecting directories."""
+    regular = tmp_path / 'ordinary.wav'
+    arbitrary = tmp_path / 'notes.custom'
+    regular.touch()
+    arbitrary.touch()
+    alias = tmp_path / 'alias.custom'
+    alias.symlink_to(regular)
+    directory = tmp_path / 'directory.wav'
+    directory.mkdir()
+    directory_alias = tmp_path / 'directory-alias'
+    directory_alias.symlink_to(directory, target_is_directory=True)
+    broken_alias = tmp_path / 'broken-alias'
+    broken_alias.symlink_to(tmp_path / 'missing')
+    pattern = Task(source=str(tmp_path / '*'), language='en', transcriber='azure')
+
+    with owned_path_probes():
+        result = testee.resolve_filesystem_tasks(pattern)
+
+    assert {task.source for task in result} == {str(regular), str(arbitrary), str(alias)}
+    assert all(task.language == pattern.language and task.transcriber == pattern.transcriber for task in result)
+
+
+@pytest.mark.parametrize('matches_directory', [True, False])
+def test_resolve_filesystem_tasks_returns_empty_without_file_matches(tmp_path, owned_path_probes, matches_directory):
+    """Directory-only and unmatched patterns produce no filesystem tasks."""
+    if matches_directory:
+        (tmp_path / 'directory').mkdir()
+    pattern = Task(source=str(tmp_path / '*'))
+
+    with owned_path_probes():
+        assert testee.resolve_filesystem_tasks(pattern) == []
 
 
 def test_model_copy_preserves_non_source_fields():
@@ -191,20 +230,41 @@ def test_add_tasks_rejects_filesystem_source_with_none_transcriber(client, mocke
     mock_queue_transcription_tasks.assert_not_called()
 
 
-def test_add_tasks_failed_resolution(client, mocker):
-    """Test that unresolved filesystem tasks are returned in the failed list."""
-    task = Task(source='/tmp/*.wav', language='en')
-    mocker.patch.object(testee, 'is_url', return_value=False)
-    mocker.patch.object(testee, 'resolve_filesystem_tasks', return_value=[])
+@pytest.mark.parametrize('matches_directory', [True, False])
+def test_add_tasks_failed_resolution(client, mocker, tmp_path, owned_path_probes, matches_directory):
+    """Directory-only and unmatched filesystem submissions fail without queueing."""
+    if matches_directory:
+        (tmp_path / 'directory.wav').mkdir()
+    task = Task(source=str(tmp_path / '*'), language='en')
     mock_queue_youtube_task = mocker.patch.object(testee, 'queue_youtube_task')
     mock_queue_transcription_tasks = mocker.patch.object(testee, 'queue_transcription_tasks')
 
-    response = client.post("/tasks", json=[task.model_dump(mode='json')])
+    with owned_path_probes():
+        response = client.post('/tasks', json=[task.model_dump(mode='json')])
 
     assert response.status_code == 201
     assert response.json() == {'successful': [], 'failed': [task.model_dump(mode='json')]}
     mock_queue_youtube_task.assert_not_called()
     mock_queue_transcription_tasks.assert_not_called()
+
+
+def test_add_tasks_mixed_matches_queue_only_files(client, mocker, tmp_path, owned_path_probes):
+    """Mixed filesystem submissions report and enqueue only files with request metadata intact."""
+    file = tmp_path / 'notes.custom'
+    file.touch()
+    (tmp_path / 'directory.wav').mkdir()
+    pattern = Task(source=str(tmp_path / '*'), language='zh-cn', transcriber='azure')
+    resolved = pattern.model_copy(update={'source': str(file)})
+    youtube_enqueue = mocker.patch.object(testee, 'queue_youtube_task')
+    transcription_enqueue = mocker.patch.object(testee, 'queue_transcription_tasks')
+
+    with owned_path_probes():
+        response = client.post('/tasks', json=[pattern.model_dump(mode='json')])
+
+    assert response.status_code == 201
+    assert response.json() == {'successful': [resolved.model_dump(mode='json')], 'failed': []}
+    youtube_enqueue.assert_not_called()
+    transcription_enqueue.assert_called_once_with(ANY, [resolved])
 
 
 def test_add_tasks_propagates_queueing_failure(mocker):

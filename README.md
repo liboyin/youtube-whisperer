@@ -82,7 +82,7 @@ The worker entrypoint loads no transcription or download engine when imported, w
 ## Data Flow
 
 1. A user submits one or more tasks via `POST /tasks`. Each task specifies a `source` (required — a YouTube URL or a filesystem glob), a transcriber (`whisper`, `azure`, or `none` to download a URL without transcribing it), a single source language (`en-us` by default).
-2. The API routes URL tasks to `stream:youtube`. Filesystem glob patterns are expanded immediately and the concrete file paths are pushed to `stream:whisper` or `stream:azure`.
+2. The API routes URL tasks to `stream:youtube`. Filesystem glob patterns are expanded immediately; only files (including file symlinks, with no extension restriction) are pushed to `stream:whisper` or `stream:azure`, in glob order. Patterns matching no files are reported as failed.
 3. The YouTube worker expands playlist/channel URLs into individual video URLs, then handles each video on its own: it downloads the media and tries to fetch an existing transcript.
 4. If a transcript is already present (or the transcriber is `none`), that video is complete and no follow-up transcription task is queued.
 5. Otherwise, if a transcript is missing, the YouTube worker immediately enqueues a concrete filesystem task for that video into the requested transcriber's stream, before moving to the next video.
