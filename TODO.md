@@ -212,7 +212,7 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 #### NB30 — Three download operations duplicate yt-dlp defaults
 
-**Severity: Low. Validated structural observation — source/AST inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [Title lookup](youtube_whisperer/downloaders/utils.py):20–26, [flat extraction](youtube_whisperer/downloaders/playlist_downloader.py):26–32, and [video download](youtube_whisperer/downloaders/video_downloader.py):31–38 separately configure verbose logging, Deno, and conditional Firefox cookies. **Outcome:** one small function supplies fresh baseline options; each operation keeps its own simulation, extraction, format, and output-path options. **Acceptance:** all three operations retain their options and anonymous fallback, independent option dictionaries cannot contaminate one another, and cookie availability is injected in tests without profile access. **Dependencies:** none; preserve current operation-time discovery and cached availability semantics. Do not share a live `YoutubeDL` object or add a downloader class hierarchy.
+**Severity: Low. Validated structural observation — source/AST inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [Title lookup](youtube_whisperer/downloaders/utils.py):20–26, [flat extraction](youtube_whisperer/downloaders/playlist_downloader.py):26–32, and [video download](youtube_whisperer/downloaders/video_downloader.py):31–38 separately configure verbose logging, Deno, and conditional Firefox cookies. **Outcome:** one small function supplies fresh baseline options; each operation keeps its own simulation, extraction, format, and output-path options. **Acceptance:** all three operations retain their options and anonymous fallback, independent option dictionaries cannot contaminate one another, and cookie availability is injected in tests without profile access. **Dependencies:** N11's downloader-local test fixture is implemented; preserve current operation-time discovery and cached availability semantics. Do not share a live `YoutubeDL` object or add a downloader class hierarchy. **Execution boundary:** [NB30](#nb30-execution-boundary).
 
 #### NB31 — Compose repeats the shared application-service configuration
 
@@ -256,13 +256,15 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 **Severity: Low. Validated — source and exhaustive registered-code comparison at ed9b3a1 on 2026-09-14.** The historical [LanguageCode](youtube_whisperer/adaptors/lang_code_adaptor.py) source conversion separately handles ISO and BCP strings, although both yield `code.split('-', 1)[0]` for every registered value. **Outcome:** remove the redundant membership branch in source ISO conversion; NB32 removed the target-conversion API under D23/D24; the source-conversion branch remains unchanged. **Acceptance:** source output remains identical for all registered codes; retain whitelist validation, constructor/parsing normalization differences, and BCP-only conversion errors. **Dependencies:** preserve the source conversion methods retained by NB32 and keep this independent simplification distinguishable from the completed translation removal.
 
-#### N11 — Downloader tests duplicate their yt-dlp fake and construction setup
-
-**Severity: Low. Validated structural observation — source comparison at ed9b3a1 on 2026-09-14; proposed simplification.** [Video tests](tests/downloaders/test_video_downloader.py):7 and [playlist tests](tests/downloaders/test_playlist_downloader.py):22 define the same `FakeYoutubeDL`, with repeated construction-record dictionaries and nested factories in the surrounding tests. **Outcome:** one downloader-local fixture factory supplies fresh fake instances and call records per test. **Acceptance:** extraction/download/options assertions still fail on wrong behavior, exceptions propagate, and no state survives teardown. **Dependencies:** coordinate NB30 if touching the same tests; preserve NB11's need to verify the real overwrite contract beyond a fake. This is not a project-wide fake framework.
-
 #### N12 — Worker dispatch tests repeat one mapping invariant
 
 **Severity: Low. Validated structural observation — source inspection at ed9b3a1 on 2026-09-14; optional simplification during nearby work.** [Dispatch tests](tests/workers/test___main__.py):43–77 repeat the same slot-resolution, worker-construction, and polling assertions for three roles. **Outcome:** use an explicit parameter table for role, expected worker, and slot with one assertion body, retaining all cases. **Acceptance:** swapping or omitting any role mapping still fails, and every role forwards the slot/poll interval correctly. Expected mappings must not be derived from production dispatch data. **Dependencies:** coordinate any role-loading/worker cleanup; apply AGENTS' mutation requirements before removing assertions. Keep distinct invalid-role and CLI tests.
+
+## Selected downloader group execution boundaries
+
+### NB30 execution boundary
+
+**Intent:** centralize the verbose logging, Deno runtime and optional Firefox-cookie yt-dlp defaults shared by title lookup, flat extraction and video download. **Dependencies:** N11's implemented downloader-local fixture; preserve D18 public API compatibility and operation-time cached discovery. **Direction:** add one small typed function in downloader utilities returning a new baseline dictionary, including a fresh nested runtime mapping, on every call; each caller adds its existing operation-specific options. Keep the cached cookie detector and its discovery/logging behavior unchanged. **Non-goals:** shared live downloaders, cookie/profile redesign, filename/naming or overwrite changes (B5/NB8/NB11), yt-dlp dependency changes, or hierarchy/framework additions. **Validation:** all three operations retain exact option values and calls with available and unavailable cookies; mutate returned dictionaries to prove independence and verify discovery remains lazy/cached. Isolated revert, regression and over-restriction mutants must fail applicable tests; run all AGENTS gates and independent review. **Done:** three callers use one baseline policy, dictionaries cannot contaminate later calls, existing interfaces and anonymous fallback remain valid, README ownership is current, all gates and review pass, and the task entry is removed in its implementation commit.
 
 ## Ready for implementation
 
@@ -273,6 +275,8 @@ Other new entries are compact findings, not implementation assignments: expand e
 D18–D21 settle the compatibility, resource ownership, settings lifetime, and worker-identity choices. NB25–NB26 are implemented; expand the remaining NB27 boundary before changing code; retain existing Python entry points and all previously accepted product behavior except the translation interfaces explicitly removed under D23/D24.
 
 ## Deferred, accepted, and completed dispositions
+
+- N11 is implemented: downloader tests share a function-scoped yt-dlp factory with independent session records and retain option/call/result/error assertions. NB30 builds on this fixture; the implementation commit records mutation evidence.
 
 - NB16 and NB22 implement file-only glob expansion with absolute API-resolved sources under D13, preserving file symlink aliases, arbitrary extensions, glob order, metadata, and failed-pattern reporting. README's [data flow](README.md#data-flow) owns the current behavior; NB29 must retain this contract.
 

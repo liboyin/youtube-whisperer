@@ -1,96 +1,78 @@
-
+import pytest
 from pathlib_extensions import OverwriteMode
 
-import youtube_whisperer.downloaders.video_downloader as video_testee
-
-
-class FakeYoutubeDL:
-    def __init__(self, options, extract_info_result=None):
-        self.options = options
-        self.extract_info_result = extract_info_result or {}
-        self.download_calls = []
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        return False
-
-    def extract_info(self, url, download=False):
-        self.extract_info_call = (url, download)
-        return self.extract_info_result
-
-    def download(self, urls):
-        self.download_calls.append(urls)
+import youtube_whisperer.downloaders.video_downloader as testee
 
 
 def test_download_video_returns_early_when_existing_file_should_not_be_overwritten(mocker, tmp_path):
     """Test that an existing file is not re-downloaded when overwrite is denied."""
     target_path = tmp_path / "video.mp4"
     target_path.write_text("existing")
-    mock_overwrite = mocker.patch.object(video_testee, "overwrite_existing_path", return_value=False)
-    mock_prepare = mocker.patch.object(video_testee, "prepare_output_file")
-    mock_ydl = mocker.patch.object(video_testee.yt_dlp, "YoutubeDL")
+    mock_overwrite = mocker.patch.object(testee, "overwrite_existing_path", return_value=False)
+    mock_prepare = mocker.patch.object(testee, "prepare_output_file")
+    mock_ydl = mocker.patch.object(testee.yt_dlp, "YoutubeDL")
 
-    video_testee.download_video("https://example.com/watch?v=1", target_path, OverwriteMode.NEVER)
+    testee.download_video("https://example.com/watch?v=1", target_path, OverwriteMode.NEVER)
 
     mock_overwrite.assert_called_once_with(target_path, OverwriteMode.NEVER)
     mock_prepare.assert_not_called()
     mock_ydl.assert_not_called()
 
 
-def test_download_video_downloads_with_cookies_when_available(mocker, tmp_path):
+def test_download_video_downloads_with_cookies_when_available(mocker, tmp_path, youtube_dl_factory):
     """Test that available Firefox cookies are passed to yt-dlp for the download."""
     target_path = tmp_path / "video.mp4"
-    created = {}
+    created = youtube_dl_factory(testee, cookies_available=True)
 
-    def fake_factory(options):
-        created["ydl"] = FakeYoutubeDL(options)
-        return created["ydl"]
+    mocker.patch.object(testee, "prepare_output_file")
 
-    mocker.patch.object(video_testee, "prepare_output_file")
-    mocker.patch.object(video_testee, "is_firefox_cookies_available", return_value=True)
-    mocker.patch.object(video_testee.yt_dlp, "YoutubeDL", side_effect=fake_factory)
+    testee.download_video("https://example.com/watch?v=2", target_path, OverwriteMode.ALWAYS)
 
-    video_testee.download_video("https://example.com/watch?v=2", target_path, OverwriteMode.ALWAYS)
-
-    assert created["ydl"].options["outtmpl"] == str(target_path)
-    assert created["ydl"].options["cookiesfrombrowser"] == ("firefox",)
-    assert created["ydl"].download_calls == [["https://example.com/watch?v=2"]]
+    assert created.instances[0].options["outtmpl"] == str(target_path)
+    assert created.instances[0].options["cookiesfrombrowser"] == ("firefox",)
+    assert created.instances[0].download_calls == [["https://example.com/watch?v=2"]]
 
 
-def test_download_video_omits_cookies_when_unavailable(mocker, tmp_path):
+def test_download_video_omits_cookies_when_unavailable(mocker, tmp_path, youtube_dl_factory):
     """Test that the download omits Firefox cookies when no browser profile is available."""
     target_path = tmp_path / "video.mp4"
-    created = {}
+    created = youtube_dl_factory(testee, cookies_available=False)
 
-    def fake_factory(options):
-        created["ydl"] = FakeYoutubeDL(options)
-        return created["ydl"]
+    mocker.patch.object(testee, "prepare_output_file")
 
-    mocker.patch.object(video_testee, "prepare_output_file")
-    mocker.patch.object(video_testee, "is_firefox_cookies_available", return_value=False)
-    mocker.patch.object(video_testee.yt_dlp, "YoutubeDL", side_effect=fake_factory)
-
-    video_testee.download_video("https://example.com/watch?v=4", target_path, OverwriteMode.ALWAYS)
+    testee.download_video("https://example.com/watch?v=4", target_path, OverwriteMode.ALWAYS)
 
     # Asking yt-dlp for browser cookies that do not exist makes it fail instead of downloading anonymously.
-    assert "cookiesfrombrowser" not in created["ydl"].options
-    assert created["ydl"].download_calls == [["https://example.com/watch?v=4"]]
+    assert "cookiesfrombrowser" not in created.instances[0].options
+    assert created.instances[0].download_calls == [["https://example.com/watch?v=4"]]
+
+
+def test_download_video_propagates_error_and_exits_context(tmp_path, youtube_dl_factory):
+    """Download failure exits its session and preserves the exception identity."""
+    error = RuntimeError('download failed')
+    created = youtube_dl_factory(testee, cookies_available=False, error=error)
+    with pytest.raises(RuntimeError) as caught:
+        testee.download_video('url', tmp_path / 'video.mp4', OverwriteMode.ALWAYS)
+    assert caught.value is error
+    instance = created.instances[0]
+    assert instance.download_calls == [['url']]
+    assert len(instance.exit_calls) == 1
+    assert instance.exit_calls[0][:2] == (RuntimeError, error)
+    assert instance.exit_calls[0][2] is not None
 
 
 def test_download_video_with_default_title_sanitizes_title_and_downloads(mocker, tmp_path):
     """Test that the video title is sanitized into the output filename before downloading."""
-    mocker.patch.object(video_testee, "get_video_title", return_value="bad:/title")
-    mocker.patch.object(video_testee, "replace_os_reserved_chars", return_value="bad_title")
+    mocker.patch.object(testee, "get_video_title", return_value="bad:/title")
+    mocker.patch.object(testee, "replace_os_reserved_chars", return_value="bad_title")
     mocker.patch.object(
-        video_testee,
+        testee,
         "truncate_filename",
         side_effect=lambda path, max_length: path,
     )
-    mock_download = mocker.patch.object(video_testee, "download_video")
+    mock_download = mocker.patch.object(testee, "download_video")
 
-    result = video_testee.download_video_with_default_title(
+    result = testee.download_video_with_default_title(
         "https://example.com/watch?v=3",
         target_dir=tmp_path,
         overwrite=OverwriteMode.NEVER,
