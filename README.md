@@ -130,6 +130,8 @@ For non-WAV input, the Azure worker reuses an existing sidecar WAV or calls `sav
 
 `get_default_whisper_model()` builds its default `WhisperModel` lazily on the first uncached invocation and keeps it resident. Runtime helpers pass an immutable identity containing model name, cache directory, device, compute type and CPU threads to the same cache, so matching configurations reuse a model and differing snapshots cannot reuse the wrong one. `cache_clear()` releases every cached identity. No-argument default calls retain their initial model until cache cleanup; supplied settings control runtime model configuration independently. Each Whisper task still performs its live GPU health check when CUDA is enabled.
 
+Whisper decoding passes the input path to ffmpeg and captures the complete mono PCM16 output in Python before converting it to a one-dimensional normalized float32 waveform. If decoding produces no samples, file transcription raises an error before loading the model or writing an SRT. The worker records that failure in the dead-letter list before acknowledging and deleting the task; if recording fails, the task remains pending. An existing SRT still satisfies the worker's `NEVER` policy without decoding the media.
+
 ### Dual transcription engines
 
 The project started as a privacy-focused transcriber using Whisper. Azure Speech was added later for two reasons: (1) transcribing public content where on-device privacy guarantees are unnecessary, and (2) working around occasional Whisper failures on non-English audio. Azure was chosen as the most cost-effective option in the Sydney, Australia region.

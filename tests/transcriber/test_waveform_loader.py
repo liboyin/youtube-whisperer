@@ -34,24 +34,33 @@ class FakeStream:
         return self.stdout, self.stderr
 
 
-def test_load_whisper_waveform_from_file_streams_path_through_ffmpeg(mocker, tmp_path):
-    """Test that a file path is streamed through ffmpeg without buffering bytes in Python."""
+@pytest.mark.parametrize("sample_rate", [testee.DEFAULT_SAMPLE_RATE, 8000])
+@pytest.mark.parametrize("samples", [[-32768, -16384, -1, 0, 1, 16384, 32767], []])
+def test_load_whisper_waveform_from_file_captures_pcm_and_normalizes_samples(mocker, tmp_path, sample_rate, samples):
+    """Pass a file path to ffmpeg and convert its captured mono PCM buffer to float32."""
     input_path = tmp_path / "audio.raw"
-    pcm = np.array([0, 16384, -16384], dtype=np.int16).tobytes()
+    pcm = np.array(samples, dtype=np.int16).tobytes()
     stream = FakeStream(stdout=pcm)
     mock_prepare = mocker.patch.object(testee, "prepare_input_file", return_value=input_path)
     mock_input = mocker.patch.object(testee.ffmpeg, "input", return_value=stream)
 
-    waveform = testee.load_whisper_waveform_from_file(Path("ignored.raw"), sample_rate=8000)
+    waveform = (
+        testee.load_whisper_waveform_from_file(Path("ignored.raw"))
+        if sample_rate == testee.DEFAULT_SAMPLE_RATE
+        else testee.load_whisper_waveform_from_file(Path("ignored.raw"), sample_rate=sample_rate)
+    )
 
-    np.testing.assert_allclose(waveform, np.array([0.0, 0.5, -0.5], dtype=np.float32))
+    np.testing.assert_array_equal(waveform, np.array(samples, dtype=np.float32) / 32768)
+    assert waveform.shape == (len(samples),)
+    assert waveform.dtype == np.float32
     mock_prepare.assert_called_once_with(Path("ignored.raw"))
     mock_input.assert_called_once_with(str(input_path), threads=0)
+    assert stream.output_args == ("pipe:",)
     assert stream.output_kwargs == {
         "format": "s16le",
         "acodec": "pcm_s16le",
         "ac": 1,
-        "ar": 8000,
+        "ar": sample_rate,
     }
     assert stream.run_calls == [{"capture_stdout": True, "capture_stderr": True}]
 

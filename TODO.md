@@ -197,10 +197,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 **Severity: Medium. Validated — synthetic SRT shell reproductions.** [extract_subtitle_text.sh](extract_subtitle_text.sh):13 removes every numeric line, so dialogue such as `2026` disappears with cue indexes. On CRLF input, numeric indexes and blank lines survive because the regular expressions encounter carriage returns. **Outcome:** distinguish SRT structure from cue content and handle both line endings. **Acceptance:** numeric/ordinary dialogue, timestamps, indexes, blank lines, and equivalent LF/CRLF files produce the intended text. **Dependencies:** none; protect both defects in one cohesive parser boundary.
 
-#### NB23 — Empty Whisper input is acknowledged without output or a dead letter
-
-**Severity: Medium. Validated — source inspection; changed product disposition under D15.** [Whisper transcription](youtube_whisperer/transcriber/whisper_transcriber.py):127–129 returns `None` for an empty waveform; [WhisperWorker](youtube_whisperer/workers/whisper_worker.py):88 ignores the return, so the common loop acknowledges success with no SRT. **Outcome:** empty decoded audio raises an actionable failure that reaches the dead-letter endpoint. **Acceptance:** controlled empty waveform produces no SRT and one durable failure before acknowledgement; nonempty success and existing-output behavior remain covered. **Dependencies:** D15 supersedes the current documented skip; update that docstring and the test that expects `None` in the implementation commit.
-
 #### NB24 — Caption-service errors abort already-downloaded video work
 
 **Severity: Medium. Validated — source inspection; requested under D16.** [Transcript lookup](youtube_whisperer/downloaders/transcript_downloader.py):89–117 handles disabled/missing transcripts but propagates other service failures through [download orchestration](youtube_whisperer/downloaders/__init__.py):26–28. After media has downloaded, the worker therefore dead-letters download-only work or skips its requested transcription fallback. **Outcome:** retain the successful media result, report the caption-service problem, and complete download-only work or enqueue the selected transcriber. **Acceptance:** listing/fetching service errors after successful download preserve the media and chosen fallback; genuine media-download, local output-write, and transcription failures still surface appropriately. **Dependencies:** D16; coordinate NB19 timeout handling and preserve the transcription-only task contract implemented by NB32, and preserve D17's per-video dead-lettering (a caption-service error currently dead-letters that one video). Do not catch all local/programming errors as though captions were merely unavailable.
@@ -239,10 +235,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 **Severity: Low. Validated — source comparison.** [README](README.md):158 and its configuration table use `v1.0.0`, while [CPU Compose](docker-compose.cpu.yaml):7 uses `v1.1.0`. Following the standalone build example therefore selects different helpers. **Outcome:** current instructions agree with the configured revision. **Acceptance:** inspect all helper-version references and local links. **Dependencies:** none; this correction needs no image build or application gates.
 
-#### N4 — Waveform documentation incorrectly claims streaming memory use
-
-**Severity: Low. Validated — source inspection.** [load_whisper_waveform_from_file](youtube_whisperer/transcriber/waveform_loader.py):22 says raw bytes never reside in Python, but lines 42–46 capture the entire PCM byte string and create additional arrays. **Outcome:** describe actual buffering and ownership. **Acceptance:** docstring matches the capture/conversion path. **Dependencies:** none; a streaming or memory-optimization redesign needs a separate assignment and measurements.
-
 #### N5 — Filename-limit documentation uses characters instead of bytes
 
 **Severity: Low. Validated — pinned pathlib-extensions implementation inspection.** [README](README.md):135 says filenames truncate to 220 characters; the helper measures UTF-8 bytes, so multibyte titles have fewer characters. **Outcome:** state the real unit. **Acceptance:** compare ASCII and multibyte examples with the pinned helper without media access. **Dependencies:** coordinate B5 if its naming policy changes.
@@ -254,10 +246,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 #### N8 — Fresh Compose instructions omit creation of its mandatory env file
 
 **Severity: Low. Validated — tracked Compose/documentation inspection; documentation-only disposition under D14.** [CPU Compose](docker-compose.cpu.yaml):33,50,64,78 requires `.env` for every application service. README presents `compose up` without a file-creation step although the ignored file is absent from a fresh checkout. **Outcome:** document creating the required empty/configured file and when Azure credentials are needed. **Acceptance:** setup is complete for a clean checkout and distinguishes file presence from optional credential values; validate only with synthetic configuration and no service startup or secrets. **Dependencies:** D14; N7's direct-run guidance is resolved by NB25's [README configuration](README.md#configuration). Preserve current Compose behavior.
-
-#### N9 — Waveform conversion allocates an unnecessary intermediate copy
-
-**Severity: Low. Validated — source and synthetic NumPy comparison at ed9b3a1 on 2026-09-14.** [Waveform conversion](youtube_whisperer/transcriber/waveform_loader.py):46 calls `.flatten()` on the one-dimensional `np.frombuffer` result immediately before `.astype(np.float32)` allocates another array. Removing `flatten` preserves normalized float32 values for synthetic signed extrema, zero, and intermediate samples while eliminating one full int16 copy. **Outcome:** remove that redundant operation. **Acceptance:** preserve PCM interpretation, shape, dtype, normalization, sample rate, and ffmpeg errors, including empty input. **Dependencies:** N4 describes the actual buffering behavior; this is not a streaming redesign, timing benchmark, or deployment memory estimate.
 
 #### N10 — ISO conversion branches repeat the same transformation
 
@@ -271,11 +259,13 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 NB4 is ready as written. NB2 and NB3 need their investigation gates cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
 
-Other new entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming must be settled before its dependent implementation; playlist continuation is settled by D17. D14–D16 settle the product outcomes for NB23–NB24 and N8; N7 is resolved, and N8's documentation boundary can proceed independently under AGENTS' documentation-only exemption. Expand NB23–NB24's implementation boundaries before changing code.
+Other new entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming must be settled before its dependent implementation; playlist continuation is settled by D17. D14/D16 settle the product outcomes for NB24 and N8; N7 is resolved, and N8's documentation boundary can proceed independently under AGENTS' documentation-only exemption. Expand NB24's implementation boundary before changing code.
 
 D18–D21 settle the compatibility, resource ownership, settings lifetime, and worker-identity choices. NB25–NB26 are implemented; expand the remaining NB27 boundary before changing code; retain existing Python entry points and all previously accepted product behavior except the translation interfaces explicitly removed under D23/D24.
 
 ## Deferred, accepted, and completed dispositions
+
+- NB23, N4 and N9 are implemented: empty Whisper decoding fails before model/output work and follows durable dead-letter-before-acknowledgement handling; the decoder description reflects complete PCM buffering and its conversion avoids the redundant int16 copy. README's [Whisper input and model contract](README.md#the-whisper-model-is-kept-resident) owns the current behavior under D15.
 
 - NB6 and NB7 are implemented: orphan scans retain and reset their cursor across polling cycles, polling requires positive seconds, and negative claim-idle values are rejected. README’s [stream recovery](README.md#redis-streams-and-a-shared-consumer-group) and [direct-run timing](README.md#running-components-directly) own the current behavior; NB27/NB28 must retain these contracts.
 

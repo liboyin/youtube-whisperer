@@ -219,16 +219,29 @@ def test_transcribe_file_with_default_model_returns_existing_output_when_overwri
     mock_load.assert_not_called()
 
 
-def test_transcribe_file_with_default_model_skips_empty_waveform(mocker, tmp_path, caplog):
-    """Test that an empty waveform is skipped instead of transcribed."""
+@pytest.mark.parametrize("existing", [False, True])
+def test_transcribe_file_with_default_model_rejects_empty_waveform_before_model_or_output(mocker, tmp_path, existing):
+    """Empty decoded input raises an actionable failure while preserving any existing SRT."""
     input_path = tmp_path / "audio.wav"
-    mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([]))
+    output_path = input_path.with_suffix('.srt')
+    if existing:
+        output_path.write_text('existing')
+    mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([], dtype=np.float32))
+    model = mocker.patch.object(testee, "get_default_whisper_model")
+    transcribe = mocker.patch.object(testee, "transcribe_waveform_with_default_model")
+    save = mocker.patch.object(testee, "save_segments_as_srt")
 
-    with caplog.at_level(logging.WARNING):
-        result = testee.transcribe_file_with_default_model(input_path, LANGUAGE)
+    with pytest.raises(ValueError, match="No audio samples decoded") as error:
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE, overwrite=OverwriteMode.ALWAYS)
 
-    assert result is None
-    assert f"Skipping {input_path} because empty waveform is loaded" in caplog.text
+    assert str(input_path) in str(error.value)
+    assert 'decodable audio track' in str(error.value)
+    model.assert_not_called()
+    transcribe.assert_not_called()
+    save.assert_not_called()
+    assert list(tmp_path.iterdir()) == ([output_path] if existing else [])
+    if existing:
+        assert output_path.read_text() == 'existing'
 
 
 def test_transcribe_file_with_default_model_raises_on_rejected_transcription(mocker, tmp_path):

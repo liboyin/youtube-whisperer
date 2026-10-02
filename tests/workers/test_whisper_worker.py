@@ -4,8 +4,10 @@ from types import SimpleNamespace
 import pytest
 from pathlib_extensions import OverwriteMode
 
+import youtube_whisperer.transcriber.waveform_loader as waveform_testee
+import youtube_whisperer.transcriber.whisper_transcriber as transcriber_testee
 import youtube_whisperer.workers.whisper_worker as testee
-from youtube_whisperer.models import Task
+from youtube_whisperer.models import DeadLetter, Task
 from youtube_whisperer.transcriber.rejection_policy import RejectedTranscriptionError
 from youtube_whisperer.utils import TranscriberType
 
@@ -114,3 +116,55 @@ def test_dispatch_task_rechecks_gpu_for_each_task_using_supplied_snapshot(mocker
     assert use_cuda.call_count == 2
     use_cuda.assert_called_with(snapshot)
     transcribe.assert_called_once_with(source, task.language, overwrite=OverwriteMode.NEVER, settings=snapshot)
+
+
+@pytest.mark.parametrize('dead_letter_fails', [False, True])
+def test_process_queue_empty_decoded_input_dead_letters_before_ack_or_stays_pending(mocker, worker, client, tmp_path, dead_letter_fails):
+    """Real empty-input decoding reaches durable dead-letter storage before stream removal."""
+    source = tmp_path / 'empty.wav'
+    source.write_bytes(b'owned media placeholder')
+    task = Task(source=str(source), transcriber=TranscriberType.WHISPER)
+    message_id = b'1-0'
+    mocker.patch.object(worker, 'yield_tasks', return_value=iter([(message_id, task)]))
+    stream = mocker.MagicMock(name='ffmpeg-stream')
+    stream.output.return_value = stream
+    stream.run.return_value = (b'', b'')
+    ffmpeg_input = mocker.patch.object(waveform_testee.ffmpeg, 'input', return_value=stream)
+    model = mocker.patch.object(transcriber_testee, 'get_default_whisper_model')
+    transcribe = mocker.patch.object(transcriber_testee, 'transcribe_waveform_with_default_model')
+    save = mocker.patch.object(transcriber_testee, 'save_segments_as_srt')
+    pipe = client.pipeline.return_value
+    if dead_letter_fails:
+        client.rpush.side_effect = RuntimeError('dead-letter storage unavailable')
+        with pytest.raises(RuntimeError, match='dead-letter storage unavailable'):
+            worker.process_queue()
+        client.pipeline.assert_not_called()
+        pipe.xack.assert_not_called()
+        pipe.xdel.assert_not_called()
+        pipe.execute.assert_not_called()
+        expected_calls = [mocker.call.rpush('tasks:dead-letter', mocker.ANY)]
+    else:
+        worker.process_queue()
+        expected_calls = [
+            mocker.call.rpush('tasks:dead-letter', mocker.ANY),
+            mocker.call.pipeline(),
+            mocker.call.pipeline().xack('stream:whisper', 'workers', message_id),
+            mocker.call.pipeline().xdel('stream:whisper', message_id),
+            mocker.call.pipeline().execute(),
+        ]
+    assert client.mock_calls == expected_calls
+    client.rpush.assert_called_once()
+    key, payload = client.rpush.call_args.args
+    assert key == 'tasks:dead-letter'
+    dead_letter = DeadLetter.model_validate_json(payload)
+    assert dead_letter.task == task
+    assert dead_letter.queue == 'stream:whisper'
+    assert 'No audio samples decoded' in dead_letter.error
+    assert str(source) in dead_letter.error
+    assert 'decodable audio track' in dead_letter.error
+    ffmpeg_input.assert_called_once_with(str(source), threads=0)
+    stream.run.assert_called_once_with(capture_stdout=True, capture_stderr=True)
+    model.assert_not_called()
+    transcribe.assert_not_called()
+    save.assert_not_called()
+    assert list(tmp_path.iterdir()) == [source]

@@ -22,7 +22,8 @@ def load_whisper_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPL
     """
     Load Whisper-style waveform from a file and return it as a NumPy array.
 
-    ffmpeg streams the file directly so the raw bytes never reside in Python memory.
+    ffmpeg receives the input path; Python captures the complete decoded PCM byte
+    buffer before converting its one-dimensional int16 view to float32 samples.
 
     Args:
         path (Path): Path to the audio/video file to decode.
@@ -46,7 +47,7 @@ def load_whisper_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPL
     except ffmpeg.Error as e:
         logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise
-    return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768
+    return np.frombuffer(out, np.int16).astype(np.float32) / 32768
 
 
 def _convert_audio_to_stage(input_file_path: Path, stage: Path) -> None:

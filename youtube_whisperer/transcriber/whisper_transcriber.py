@@ -119,9 +119,10 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
         overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
 
     Returns:
-        Path | None: Output SRT file path, or `None` if the input decodes to an empty waveform.
+        Path | None: Output SRT file path, including an existing output when overwrite is denied.
 
     Raises:
+        ValueError: If decoding produces no audio samples, before model or SRT work.
         RejectedTranscriptionError: If Whisper emits a known bad output substring.
         Exception: If loading the waveform or transcription otherwise fails; the error propagates
             so callers (e.g. the worker loop) can dead-letter the task instead of silently dropping it.
@@ -134,8 +135,7 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
             overwrite = OverwriteMode.ALWAYS
     waveform = load_whisper_waveform_from_file(input_file_path)
     if len(waveform) == 0:
-        logger.warning("Skipping %s because empty waveform is loaded", input_file_path)
-        return None
+        raise ValueError(f"No audio samples decoded from {input_file_path}; check that the file contains a decodable audio track.")
     segments = transcribe_waveform_with_default_model(waveform, language) if settings is None else transcribe_waveform_with_default_model(waveform, language, settings=settings)
     segments_generator = reject_bad_segments(segments)
     save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
