@@ -4,24 +4,29 @@ Use this recipe when the [review procedure](../SKILL.md#procedure) requires scra
 
 Create a scratch copy only when writable execution is needed. Within one agent's assessment of a fixed candidate, reuse one owned scratch tree for focused checks and mutants where practical, restoring the candidate before each mutation and using fresh test processes. Do not share a writable scratch tree between agents. A new assessment must use its current candidate; changing import-lifecycle requirements may justify a separate copy. Evidence inspection alone needs no scratch copy.
 
-Run fresh Python processes from the prepared scratch root using `python -m pytest`, with `PYTHONPATH` pointing to that root and `TMPDIR` plus pytest's `--basetemp` inside an owned scratch subdirectory. Preserve the copied `tests/conftest.py` configuration bootstrap. Add scratch-only provenance checks in the process exercising the code, after its configuration setup, without changing import timing or module absence protected by the tests; a separate `find_spec` probe does not certify the pytest process. For a focused API run whose tests normally import the app and do not test its import lifecycle, add the following hook only to the scratch copy of `tests/conftest.py`, after the existing configuration bootstrap. That location makes `Path(__file__).resolve().parents[1]` the scratch root. Preserve existing hooks and imports; do not use this eager-import example for a full suite containing import-lifecycle tests:
+Run fresh Python processes from the prepared scratch root using `python -m pytest`, with `PYTHONPATH` pointing to that root and `TMPDIR` plus pytest's `--basetemp` inside an owned scratch subdirectory. Preserve the copied `tests/conftest.py` configuration bootstrap. Add scratch-only provenance checks in the process exercising the code without changing application import timing; a separate `find_spec` probe does not certify the pytest process. For focused tests whose exercised modules remain loaded, prefer checking `sys.modules` after execution. Add the following example only to the scratch copy of `tests/conftest.py`, adapting the expected module names to the selected tests and preserving existing hooks and imports:
 
 ```python
 from pathlib import Path
+import sys
 
 import pytest
 
 
-def pytest_sessionstart(session):
-    """Reject pytest runs that import the API outside the owned scratch tree."""
-    import youtube_whisperer.api.app as testee
-
+def pytest_sessionfinish(session, exitstatus):
+    """Verify exercised API provenance without preloading application modules."""
     scratch_root = Path(__file__).resolve().parents[1]
-    if not Path(testee.__file__).resolve().is_relative_to(scratch_root):
-        raise pytest.UsageError("Application import escaped the scratch tree")
+    for name in ("youtube_whisperer.api.app",):
+        module = sys.modules.get(name)
+        if module is None:
+            raise pytest.UsageError(f"Expected exercised module is absent: {name}")
+        location = Path(module.__file__).resolve()
+        if not location.is_relative_to(scratch_root):
+            raise pytest.UsageError(f"Application import escaped scratch: {name}: {location}")
+        print(f"ACTUAL_IMPORT_PROVENANCE {name}={location}")
 ```
 
-Adapt the checks to the application modules exercised or mutated and preserve existing hooks. For lazy-import or import-lifecycle tests, inspect the actual module in `sys.modules` after the test-controlled import instead of preloading it for verification; modules expected to remain absent MUST remain absent. For test-spawned child processes, add equivalent scratch-only location checks inside each child after its own configuration setup and controlled imports. A parent pytest check does not certify a child's imports. From the scratch root, a focused API run is:
+List only modules the selected tests are expected to exercise; modules intentionally kept absent MUST remain absent. If tests unload or replace modules, check provenance immediately after the relevant test-controlled import instead of relying on the session-end hook. For test-spawned child processes, add equivalent scratch-only location checks inside each child after its own configuration setup and controlled imports. A parent pytest check does not certify a child's imports. From the scratch root, a focused API run is:
 
 ```bash
 mkdir -p owned-temp

@@ -24,7 +24,7 @@ Reuse one Codex reviewer within a task or closely coupled group, retaining its o
 
 ## Procedure
 
-1. **Gate, freeze, and snapshot.** Before dispatching the reviewer, the main agent MUST establish passing results for every gate required by `AGENTS.md` on the exact target state, by running it or verifying explicitly permitted reuse. If any gate fails, resolve the failure before formal review. Freeze repository edits and take a temporary integrity snapshot: `git status`, hashes/modes/symlink targets for dirty tracked and in-scope untracked files, out-of-scope untracked paths, and any relevant owned processes. Do not inspect or hash ignored untracked content. Start the compact [review record](#evidence-retention); the temporary integrity snapshot need not be retained after a successful comparison unless needed for evidence reuse or investigation.
+1. **Freeze, gate, and snapshot.** Freeze candidate edits before final gates. Before dispatching the reviewer, the main agent MUST establish passing results for every gate required by `AGENTS.md` on the exact target state, by running it or verifying explicitly permitted reuse. If any gate fails, resolve the failure before formal review. With gates passed and edits still frozen, take a temporary integrity snapshot: `git status`, hashes/modes/symlink targets for dirty tracked and in-scope untracked files, out-of-scope untracked paths, and any relevant owned processes. Do not inspect or hash ignored untracked content. Update the existing compact [review record](#evidence-retention), or create it if none exists; the temporary integrity snapshot need not be retained after a successful comparison unless needed for evidence reuse or investigation.
 
 2. **Dispatch the reviewer.** Ask the [recorded reviewer](#reviewer-session) to read the current skill, perform step 3 for the requested full or follow-up scope, and return the report; the main agent owns steps 1, 2 and 4.
 
@@ -63,30 +63,37 @@ Reuse one Codex reviewer within a task or closely coupled group, retaining its o
 
 ## Report
 
-Record purpose, target, reviewer, material assumptions, verification, limitations, and verdict without rewritten code. Every finding MUST cite a path and, when possible, a line. The following structure is available when useful; omit empty finding sections and dismissed hypotheses that do not explain a material decision. A clean report states that there are no findings. The report MAY be a section of the retained review record rather than a separate file.
+Use structured feedback by default, with review context, verification, findings grouped by classification, and an explicit verdict. Keep it in a reviewer-owned section of the retained record unless a separate report is requested or makes findings easier to review. Reference boundary, gate and mutation evidence already recorded instead of restating them. Every finding MUST give its classification, evidence and impact, cite a path and, when possible, a line.
+
+The template below is a guide, not a form. Omit irrelevant or empty sections and dismissed hypotheses that do not explain a material decision; a clean review still states that there are no findings and gives its verification and verdict. Follow-up reports MAY focus on the reviewed delta, new verification, updates to outstanding findings, and the updated verdict, referencing unchanged context from the earlier report.
 
 ```markdown
 ## Adversarial Review Report
-**Purpose:** ...
-**Target:** <candidate and full or follow-up scope; prior reviewed target when applicable>
-**Reviewer:** <agent/session ID, model/effort, tool; failure>
-**Assumptions:** ...
-**Verification:** <commands and results>
-**Limitations:** ...
+
+**Target:** <candidate and scope; prior reviewed target for follow-ups>
+**Reviewer:** <agent/session, model/effort>
+**Verification:** <paths and evidence checked, new probes/results; reference recorded gates>
+**Assumptions and limitations:** <material qualifications, or reference existing context>
+**Cleanup:** <owned scratch/process cleanup, or none created>
 
 ### Blocking
-1. `path:line` — <defect>. Impact: ... Proposed remedy (optional): ...
+
+1. `path:line` — <defect, supporting evidence and impact; optional remedy>
+
 ### Non-blocking
-...
+
+1. `path:line` — <defect, supporting evidence and impact; optional remedy>
+
 ### Nits
-...
-### Dismissed
-<hypothesis and measured reason>
+
+1. `path:line` — <local issue and optional remedy>
+
 ### Verdict
-<No blocking findings | N blocking findings — fix and re-review | Review blocked — scratch environment or repository integrity>
+
+<No blocking findings | N blocking findings — fix and re-review | Review blocked — reason>
 ```
 
-After handling the report, the main agent appends a **Main-agent validation** section recording the integrity comparison and each finding's validation and disposition under step 4. When there are no findings, say so once; no empty disposition sections are needed. This addendum does not alter the reviewer's triage or verdict.
+After handling the report, the main agent appends the integrity comparison and each finding's validation and disposition under step 4. For a clean review, the integrity comparison result suffices; do not restate the review or add empty disposition sections. This addendum does not alter the reviewer's triage or verdict.
 
 ## Evidence Retention
 

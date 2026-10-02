@@ -14,7 +14,7 @@ Link to the owning document instead of duplicating its procedure. Operational in
 
 - If not running in a Docker container, stop and confirm with the user before continuing.
 - This repository assumes execution inside its devcontainer with harness permissions set to Full Access or bypass. If the active harness imposes restrictions, follow its enforced policy and report the configuration mismatch.
-- Read relevant code and documentation and inspect repository status before editing. Preserve unrelated work.
+- Read relevant code and documentation and inspect repository status before editing. Reuse guidance already read in the current task while it remains unchanged.
 - Each change MUST have a boundary: intent, dependencies, non-goals, validation strategy, and done criteria. Revalidate written tasks against the affected code; do not implement them mechanically or broaden their material scope unilaterally.
 - State assumptions. Confirm unresolved choices that materially affect scope, architecture, dataflow, correctness, security, or user-visible behavior before dependent work; continue independent work where possible.
 - Accepted decisions and user authorization persist. Do not ask again about settled choices. Document superseding decisions and their reasoning before committing the affected change.
@@ -53,7 +53,7 @@ Link to the owning document instead of duplicating its procedure. Operational in
 - Documentation-only changes and read-only assessments are exempt from application gates and formal adversarial review. Verify their claims, references, completeness, and diff instead. Report what was actually checked.
 - Verify success with checks that distinguish failure. Explain non-zero exits, verify absence directly, and verify rollback against the recorded pre-change state.
 - Never point a development or test run at real host data: the media library behind `ASSETS_DIR`, the browser profile behind `FIREFOX_PROFILE_DIR`, or the host model cache. NEVER read or copy that browser profile; it holds live session cookies. Treat every value in `.env` as a secret: do not echo, log, commit, or transmit it. `docker compose down -v` destroys the Redis volume holding queued tasks and pending-entry state, so it requires explicit user authorization.
-- Clean up owned processes and disposable artifacts while preserving the [review skill's retained evidence](.agents/skills/adversarial-review/SKILL.md#evidence-retention) and requested deliverables. Identify owned PIDs before using `kill`; NEVER use `pkill -f`. Re-check this file and the task boundary before finishing.
+- Clean up owned processes and disposable artifacts while preserving the [review skill's retained evidence](.agents/skills/adversarial-review/SKILL.md#evidence-retention) and requested deliverables. Identify owned PIDs before using `kill`; NEVER use `pkill -f`. Before finishing, check for changes to this file and the task boundary, reread changed guidance, and verify the result against their current requirements.
 
 # Version Control
 

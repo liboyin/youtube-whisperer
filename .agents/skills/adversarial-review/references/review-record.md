@@ -2,7 +2,7 @@
 
 Use this compact template for the [review procedure](../SKILL.md#procedure). Keep one record per task or cohesive group, updating it for follow-up candidates; it MAY contain the reviewer report and main-agent addendum. Reference supporting artifacts instead of duplicating their contents, and omit conditional sections when they do not apply. Record decisions and results, not a chronological transcript. Retain failure excerpts only when they establish the behavioral outcome or explain a finding; full passing logs are unnecessary.
 
-- **Boundary:** intent, dependencies, implementation direction, non-goals, validation, acceptance and done criteria for each task; write the accepted boundary here or link its sole owning location. Distinguish existing caller contracts from new runtime validation requirements.
+- **Boundary:** intent, dependencies, implementation direction, non-goals, validation, acceptance and done criteria for each task; write the accepted boundary here or link its sole owning location. State shared group constraints once and give each task distinct acceptance criteria. Distinguish existing caller contracts from new runtime validation requirements.
 - **Target:** starting and candidate revisions/range, in-scope paths and uncommitted inputs; full or follow-up scope and prior target when applicable.
 - **Reviewer:** agent/session ID, model/effort; replacement reason and transferred findings when applicable.
 - **Checks:** commands, results, relevant non-secret environment summary, and baseline selection rationale. Include the integration-coverage decision when deciding whether a further group review is needed.
@@ -19,4 +19,4 @@ Record the original tested revision, commands/results and evidence location. Com
 
 For cosmetic gate/verdict reuse, explain why the delta cannot affect the contracts listed in the skill, record affected lint/format and diff checks and updated fingerprints, and preserve all prior finding dispositions. Reuse does not waive review after non-trivial fixes.
 
-Retain reconstructible candidates when needed for reuse or follow-up comparison: revisions plus patches for uncommitted inputs, or equivalent snapshots. Fingerprints identify content but cannot reconstruct it. Keep referenced evidence outside disposable scratch; detailed logs may be discarded once definitions, outcomes and provenance are sufficient.
+Keep referenced evidence outside disposable scratch; detailed logs may be discarded once definitions, outcomes and provenance are sufficient.
