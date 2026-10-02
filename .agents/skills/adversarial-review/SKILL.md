@@ -39,7 +39,7 @@ Reuse one Codex reviewer within a task or closely coupled group, retaining its o
    - Repository path and exact target: dirty tree, commit, or range; for follow-ups, the last reviewed target and requested delta.
    - In-scope paths and any unrelated dirty paths to ignore.
    - Purpose of the change in a few sentences.
-   - The retained evidence record's output location.
+   - The retained record's location, including accepted boundaries and available evidence to read; the report destination if separate.
 
    Add undocumented constraints, accepted findings not to re-raise, or prior mutation evidence only when nonempty. Do not inline the diff, full conversation, architecture summaries available in the repository, suspected defects, or the main agent's conclusions.
 
@@ -50,7 +50,7 @@ Reuse one Codex reviewer within a task or closely coupled group, retaining its o
    - Reads the current `AGENTS.md`, the complete requested diff, in-scope untracked files, and relevant source, tests, documentation, and configuration. Never reads ignored untracked content.
    - Takes a constructively adversarial stance: assume the change may be wrong and actively try to falsify it with counterexamples, boundary and failure cases, invariant violations, state transitions, tests that can pass for the wrong reason, and mutants. For this project, scrutinize Redis stream and consumer-group semantics, acknowledgement and dead-letter ordering, worker process and concurrency boundaries, filesystem and path handling, and external-service failure paths where relevant. Check intended behavior, correctness, simplicity, documentation, design and testability. Never manufacture findings, treat taste as a defect, or inflate severity; every finding needs evidence and proportional impact.
    - Classifies each finding using judgment based on its evidence, impact, likelihood, task requirements, and risk of deferral. **Blocking** findings must be resolved before commit; **Non-blocking** findings are genuine issues that may reasonably be deferred; **Nits** are low-impact style or readability issues with an obvious local remedy. These are judgment categories, not mechanical issue-type rules.
-   - Verifies claims with safe, bounded commands. Rely on the main agent's passing gate results for the frozen target; do not repeat the complete suite without a specific concern. Run focused tests when needed. Apply AGENTS' targeted mutation requirements, including protection of removed/weakened coverage, and request additional mutation evidence where test protection is doubtful. Independently check supplied evidence; produce missing required evidence in scratch or return `Review blocked`. Count a mutation kill only when a relevant test fails for the protected invariant; collection, syntax, import and environment failures do not count. Record the invariant, mutant, command/seed, and behavioral outcome, or verified reuse under [evidence retention](#evidence-retention).
+   - Verifies claims with safe, bounded commands. Rely on the main agent's passing gate results for the frozen target; do not repeat the complete suite without a specific concern. Run focused tests when needed. Apply AGENTS' targeted mutation requirements, including protection of removed/weakened coverage, and request additional mutation evidence where test protection is doubtful. Independently check supplied evidence using the [evidence rules](#evidence-retention); this does not require replaying every supplied mutant. Produce missing required evidence in scratch or return `Review blocked`. Count a mutation kill only when a relevant test fails for the protected invariant; collection, syntax, import and environment failures do not count. Record the invariant, mutant, command/seed, and behavioral outcome.
    - Keeps the repository read-only, preserves the required evidence record before cleaning up only its recorded disposable scratch artifacts and processes, reports that cleanup, and returns the report below.
 
 4. **Validate and disposition findings.** The reviewer owns the triage and verdict. The main agent first compares repository status, recorded hashes, file modes, symlink targets, and the out-of-scope untracked path list against the step 1 snapshot; any unexplained repository change blocks the review. It then handles each finding according to its reviewer-assigned classification:
@@ -63,7 +63,7 @@ Reuse one Codex reviewer within a task or closely coupled group, retaining its o
 
 ## Report
 
-Return this structure without rewritten code. Every finding MUST cite a path and, when possible, a line; write “None” for empty sections.
+Record purpose, target, reviewer, material assumptions, verification, limitations, and verdict without rewritten code. Every finding MUST cite a path and, when possible, a line. The following structure is available when useful; omit empty finding sections and dismissed hypotheses that do not explain a material decision. A clean report states that there are no findings. The report MAY be a section of the retained review record rather than a separate file.
 
 ```markdown
 ## Adversarial Review Report
@@ -72,6 +72,7 @@ Return this structure without rewritten code. Every finding MUST cite a path and
 **Reviewer:** <agent/session ID, model/effort, tool; failure>
 **Assumptions:** ...
 **Verification:** <commands and results>
+**Limitations:** ...
 
 ### Blocking
 1. `path:line` — <defect>. Impact: ... Proposed remedy (optional): ...
@@ -85,11 +86,13 @@ Return this structure without rewritten code. Every finding MUST cite a path and
 <No blocking findings | N blocking findings — fix and re-review | Review blocked — scratch environment or repository integrity>
 ```
 
-After handling the report, the main agent appends a **Main-agent validation** section that records each finding as **Validated**, **Could not validate**, or **Not independently validated**, with supporting evidence when validation was attempted. This addendum does not alter the reviewer's triage or verdict.
+After handling the report, the main agent appends a **Main-agent validation** section recording the integrity comparison and each finding's validation and disposition under step 4. When there are no findings, say so once; no empty disposition sections are needed. This addendum does not alter the reviewer's triage or verdict.
 
 ## Evidence Retention
 
 Keep one compact [review record](references/review-record.md) outside disposable scratch and link it in the handoff. It records the boundary, target, reviewer, checks/results, findings/dispositions, integrity comparison result, and limitations. Include mutation evidence only when required or performed. Preserve accepted boundaries before removing their TODO entries. Retain enough candidate content to establish a follow-up diff when needed; a commit reference suffices for committed inputs, while uncommitted inputs need a patch or equivalent snapshot.
+
+Assign one primary producer for required mutation evidence on each cohesive candidate; the reviewer may fill gaps or add probes. The reviewer MUST independently assess supplied evidence against the candidate: check the relevant source/test identity, exact mutant and protected assertion, execution command/seed, actual-import provenance, and behavioral outcome. Reliable matching evidence MAY be accepted without replay; the reviewer records what was checked. Rerun affected cases when those checks cannot establish validity, relevant inputs changed, or a concrete concern needs reproduction. Add a different probe when the supplied mutant does not distinguish the suspected failure. Independent review remains mandatory for non-trivial committed candidates; duplicate execution is not its definition.
 
 Evidence reuse is optional. When reusing baselines, gates, mutation evidence, or verdicts, follow the template's additional provenance requirements; rerunning checks is always an alternative. Identical tested content MAY justify baseline reuse across changed commit metadata only when checks are metadata-independent. Cosmetic reuse follows [Review Scope](#review-scope); non-trivial fixes still require full gates and an updated verdict.
 

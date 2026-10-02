@@ -1,8 +1,8 @@
 # Review Record
 
-Use this compact template for the [review procedure](../SKILL.md#procedure). References to retained artifacts are sufficient; do not duplicate their contents. Omit conditional sections when they do not apply.
+Use this compact template for the [review procedure](../SKILL.md#procedure). Keep one record per task or cohesive group, updating it for follow-up candidates; it MAY contain the reviewer report and main-agent addendum. Reference supporting artifacts instead of duplicating their contents, and omit conditional sections when they do not apply. Record decisions and results, not a chronological transcript. Retain failure excerpts only when they establish the behavioral outcome or explain a finding; full passing logs are unnecessary.
 
-- **Boundary:** intent, dependencies, non-goals, acceptance criteria; link or preserve the accepted task/group boundary.
+- **Boundary:** intent, dependencies, implementation direction, non-goals, validation, acceptance and done criteria for each task; write the accepted boundary here or link its sole owning location. Distinguish existing caller contracts from new runtime validation requirements.
 - **Target:** starting and candidate revisions/range, in-scope paths and uncommitted inputs; full or follow-up scope and prior target when applicable.
 - **Reviewer:** agent/session ID, model/effort; replacement reason and transferred findings when applicable.
 - **Checks:** commands, results, relevant non-secret environment summary, and baseline selection rationale. Include the integration-coverage decision when deciding whether a further group review is needed.
@@ -11,7 +11,7 @@ Use this compact template for the [review procedure](../SKILL.md#procedure). Ref
 
 ## Mutation evidence, when required or performed
 
-For each protected invariant, record the mutant definition, relevant test, exact command/seed, and behavioral failure. Explain why the chosen mutation probes the risk; no category checklist or assertion-by-assertion inventory is required. Multiple assertions may share evidence. For removed/weakened coverage, identify the remaining test that still rejects the broken behavior. Report invalid runs separately from behavioral failures.
+Name the primary evidence producer and any reviewer additions. For each protected invariant, record the tested candidate (revision plus patch or equivalent for uncommitted inputs), actual-import provenance, mutant definition, relevant test, exact command/seed, and behavioral failure. Explain why the chosen mutation probes the risk; no category checklist or assertion-by-assertion inventory is required. Multiple assertions may share evidence. For removed/weakened coverage, identify the remaining test that still rejects the broken behavior. Report invalid runs separately from behavioral failures. The reviewer records the evidence checks and any reason for rerunning or extending a case; do not duplicate the producer's evidence in the reviewer report.
 
 ## Additional provenance for evidence reuse
 

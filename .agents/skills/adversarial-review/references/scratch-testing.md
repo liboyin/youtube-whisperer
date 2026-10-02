@@ -2,6 +2,8 @@
 
 Use this recipe when the [review procedure](../SKILL.md#procedure) requires scratch execution. It supplies examples, not a substitute for AGENTS' test-ownership rules.
 
+Create a scratch copy only when writable execution is needed. Within one agent's assessment of a fixed candidate, reuse one owned scratch tree for focused checks and mutants where practical, restoring the candidate before each mutation and using fresh test processes. Do not share a writable scratch tree between agents. A new assessment must use its current candidate; changing import-lifecycle requirements may justify a separate copy. Evidence inspection alone needs no scratch copy.
+
 Run fresh Python processes from the prepared scratch root using `python -m pytest`, with `PYTHONPATH` pointing to that root and `TMPDIR` plus pytest's `--basetemp` inside an owned scratch subdirectory. Preserve the copied `tests/conftest.py` configuration bootstrap. Add scratch-only provenance checks in the process exercising the code, after its configuration setup, without changing import timing or module absence protected by the tests; a separate `find_spec` probe does not certify the pytest process. For a focused API run whose tests normally import the app and do not test its import lifecycle, add the following hook only to the scratch copy of `tests/conftest.py`, after the existing configuration bootstrap. That location makes `Path(__file__).resolve().parents[1]` the scratch root. Preserve existing hooks and imports; do not use this eager-import example for a full suite containing import-lifecycle tests:
 
 ```python
@@ -26,6 +28,6 @@ mkdir -p owned-temp
 PYTHONPATH="$PWD" PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/owned-temp" python -m pytest tests/api/test_app.py --no-cov --basetemp="$PWD/owned-temp/pytest"
 ```
 
-A run failing the import check is invalid evidence, rather than a surviving or killed mutant. Restore the candidate source before each mutant, and save required evidence outside disposable scratch before cleanup. `PYTHONPATH` and owned temporary paths do not replace the test bootstrap's settings isolation or service doubles.
+A run failing the import check is invalid evidence, rather than a surviving or killed mutant. Save required evidence outside disposable scratch before cleanup. `PYTHONPATH` and owned temporary paths do not replace the test bootstrap's settings isolation or service doubles.
 
 The focused command uses `--no-cov` because the repository's default pytest coverage threshold applies to the whole application. Preserve pytest-randomly's reported seed when reproducing a failure, and identify order-dependent results.
