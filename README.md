@@ -162,7 +162,7 @@ The asset directory is intentionally a human-browsable media library rather than
 
 ### Workers as separate processes
 
-Workers run as independent Docker services rather than background tasks inside the API. The compose files define `youtube_worker`, `whisper_worker`, and `azure_worker`. Each worker's consumer name comes from `WORKER_SLOT_ID` if set, otherwise the container hostname (see [Redis Streams and a shared consumer group](#redis-streams-and-a-shared-consumer-group)). The shared loop lives in `workers/common.py`; each role subclass (`youtube_worker.py`, `whisper_worker.py`, `azure_worker.py`) only supplies its stream name and per-task work.
+Workers run as independent Docker services rather than background tasks inside the API. The compose files define `youtube_worker`, `whisper_worker`, and `azure_worker`. Each worker's consumer name comes from `WORKER_SLOT_ID` if set, otherwise the container hostname (see [Redis Streams and a shared consumer group](#redis-streams-and-a-shared-consumer-group)). The shared `BaseWorker` in `workers/common.py` owns stream and consumer identity, compatible accessors, runtime resources, and the recovery/acknowledgement loop. Role subclasses (`youtube_worker.py`, `whisper_worker.py`, `azure_worker.py`) supply identity during construction and retain their per-task work. The poller shares payload validation and missing-group recovery while keeping own-pending, orphan-claim, and new-work reads explicit.
 
 ### SRT as the output format
 

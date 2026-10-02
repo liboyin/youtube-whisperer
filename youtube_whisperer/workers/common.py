@@ -29,6 +29,22 @@ XAutoClaimResponse = tuple[bytes, list[tuple[bytes, dict[bytes, bytes]]], list[b
 DEFAULT_CLAIM_MIN_IDLE_SECONDS = 21600  # 6 hours; see Settings.worker_claim_min_idle_seconds
 
 
+def _decode_task(fields: dict[bytes, bytes], stream_name: str, log_message: str) -> Task:
+    """Decode, log and validate a payload without containing malformed task errors.
+
+    Args:
+        fields: Redis message fields containing the serialized task payload.
+        stream_name: Stream whose task is being recovered or received.
+        log_message: Stage-specific logging format retained by the polling loop.
+
+    Returns:
+        The validated task.
+    """
+    payload = decode_redis_value(fields[b'payload'])
+    logger.info(log_message, stream_name, payload)
+    return Task.model_validate_json(payload)
+
+
 def yield_task(
     client: StrictRedis,
     stream_name: str,
@@ -82,34 +98,16 @@ def yield_task(
                 _stream, messages = pending_messages[0]
                 if messages:
                     msg_id, fields = messages[0]
-                    task_payload = fields[b'payload']
-                    logger.info("Resuming orphaned task from %s: %s", stream_name, decode_redis_value(task_payload))
-                    yield msg_id, Task.model_validate_json(decode_redis_value(task_payload))
+                    yield msg_id, _decode_task(fields, stream_name, "Resuming orphaned task from %s: %s")
                     continue
-        except redis.exceptions.ResponseError as e:
-            if "NOGROUP" in str(e):
-                ensure_consumer_group(client, stream_name, group_name)
-                claim_cursor = '0-0'
-                continue
-            raise
-        try:
             claim_cursor, claimed_messages, *_deleted = cast(
                 XAutoClaimResponse,
                 client.xautoclaim(stream_name, group_name, consumer_name, min_idle_time=claim_min_idle_ms, start_id=claim_cursor, count=1),
             )
             if claimed_messages:
                 msg_id, fields = claimed_messages[0]
-                task_payload = fields[b'payload']
-                logger.info("Claimed stranded task from %s: %s", stream_name, decode_redis_value(task_payload))
-                yield msg_id, Task.model_validate_json(decode_redis_value(task_payload))
+                yield msg_id, _decode_task(fields, stream_name, "Claimed stranded task from %s: %s")
                 continue
-        except redis.exceptions.ResponseError as e:
-            if "NOGROUP" in str(e):
-                ensure_consumer_group(client, stream_name, group_name)
-                claim_cursor = '0-0'
-                continue
-            raise
-        try:
             new_messages = cast(
                 StreamReadResponse,
                 client.xreadgroup(
@@ -124,9 +122,7 @@ def yield_task(
                 _stream, messages = new_messages[0]
                 if messages:
                     msg_id, fields = messages[0]
-                    task_payload = fields[b'payload']
-                    logger.info("Claimed new task from %s: %s", stream_name, decode_redis_value(task_payload))
-                    yield msg_id, Task.model_validate_json(decode_redis_value(task_payload))
+                    yield msg_id, _decode_task(fields, stream_name, "Claimed new task from %s: %s")
         except redis.exceptions.ResponseError as e:
             if "NOGROUP" in str(e):
                 ensure_consumer_group(client, stream_name, group_name)
@@ -138,31 +134,50 @@ def yield_task(
 class BaseWorker(ABC):
     """Abstract base worker providing a robust task-processing loop via Redis Streams."""
 
-    def __init__(self, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
+    def __init__(self, client: StrictRedis | None = None, *, stream_name: str | None = None, slot: str | None = None, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
         """Bind the worker to the Redis client it consumes and acknowledges tasks on.
 
         Args:
             client: Redis client used for stream reads, acknowledgements, and dead-lettering.
                 Borrowed when supplied; otherwise owned by this worker.
+            stream_name: Stream key, omitted only by legacy subclasses overriding accessors.
+            slot: Consumer identity, omitted only by legacy subclasses overriding accessors.
             settings: Supplied settings snapshot, or invocation-time environment defaults.
             runtime: Borrowed runtime supplying resources and the authoritative snapshot.
         """
+        if stream_name is not None:
+            self.stream_name = stream_name
+        if slot is not None:
+            self.slot = slot
         self._owns_runtime = runtime is None
         self.runtime = runtime if runtime is not None else Runtime(settings if settings is not None else Settings(), client)
         self.settings = self.runtime.settings
         self.client = self.runtime.client
 
-    @abstractmethod
     def get_stream_name(self) -> str:
         """Return the active stream name for the worker.
 
         Returns:
             The Redis key string for the stream this worker consumes.
-        """
 
-    @abstractmethod
+        Raises:
+            NotImplementedError: If a legacy subclass supplies no stream or override.
+        """
+        try:
+            return self.stream_name
+        except AttributeError as exc:
+            raise NotImplementedError("Worker stream identity is not configured") from exc
+
     def get_consumer_name(self) -> str:
-        """Return the active consumer name assigned to this worker."""
+        """Return the active consumer identity, including later slot assignments.
+
+        Raises:
+            NotImplementedError: If a legacy subclass supplies no slot or override.
+        """
+        try:
+            return self.slot
+        except AttributeError as exc:
+            raise NotImplementedError("Worker consumer identity is not configured") from exc
 
     def yield_tasks(self, poll_interval_seconds: int) -> Generator[tuple[bytes, Task], None, None]:
         """Yield tasks from the worker's queue.
@@ -250,23 +265,8 @@ class TranscriptionWorker(BaseWorker):
             settings: Supplied snapshot, or invocation-time environment defaults.
             runtime: Borrowed runtime supplying resources and its snapshot.
         """
-        stream_name = get_stream_name(transcriber)
-        super().__init__(client, settings=settings, runtime=runtime)
+        super().__init__(client, stream_name=get_stream_name(transcriber), slot=slot, settings=settings, runtime=runtime)
         self.transcriber = transcriber
-        self.slot = slot
-        self.stream_name = stream_name
-
-    def get_stream_name(self) -> str:
-        """Return the active stream name configured for this transcriber.
-
-        Returns:
-            The Redis string key for the active stream.
-        """
-        return self.stream_name
-
-    def get_consumer_name(self) -> str:
-        """Return the active consumer name configured for this transcriber."""
-        return self.slot
 
     def process_task(self, task: Task) -> None:
         """Resolve the valid media file path and dispatch the task for transcription.

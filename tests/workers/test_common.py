@@ -18,6 +18,33 @@ def mock_redis(mocker):
     return client
 
 
+@pytest.mark.parametrize('stage, log_prefix', [
+    ('pel', 'Resuming orphaned'),
+    ('claim', 'Claimed stranded'),
+    ('new', 'Claimed new'),
+])
+@pytest.mark.parametrize('payload', [b'{"source":"owned","language":"en"}', b'invalid-json'])
+def test_yield_task_preserves_stage_logs_and_payload_validation(mock_redis, mocker, caplog, stage, log_prefix, payload):
+    """Every read stage logs its payload and propagates malformed task validation."""
+    mocker.patch.object(testee, 'ensure_consumer_group')
+    messages = [(b'1-0', {b'payload': payload})]
+    response = [(b'stream', messages)]
+    mock_redis.xreadgroup.side_effect = [response] if stage == 'pel' else [[], response]
+    if stage == 'claim':
+        mock_redis.xautoclaim.return_value = (b'0-0', messages, [])
+    generator = testee.yield_task(mock_redis, 'stream', 'group', 'consumer')
+    with caplog.at_level('INFO', logger=testee.__name__):
+        try:
+            if payload == b'invalid-json':
+                with pytest.raises(ValueError, match='Invalid JSON'):
+                    next(generator)
+            else:
+                assert next(generator) == (b'1-0', Task(source='owned', language='en'))
+        finally:
+            generator.close()
+    assert caplog.messages == [f'{log_prefix} task from stream: {payload.decode()}']
+
+
 @pytest.mark.parametrize('poll,idle,error', [(0, 21600, 'poll_interval'), (-1, 21600, 'poll_interval'), (5, -1, 'claim_min_idle')])
 def test_yield_task_rejects_invalid_timing_before_any_redis_command(mock_redis, poll, idle, error):
     """Invalid generator timing fails on first iteration before group creation."""
@@ -385,6 +412,90 @@ def test_model_copy_preserves_non_source_fields():
 class MockWorker(testee.TranscriptionWorker):
     def dispatch_task(self, task: Task, source: Path) -> None:
         pass
+
+
+def test_base_worker_supports_explicit_identity_and_legacy_accessor_overrides(mocker, mock_redis):
+    """Legacy constructors and getter overrides retain queue identity and runtime ownership."""
+    class LegacyWorker(testee.BaseWorker):
+        """Model a public subclass using the original constructor and accessors."""
+
+        def __init__(self, client):
+            """Set legacy identity before calling the original base constructor."""
+            self.stream_name = 'legacy-stream'
+            self.slot = 'legacy-consumer'
+            super().__init__(client)
+
+        def get_stream_name(self) -> str:
+            """Return the legacy stream identity."""
+            return self.stream_name
+
+        def get_consumer_name(self) -> str:
+            """Return the legacy consumer identity."""
+            return self.slot
+
+        def process_task(self, task: Task) -> None:
+            """Complete a synthetic task without external resources."""
+
+    legacy = LegacyWorker(mock_redis)
+    runtime = mocker.Mock(client=mock_redis)
+    explicit = MockWorker(TranscriberType.WHISPER, 'first', runtime=runtime)
+    assert explicit.transcriber is TranscriberType.WHISPER
+    assert explicit.stream_name == 'stream:whisper'
+    explicit.slot, explicit.stream_name = 'changed-consumer', 'changed-stream'
+    assert explicit.get_consumer_name() == 'changed-consumer'
+    assert explicit.get_stream_name() == 'changed-stream'
+    yield_task = mocker.patch.object(testee, 'yield_task', return_value=iter([]))
+    legacy.yield_tasks(7)
+    assert yield_task.call_args.kwargs['stream_name'] == 'legacy-stream'
+    assert yield_task.call_args.kwargs['consumer_name'] == 'legacy-consumer'
+    assert yield_task.call_args.kwargs['client'] is mock_redis
+    legacy.runtime.close()
+    runtime.close.assert_not_called()
+
+
+def test_base_worker_legacy_read_only_identity_properties_are_not_assigned(mocker):
+    """The original constructor leaves subclass read-only identity properties intact."""
+    class PropertyWorker(testee.BaseWorker):
+        """Model a legacy subclass exposing read-only identity data."""
+
+        @property
+        def stream_name(self) -> str:
+            """Return the legacy stream without a setter."""
+            return 'property-stream'
+
+        @property
+        def slot(self) -> str:
+            """Return the legacy consumer without a setter."""
+            return 'property-consumer'
+
+        def get_stream_name(self) -> str:
+            """Return the read-only legacy stream property."""
+            return self.stream_name
+
+        def get_consumer_name(self) -> str:
+            """Return the read-only legacy consumer property."""
+            return self.slot
+
+        def process_task(self, task: Task) -> None:
+            """Complete a synthetic task without external resources."""
+
+    worker = PropertyWorker(runtime=mocker.Mock())
+    assert worker.get_stream_name() == 'property-stream'
+    assert worker.get_consumer_name() == 'property-consumer'
+
+
+@pytest.mark.parametrize('accessor', ['get_stream_name', 'get_consumer_name'])
+def test_base_worker_missing_identity_requires_legacy_override(mocker, accessor):
+    """An omitted identity produces an explicit error rather than an invalid Redis key."""
+    class IdentitylessWorker(testee.BaseWorker):
+        """Supply task handling while leaving identity unconfigured."""
+
+        def process_task(self, task: Task) -> None:
+            """Complete a synthetic task without external resources."""
+
+    worker = IdentitylessWorker(runtime=mocker.Mock())
+    with pytest.raises(NotImplementedError, match='identity is not configured'):
+        getattr(worker, accessor)()
 
 
 @pytest.mark.parametrize('poll', [0, -1])

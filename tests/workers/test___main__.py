@@ -92,33 +92,23 @@ def test_process_queue_rejects_invalid_poll_before_resource_creation(mocker, pol
     loader.assert_not_called()
 
 
-def test_process_queue_routes_youtube_work(mocker):
-    """Test that the queue entry point dispatches YouTube work to the YouTube processor."""
-    mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='youtube-0')
+@pytest.mark.parametrize('role, role_name, resolved_slot', [
+    (testee.WorkerRole.YOUTUBE, 'youtube', 'youtube-0'),
+    (testee.WorkerRole.WHISPER, 'whisper', 'gpu-0'),
+    (testee.WorkerRole.AZURE, 'azure', 'azure-0'),
+])
+def test_process_queue_routes_each_role_with_snapshot_slot_and_poll(mocker, role, role_name, resolved_slot):
+    """Each role forwards its snapshot, resolved slot and polling to its selected worker."""
+    mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value=resolved_slot)
     mock_worker = mocker.Mock()
     loader = mocker.patch.object(testee, '_load_worker_class', return_value=mock_worker)
     runtime = mocker.patch.object(testee, 'Runtime').return_value.__enter__.return_value
 
-    testee.process_queue(role=testee.WorkerRole.YOUTUBE, poll_interval_seconds=7)
+    testee.process_queue(role=role, poll_interval_seconds=7)
 
-    mock_slot.assert_called_once_with(None, testee.WorkerRole.YOUTUBE.value, settings=runtime.settings)
-    loader.assert_called_once_with(testee.WorkerRole.YOUTUBE)
-    mock_worker.assert_called_once_with('youtube-0', runtime=runtime)
-    mock_worker.return_value.process_queue.assert_called_once_with(poll_interval_seconds=7)
-
-
-def test_process_queue_routes_whisper_work(mocker):
-    """Test that the queue entry point dispatches Whisper work with a resolved slot."""
-    mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='gpu-0')
-    mock_worker = mocker.Mock()
-    loader = mocker.patch.object(testee, '_load_worker_class', return_value=mock_worker)
-    runtime = mocker.patch.object(testee, 'Runtime').return_value.__enter__.return_value
-
-    testee.process_queue(role=testee.WorkerRole.WHISPER, poll_interval_seconds=7)
-
-    mock_slot.assert_called_once_with(None, testee.WorkerRole.WHISPER.value, settings=runtime.settings)
-    loader.assert_called_once_with(testee.WorkerRole.WHISPER)
-    mock_worker.assert_called_once_with('gpu-0', runtime=runtime)
+    mock_slot.assert_called_once_with(None, role_name, settings=runtime.settings)
+    loader.assert_called_once_with(role)
+    mock_worker.assert_called_once_with(resolved_slot, runtime=runtime)
     mock_worker.return_value.process_queue.assert_called_once_with(poll_interval_seconds=7)
 
 
@@ -132,21 +122,6 @@ def test_process_queue_defaults_to_whisper(mocker):
 
     loader.assert_called_once_with(testee.WorkerRole.WHISPER)
     worker.return_value.process_queue.assert_called_once_with(poll_interval_seconds=5)
-
-
-def test_process_queue_routes_azure_work(mocker):
-    """Test that the queue entry point dispatches Azure work with a resolved slot."""
-    mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='azure-0')
-    mock_worker = mocker.Mock()
-    loader = mocker.patch.object(testee, '_load_worker_class', return_value=mock_worker)
-    runtime = mocker.patch.object(testee, 'Runtime').return_value.__enter__.return_value
-
-    testee.process_queue(role=testee.WorkerRole.AZURE, poll_interval_seconds=7)
-
-    mock_slot.assert_called_once_with(None, testee.WorkerRole.AZURE.value, settings=runtime.settings)
-    loader.assert_called_once_with(testee.WorkerRole.AZURE)
-    mock_worker.assert_called_once_with('azure-0', runtime=runtime)
-    mock_worker.return_value.process_queue.assert_called_once_with(poll_interval_seconds=7)
 
 
 def test_process_queue_rejects_unknown_worker_role():

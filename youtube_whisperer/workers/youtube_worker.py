@@ -33,16 +33,7 @@ class YouTubeWorker(BaseWorker):
             runtime: Borrowed runtime supplying resources and its snapshot.
             client: Redis client used for queueing follow-up tasks. Borrowed when supplied; otherwise owned by this worker.
         """
-        super().__init__(client, settings=settings, runtime=runtime)
-        self.slot = slot
-
-    def get_stream_name(self) -> str:
-        """Return the constant stream name for YouTube extraction tasks."""
-        return YOUTUBE_STREAM
-
-    def get_consumer_name(self) -> str:
-        """Return the constant consumer name ensuring task recovery inside the topology."""
-        return self.slot
+        super().__init__(client, stream_name=YOUTUBE_STREAM, slot=slot, settings=settings, runtime=runtime)
 
     def process_video(self, task: Task) -> None:
         """Download one concrete video and enqueue its follow-up transcription work.
