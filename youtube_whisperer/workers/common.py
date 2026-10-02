@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 TaskDispatcher = Callable[[Task, Path], None]
 StreamReadResponse = list[tuple[bytes, list[tuple[bytes, dict[bytes, bytes]]]]]
-# XAUTOCLAIM returns (next_cursor, [(message_id, fields), ...], [deleted_ids]); only the messages are needed.
+# XAUTOCLAIM returns (next_cursor, [(message_id, fields), ...], [deleted_ids]).
 XAutoClaimResponse = tuple[bytes, list[tuple[bytes, dict[bytes, bytes]]], list[bytes]]
 
 DEFAULT_CLAIM_MIN_IDLE_SECONDS = 21600  # 6 hours; see Settings.worker_claim_min_idle_seconds
@@ -37,15 +37,16 @@ def yield_task(
     poll_interval_seconds: int = 5,
     claim_min_idle_seconds: int = DEFAULT_CLAIM_MIN_IDLE_SECONDS,
 ) -> Generator[tuple[bytes, Task], None, None]:
-    """
-    Poll a Redis Stream and yield tasks assigned to this consumer group.
+    """Poll a Redis Stream and yield tasks assigned to this consumer group.
 
     Each loop iteration: (1) resumes this consumer's own orphaned PEL entries (crash recovery),
     (2) claims PEL entries stranded by other (likely dead) consumer identities that have been idle
     longer than ``claim_min_idle_seconds`` via XAUTOCLAIM, then (3) blocks for newly queued tasks.
     The claim step keeps tasks abandoned by a vanished consumer name from being pinned "active"
     forever; the idle threshold must exceed the longest plausible processing time so a task
-    in-flight on a live worker is never stolen.
+    in-flight on a live worker is never stolen. Each generator retains the next claim cursor,
+    including across empty pages and yielded tasks, and resets it after group recreation.
+    One claim page per cycle leaves new work an opportunity after an empty claim.
 
     Args:
         client (StrictRedis): The Redis client to read from.
@@ -56,11 +57,20 @@ def yield_task(
         claim_min_idle_seconds (int): Minimum idle time before a PEL entry owned by another
             consumer is claimed by this worker.
 
+    Raises:
+        ValueError: On first iteration, before Redis commands, if polling is not
+            positive or claim idle time is negative. Zero idle time claims immediately.
+
     Yields:
         A tuple of (Message ID bytes, Validated Task model).
     """
+    if poll_interval_seconds <= 0:
+        raise ValueError("poll_interval_seconds must be positive")
+    if claim_min_idle_seconds < 0:
+        raise ValueError("claim_min_idle_seconds must be nonnegative")
     ensure_consumer_group(client, stream_name, group_name)
     claim_min_idle_ms = claim_min_idle_seconds * 1000
+    claim_cursor: str | bytes = '0-0'
 
     while True:
         try:
@@ -79,12 +89,13 @@ def yield_task(
         except redis.exceptions.ResponseError as e:
             if "NOGROUP" in str(e):
                 ensure_consumer_group(client, stream_name, group_name)
+                claim_cursor = '0-0'
                 continue
             raise
         try:
-            _cursor, claimed_messages, *_deleted = cast(
+            claim_cursor, claimed_messages, *_deleted = cast(
                 XAutoClaimResponse,
-                client.xautoclaim(stream_name, group_name, consumer_name, min_idle_time=claim_min_idle_ms, count=1),
+                client.xautoclaim(stream_name, group_name, consumer_name, min_idle_time=claim_min_idle_ms, start_id=claim_cursor, count=1),
             )
             if claimed_messages:
                 msg_id, fields = claimed_messages[0]
@@ -95,6 +106,7 @@ def yield_task(
         except redis.exceptions.ResponseError as e:
             if "NOGROUP" in str(e):
                 ensure_consumer_group(client, stream_name, group_name)
+                claim_cursor = '0-0'
                 continue
             raise
         try:
@@ -118,6 +130,7 @@ def yield_task(
         except redis.exceptions.ResponseError as e:
             if "NOGROUP" in str(e):
                 ensure_consumer_group(client, stream_name, group_name)
+                claim_cursor = '0-0'
                 continue
             raise
 
@@ -157,9 +170,14 @@ class BaseWorker(ABC):
         Args:
             poll_interval_seconds: Number of seconds to wait before checking again when the queue is empty.
 
+        Raises:
+            ValueError: If the polling interval is not positive.
+
         Yields:
             Validated task models alongside their message sequence IDs.
         """
+        if poll_interval_seconds <= 0:
+            raise ValueError("poll_interval_seconds must be positive")
         stream_name = self.get_stream_name()
         consumer_name = self.get_consumer_name()
         logger.info("Worker for %s started with consumer identity: %s", stream_name, consumer_name)
@@ -183,6 +201,7 @@ class BaseWorker(ABC):
     def process_queue(self, poll_interval_seconds: int = 5) -> None:
         """Poll the queue indefinitely and process tasks.
 
+        Invalid polling closes an owned runtime while leaving borrowed resources open.
         A message is acknowledged and deleted only after the task succeeds or is
         durably dead-lettered. If processing is aborted by a BaseException (e.g.
         KeyboardInterrupt) or the dead-letter write itself fails, the acknowledgement
@@ -190,9 +209,14 @@ class BaseWorker(ABC):
         worker can recover it via its PEL.
 
         Args:
-            poll_interval_seconds: Number of seconds to wait before checking again when the queue is empty.
+            poll_interval_seconds: Positive seconds between empty-queue checks.
+
+        Raises:
+            ValueError: If the polling interval is not positive.
         """
         try:
+            if poll_interval_seconds <= 0:
+                raise ValueError("poll_interval_seconds must be positive")
             stream_name = self.get_stream_name()
             for msg_id, task in self.yield_tasks(poll_interval_seconds):
                 try:

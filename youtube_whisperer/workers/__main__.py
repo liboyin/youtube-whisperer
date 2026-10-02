@@ -121,8 +121,10 @@ def process_queue(role: WorkerRole | str = WorkerRole.WHISPER, slot: str | None 
         None. The selected worker loop runs until the process is stopped.
 
     Raises:
-        ValueError: If `role` is not one of the supported worker roles.
+        ValueError: If the role is unsupported or polling is not positive.
     """
+    if poll_interval_seconds <= 0:
+        raise ValueError("poll_interval_seconds must be positive")
     try:
         role = WorkerRole(role)
     except ValueError as exc:
@@ -131,6 +133,27 @@ def process_queue(role: WorkerRole | str = WorkerRole.WHISPER, slot: str | None 
         resolved_slot = resolve_worker_slot(slot, role.value, settings=runtime.settings)
         worker_class = _load_worker_class(role)
         worker_class(resolved_slot, runtime=runtime).process_queue(poll_interval_seconds=poll_interval_seconds)
+
+
+def positive_poll_interval(value: str) -> int:
+    """Parse finite positive polling seconds for argparse.
+
+    Args:
+        value: CLI integer text.
+
+    Returns:
+        The positive polling interval in seconds.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a positive integer.
+    """
+    try:
+        seconds = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("poll interval must be a positive integer") from exc
+    if seconds <= 0:
+        raise argparse.ArgumentTypeError("poll interval must be a positive integer")
+    return seconds
 
 
 def main() -> None:
@@ -148,7 +171,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('role', nargs='?', choices=WorkerRole.values(), default=settings.worker_role)
     parser.add_argument('--slot', default=None, help="Active-slot identifier for whisper/Azure workers. Defaults to WORKER_SLOT_ID, then machine hostname.")
-    parser.add_argument('--poll-interval-seconds', type=int, default=5)
+    parser.add_argument('--poll-interval-seconds', type=positive_poll_interval, default=5)
     args = parser.parse_args()
     process_queue(role=args.role, slot=args.slot, poll_interval_seconds=args.poll_interval_seconds, settings=settings)
 

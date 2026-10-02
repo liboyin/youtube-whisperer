@@ -18,6 +18,33 @@ def mock_redis(mocker):
     return client
 
 
+@pytest.mark.parametrize('poll,idle,error', [(0, 21600, 'poll_interval'), (-1, 21600, 'poll_interval'), (5, -1, 'claim_min_idle')])
+def test_yield_task_rejects_invalid_timing_before_any_redis_command(mock_redis, poll, idle, error):
+    """Invalid generator timing fails on first iteration before group creation."""
+    generator = testee.yield_task(mock_redis, 'stream', 'group', 'consumer', poll, idle)
+    assert mock_redis.mock_calls == []
+    with pytest.raises(ValueError, match=error):
+        next(generator)
+    assert mock_redis.mock_calls == []
+
+
+@pytest.mark.parametrize('poll,idle', [(5, 21600), (2, 7), (1, 0)])
+def test_yield_task_converts_finite_polling_and_nonnegative_claim_idle(mock_redis, mocker, tmp_path, poll, idle):
+    """Finite empty reads revisit recovery with millisecond timings including zero idle."""
+    mocker.patch.object(testee, 'ensure_consumer_group')
+    payload = Task(source=str(tmp_path / 'audio.wav'), language='en').model_dump_json().encode()
+    mock_redis.xreadgroup.side_effect = [[], [], []]
+    mock_redis.xautoclaim.side_effect = [(b'9-0', [], []), (b'0-0', [(b'10-0', {b'payload': payload})], [])]
+    args = {} if (poll, idle) == (5, 21600) else {'poll_interval_seconds': poll, 'claim_min_idle_seconds': idle}
+    generator = testee.yield_task(mock_redis, 'stream', 'group', 'consumer', **args)
+    assert next(generator)[0] == b'10-0'
+    generator.close()
+    assert mock_redis.xautoclaim.call_count == 2
+    assert [call.kwargs['min_idle_time'] for call in mock_redis.xautoclaim.call_args_list] == [idle * 1000] * 2
+    assert mock_redis.xautoclaim.call_args.kwargs['start_id'] == b'9-0'
+    assert mock_redis.xreadgroup.call_args_list[1].kwargs['block'] == poll * 1000
+
+
 def test_yield_task(mock_redis, mocker):
     """Test the streaming task generator connects properly and resolves messages natively."""
     task_dict = {'source': 'http://example.com', 'language': 'en'}
@@ -116,7 +143,7 @@ def test_yield_task_claims_stranded_tasks_from_dead_consumers(mock_redis, mocker
     assert msg_id == b'4242-0'
     assert task == Task(source='/tmp/audio.wav', language='en')
     # The configured idle threshold (seconds) is passed to XAUTOCLAIM in milliseconds so live in-flight tasks are not stolen.
-    mock_redis.xautoclaim.assert_called_once_with('stream:name', 'grp', 'c1', min_idle_time=120_000, count=1)
+    mock_redis.xautoclaim.assert_called_once_with('stream:name', 'grp', 'c1', min_idle_time=120_000, start_id='0-0', count=1)
 
 
 def test_yield_task_rereads_the_pel_after_claiming_a_stranded_task(mock_redis, mocker):
@@ -137,6 +164,75 @@ def test_yield_task_rereads_the_pel_after_claiming_a_stranded_task(mock_redis, m
     assert mock_redis.xreadgroup.call_args_list == [
         mocker.call('grp', 'c1', {'stream:name': '0-0'}, count=1),
         mocker.call('grp', 'c1', {'stream:name': '0-0'}, count=1),
+    ]
+
+
+def test_yield_task_scans_empty_pages_and_retains_cursor_across_yields(mock_redis, mocker):
+    """Advance past ineligible pages while preserving new-work opportunities and yielded-task cursors."""
+    payload = Task(source='/tmp/audio.wav', language='en').model_dump_json().encode()
+    # Redis scans a bounded prefix of ineligible entries before finding a later eligible task.
+    mock_redis.xautoclaim.side_effect = [
+        (b'10-0', [], []),
+        (b'20-0', [], []),
+        (b'30-0', [(b'25-0', {b'payload': payload})], []),
+        (b'0-0', [], []),
+        (b'40-0', [(b'35-0', {b'payload': payload})], []),
+    ]
+    mock_redis.xreadgroup.side_effect = [
+        [], [],  # First empty page still reads new work.
+        [], [[b'stream:name', [(b'new-0', {b'payload': payload})]]],
+        [],  # Claimed task resumes at the own-PEL read.
+        [], [],  # Wrap page still reads new work.
+        [],
+    ]
+    gen = testee.yield_task(mock_redis, 'stream:name', 'grp', 'c1', poll_interval_seconds=1)
+    try:
+        assert [next(gen)[0] for _ in range(3)] == [b'new-0', b'25-0', b'35-0']
+    finally:
+        gen.close()
+    assert [call.kwargs['start_id'] for call in mock_redis.xautoclaim.call_args_list] == [
+        '0-0', b'10-0', b'20-0', b'30-0', b'0-0',
+    ]
+    assert all(call.kwargs['count'] == 1 for call in mock_redis.xautoclaim.call_args_list)
+    assert [call.args[2] for call in mock_redis.xreadgroup.call_args_list] == [
+        {'stream:name': '0-0'}, {'stream:name': '>'},
+        {'stream:name': '0-0'}, {'stream:name': '>'},
+        {'stream:name': '0-0'}, {'stream:name': '0-0'},
+        {'stream:name': '>'}, {'stream:name': '0-0'},
+    ]
+
+
+@pytest.mark.parametrize('missing_group_path', ['pel', 'claim', 'new'])
+def test_yield_task_resets_advanced_cursor_after_any_group_recreation(mock_redis, mocker, missing_group_path):
+    """Restart an advanced claim scan after NOGROUP on each of the three polling paths."""
+    payload = Task(source='/tmp/audio.wav', language='en').model_dump_json().encode()
+    mock_ensure = mocker.patch.object(testee, 'ensure_consumer_group')
+    missing = redis.exceptions.ResponseError('NOGROUP missing')
+    first_new = [[b'stream:name', [(b'new-0', {b'payload': payload})]]]
+    reads = [[], first_new]
+    claims = [(b'10-0', [], [])]
+    if missing_group_path == 'pel':
+        reads += [missing, []]
+    elif missing_group_path == 'claim':
+        reads += [[], []]
+        claims += [missing]
+    else:
+        reads += [[], missing, []]
+        claims += [(b'20-0', [], [])]
+    claims += [(b'0-0', [(b'claimed-0', {b'payload': payload})], [])]
+    mock_redis.xreadgroup.side_effect = reads
+    mock_redis.xautoclaim.side_effect = claims
+    gen = testee.yield_task(mock_redis, 'stream:name', 'grp', 'c1')
+    try:
+        assert next(gen)[0] == b'new-0'
+        assert next(gen)[0] == b'claimed-0'
+    finally:
+        gen.close()
+    expected_cursors = ['0-0', '0-0'] if missing_group_path == 'pel' else ['0-0', b'10-0', '0-0']
+    assert [call.kwargs['start_id'] for call in mock_redis.xautoclaim.call_args_list] == expected_cursors
+    assert mock_ensure.call_args_list == [
+        mocker.call(mock_redis, 'stream:name', 'grp'),
+        mocker.call(mock_redis, 'stream:name', 'grp'),
     ]
 
 
@@ -291,6 +387,16 @@ class MockWorker(testee.TranscriptionWorker):
         pass
 
 
+@pytest.mark.parametrize('poll', [0, -1])
+def test_worker_yield_tasks_rejects_invalid_poll_without_redis(mock_redis, poll):
+    """The worker polling entry point rejects invalid intervals without Redis calls."""
+    worker = MockWorker(TranscriberType.WHISPER, 'owned', client=mock_redis)
+    with pytest.raises(ValueError, match='poll_interval_seconds'):
+        worker.yield_tasks(poll)
+    assert mock_redis.mock_calls == []
+    worker.runtime.close()
+
+
 def test_transcription_worker_consumes_its_transcriber_stream_under_its_slot(mocker, mock_redis):
     """Test that a transcription worker reads its transcriber's stream under the slot identity it was given."""
     mock_yield = mocker.patch.object(testee, 'yield_task', return_value=iter([]))
@@ -351,6 +457,20 @@ def test_worker_queue_leaves_borrowed_runtime_open(mocker, failure):
     with expected:
         worker.process_queue()
     runtime.close.assert_not_called()
+
+
+@pytest.mark.parametrize('poll', [0, -1])
+@pytest.mark.parametrize('borrowed', [False, True])
+def test_worker_invalid_poll_preserves_runtime_ownership(mocker, mock_redis, poll, borrowed):
+    """Invalid direct execution closes only the worker-owned runtime before Redis commands."""
+    runtime = mocker.Mock(client=mock_redis)
+    factory = mocker.patch.object(testee, 'Runtime', return_value=runtime)
+    worker = MockWorker(TranscriberType.WHISPER, 'owned', runtime=runtime if borrowed else None)
+    with pytest.raises(ValueError, match='poll_interval_seconds'):
+        worker.process_queue(poll)
+    assert mock_redis.mock_calls == []
+    assert runtime.close.call_count == (0 if borrowed else 1)
+    assert factory.call_count == (0 if borrowed else 1)
 
 
 def test_process_active_slot_queue_full_flow(mocker, mock_redis):

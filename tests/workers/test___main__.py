@@ -81,6 +81,17 @@ def test_legacy_forwarding_rejects_unknown_class_name():
         testee.__getattr__('RemoteWorker')
 
 
+@pytest.mark.parametrize('poll', [0, -1])
+def test_process_queue_rejects_invalid_poll_before_resource_creation(mocker, poll):
+    """Python dispatch rejects invalid polling before runtime or worker construction."""
+    runtime = mocker.patch.object(testee, 'Runtime')
+    loader = mocker.patch.object(testee, '_load_worker_class')
+    with pytest.raises(ValueError, match='poll_interval_seconds'):
+        testee.process_queue(poll_interval_seconds=poll)
+    runtime.assert_not_called()
+    loader.assert_not_called()
+
+
 def test_process_queue_routes_youtube_work(mocker):
     """Test that the queue entry point dispatches YouTube work to the YouTube processor."""
     mock_slot = mocker.patch.object(testee, 'resolve_worker_slot', return_value='youtube-0')
@@ -172,6 +183,30 @@ def test_worker_entrypoint_closes_runtime_on_constructor_and_execution_failure(m
         runtime = worker.call_args.kwargs['runtime']
         assert runtime.settings is settings
         assert runtime.client is client
+
+
+@pytest.mark.parametrize('value', ['0', '-1', 'text', '1.5'])
+def test_main_real_argparse_rejects_invalid_polling(mocker, monkeypatch, capsys, value):
+    """Real argparse rejects invalid integer polling before queue dispatch."""
+    import sys
+
+    monkeypatch.setattr(sys, 'argv', ['worker', '--poll-interval-seconds', value])
+    process = mocker.patch.object(testee, 'process_queue')
+    with pytest.raises(SystemExit) as error:
+        testee.main()
+    assert error.value.code == 2
+    assert 'poll interval must be a positive integer' in capsys.readouterr().err
+    process.assert_not_called()
+
+
+def test_main_real_argparse_forwards_positive_polling(mocker, monkeypatch):
+    """Real argparse forwards positive integer seconds without changing their value."""
+    import sys
+
+    monkeypatch.setattr(sys, 'argv', ['worker', '--poll-interval-seconds', '3'])
+    process = mocker.patch.object(testee, 'process_queue')
+    testee.main()
+    assert process.call_args.kwargs['poll_interval_seconds'] == 3
 
 
 def test_main_parses_arguments_and_dispatches(mocker):

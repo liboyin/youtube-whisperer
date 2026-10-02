@@ -105,7 +105,7 @@ The worker entrypoint loads no transcription or download engine when imported, w
 The Whisper, Azure, and YouTube workers each read their stream through one shared consumer group (`workers`) using `XREADGROUP`. This gives three recovery properties without any hand-rolled "pending/active" bookkeeping:
 
 - **Crash recovery:** before asking for new work, a worker re-reads its own PEL (`XREADGROUP ... 0-0`), so a task that was in flight when the worker crashed is reprocessed by the restarted worker under the same consumer name.
-- **Orphan recovery:** a worker then runs `XAUTOCLAIM` to claim any message that has been idle longer than `WORKER_CLAIM_MIN_IDLE_SECONDS` (default 6 hours). This rescues tasks stranded in the PEL of a consumer name that will never come back (e.g. a container that was removed), which would otherwise show as "active" forever. The threshold is deliberately far above the longest plausible transcription so a task that is genuinely in flight on a live worker is never stolen.
+- **Orphan recovery:** a worker then runs `XAUTOCLAIM` to claim any message that has been idle longer than `WORKER_CLAIM_MIN_IDLE_SECONDS` (default 6 hours). Each generator follows the returned scan cursor across polling cycles, including empty pages, wraps when Redis returns `0-0`, and restarts its scan after recreating a missing group. It scans one claim page per cycle; an empty claim still permits a read for new work. This rescues tasks stranded in the PEL of a consumer name that will never come back (e.g. a container that was removed), which would otherwise show as "active" forever. The threshold is deliberately far above the longest plausible transcription so a task that is genuinely in flight on a live worker is never stolen.
 - **Unique identities when scaled:** each worker's consumer name defaults to its container hostname, so `docker compose up --scale whisper_worker=3` yields three distinct consumers that do not fight over one PEL. Set `WORKER_SLOT_ID` only if you want a stable, explicit name instead.
 
 ### YouTube work runs outside the API
@@ -208,7 +208,7 @@ Standalone download/model-parameter/CUDA/Azure helpers resolve missing defaults 
 | `REDIS_PORT` | `6379` | Redis port. |
 | `WORKER_SLOT_ID` | unset | Stable, explicit consumer name; falls back to the container hostname. |
 | `WORKER_ROLE` | `whisper` | Default role when `python -m youtube_whisperer.workers` is run without one. |
-| `WORKER_CLAIM_MIN_IDLE_SECONDS` | `21600` | Idle time before a worker claims a PEL entry stranded by another consumer. Keep it above the longest plausible transcription. |
+| `WORKER_CLAIM_MIN_IDLE_SECONDS` | `21600` | Idle time before a worker claims a PEL entry stranded by another consumer. Must be nonnegative; zero permits immediate claims. Keep it above the longest plausible transcription. |
 
 `.env` (git-ignored) holds the Azure secrets and is loaded into every Compose service.
 
@@ -260,6 +260,8 @@ uvicorn youtube_whisperer.api.app:app --host 0.0.0.0 --port 8001
 # Worker (one role per process)
 python -m youtube_whisperer.workers {youtube|whisper|azure} [--slot ID] [--poll-interval-seconds N]
 ```
+
+Polling intervals must be positive integer seconds (default `5`) so each empty blocking read returns and orphan recovery can run again. The CLI and Python queue/poll entry points reject zero or negative polling; settings and direct polling reject negative claim-idle seconds before Redis commands.
 
 The repository also ships `extract_subtitle_text.sh` (strip timestamps from an SRT) and `ls_mp4_without_srt.sh` (find videos lacking a sibling SRT).
 

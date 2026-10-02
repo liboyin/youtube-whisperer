@@ -1,9 +1,12 @@
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Resolve an invocation snapshot with nonnegative orphan-claim timing."""
+
     model_config = SettingsConfigDict(extra="ignore")
 
     whisper_assets_dir: Path = Path(__file__).parents[1] / "assets"
@@ -19,4 +22,4 @@ class Settings(BaseSettings):
     # Idle threshold before a worker claims a PEL entry owned by another (likely dead) consumer.
     # Set conservatively above the longest plausible transcription so an in-flight task on a live
     # worker is never stolen; only genuinely stranded tasks are recovered. Defaults to 6 hours.
-    worker_claim_min_idle_seconds: int = 21600
+    worker_claim_min_idle_seconds: int = Field(default=21600, ge=0)
