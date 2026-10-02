@@ -275,7 +275,7 @@ After changing dependencies in `pyproject.toml` and reinstalling, review and com
 
 ## Testing
 
-After any code change, all of the following MUST pass:
+For non-trivial code, test, or configuration changes, all of the following MUST pass before commit. [AGENTS.md](AGENTS.md#validation-and-review) owns baseline selection and documentation/cosmetic exceptions:
 
 ```
 ./check-coverage.sh     # runs the suite, then enforces the per-file coverage policy

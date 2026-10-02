@@ -12,7 +12,7 @@ This section owns how TODO is updated. General working principles belong in AGEN
 2. Keep unassigned work compact. Before implementation, expand the assigned task into a full boundary: intent, dependencies, implementation direction, non-goals, validation, and done criteria. Link that boundary from the finding instead of duplicating it.
 3. Record accepted decisions with their rationale and affected tasks. Keep unresolved choices explicit. When a decision changes, record its supersession and update affected boundaries and dependencies before the implementation commit.
 4. Use explicit dependencies and readiness to guide execution. Do not rebuild phase-closure fences or imply that every non-blocking issue must land before unrelated work can proceed.
-5. In each implementation commit, remove the completed task's full active entry and execution boundary. Update references, dependencies, legacy mappings, and any affected counts or indexes. Keep at most a concise disposition or governing-document link needed for remaining work or traceability. Put implementation history in the commit and current operations in README.
+5. Before removing a completed task's accepted boundary, preserve it under the [review skill's evidence-retention rules](.agents/skills/adversarial-review/SKILL.md#evidence-retention). In each implementation commit, remove the completed task's full active entry and execution boundary. Update references, dependencies, legacy mappings, and any affected counts or indexes. Keep at most a concise disposition or governing-document link needed for remaining work or traceability. Put implementation history in the commit and current operations in README.
 6. Record deferral or acceptance without change explicitly, with the reason and any revisit trigger. Do not silently drop inherited work or treat a documentation rewrite as an implementation fix.
 7. Keep evidence tied to its revision and provenance. Remove obsolete status inventories; historical review results do not certify an executor's current gates. Check local links and ID/dependency consistency after restructuring this file.
 
@@ -53,7 +53,7 @@ Verification used tracked-source/AST inspection, comparison of duplicated helper
 | ID | Decision | Applies to |
 |---|---|---|
 | D1 | Tests are not type-checked. The mypy gate covers `youtube_whisperer` only, and widening it is not planned work. | NB3 |
-| D2 | The adversarial review harness for Claude Code is the Codex plugin. Antigravity is removed and is not a substitute reviewer; the review skill owns harness dispatch. | Review procedure; B1 closed |
+| D2 | The adversarial review harness for Claude Code was the Codex plugin; D30 supersedes that plugin requirement with direct CLI dispatch. Antigravity remains removed and is not a substitute reviewer; the review skill owns harness dispatch. | Review procedure; B1 closed |
 | D3 | Governance files track their ClipboardTTS counterparts. Deviate only for local project context, and record the deviation. | Documentation ownership |
 | D4 | `check-coverage.sh` owns the executable coverage policy. `pyproject.toml` keeps the pytest and aggregate coverage configuration. | Coverage policy |
 
@@ -108,6 +108,20 @@ These choices do not need to be asked again. Validate exact implementation detai
 | D27 | Accept without change the NB25 review's non-blocking race on concurrent first access to legacy `utils.REDIS_CLIENT`/`REDIS_POOL`. The user reports a clean deployment with no Redis entries and does not want further work on this compatibility path. Empty Redis does not remove the Python first-access race; revisit if concurrent legacy callers require one shared client/pool pair. | NB25 compatibility exports; review at e8b34dd |
 
 Accepted limitations above have no implementation assignment. Revisit if the user changes the product contract or evidence shows impact outside the accepted scenario. They do not waive AGENTS' safety requirements.
+
+### Accepted user decisions — execution governance, 2026-10-02
+
+| ID | Decision and rationale | Applies to |
+|---|---|---|
+| D28 | Established valid scratch execution, invariant-based evidence, content-based baseline reuse and retained records. D29 supersedes permission handling; D34 refines validation cost and record requirements. | [AGENTS validation](AGENTS.md#validation-and-review); [review skill](.agents/skills/adversarial-review/SKILL.md) |
+| D29 | Assume Full Access/bypass in the devcontainer while respecting enforced platform policies and preserving secret, host-data and test-ownership protections; supersedes D28's dispatch troubleshooting. | [AGENTS scope](AGENTS.md#scope-and-decisions) |
+| D30 | Direct Codex CLI dispatch replaces D2's plugin prerequisite, avoiding an unused dependency. Provisioning cleanup is tracked as NB33. | [Reviewer dispatch](.agents/skills/adversarial-review/SKILL.md#reviewer-session) |
+| D31 | Introduced reviewer continuity instead of fresh per-fix and separate Astra group reviewers. D34 supersedes the session-wide requirement with task/group continuity and optional replacement. | [Reviewer lifecycle](.agents/skills/adversarial-review/SKILL.md#reviewer-session) |
+| D32 | Retain cosmetic reuse and delta-based follow-ups with full gates after non-trivial fixes. D34 supersedes mandatory additional group review. | [Review scope](.agents/skills/adversarial-review/SKILL.md#review-scope) |
+| D33 | Require scratch copies for writable execution, not source/diff inspection or retained evidence output. | [Review procedure](.agents/skills/adversarial-review/SKILL.md#procedure) |
+| D34 | The user approved proportionate governance to reduce validation and review overhead: targeted mutation evidence for high-impact invariants and removed/weakened coverage, relevant baselines with full gates for broad/uncertain baselines and substantive final candidates, one review per independent commit or cohesive combined change, additional group review only for uncovered integration risks, task/group reviewer continuity, compact records with detailed provenance for optional reuse, and justified non-blocking deferrals without routine approval. This supersedes the broader mutation mandate, full-baseline mandate, D31's session-wide lifecycle, D32's unconditional group review and mandatory user disposition of every non-blocking finding. Material decisions still require confirmation; test isolation, independent review and unresolved-blocker protections remain. | [AGENTS.md](AGENTS.md); [review skill](.agents/skills/adversarial-review/SKILL.md); [group workflow](.agents/skills/grouped-task-execution/SKILL.md) |
+
+These are explicit, user-authorized local policy changes under D3; synchronization with the ClipboardTTS counterparts was not verified.
 
 ### Constraints that remain in force
 
@@ -213,6 +227,10 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 #### NB31 — Compose repeats the shared application-service configuration
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** D10 intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
+
+#### NB33 — Provisioning still installs the obsolete review plugin
+
+**Severity: Low. Validated — source inspection at a29764e on 2026-10-02 in the devcontainer.** [Container setup](.devcontainer/postCreateCommand.sh) installs the Codex plugin and describes it as required; [tool resolver documentation](.devcontainer/link_review_tools.py) assumes its companion scripts. D30 now specifies direct CLI review. **Intent/outcome:** remove obsolete plugin provisioning and align descriptions with direct CLI dispatch. **Dependencies:** D30; inventory the resolver's unique behavior and consumers before narrowing it. **Direction:** remove plugin installation from new-container setup, preserving CLI discovery, stale-link recovery, shell-hook behavior and diagnostics that remain needed. **Non-goals:** uninstalling existing user plugins, changing authentication/model choices, unrelated dependency or worker-startup changes. **Validation:** safe tests with owned tool trees and fake commands, required application gates/review, and an isolated provisioning smoke check without host resources or real plugin installation. **Done:** fresh setup no longer requires the plugin, retained CLI resolution is verified, and documentation matches. This follow-up is recorded separately from the governance-only change; expand any unresolved implementation choices before execution.
 
 ### Nits
 
