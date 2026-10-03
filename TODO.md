@@ -124,10 +124,6 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** [D10](DESIGN.md#d10) intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
 
-#### NB33 — Provisioning still installs the obsolete review plugin
-
-**Severity: Low. Validated — source inspection at a29764e on 2026-10-02 in the devcontainer.** [Container setup](.devcontainer/postCreateCommand.sh) installs the Codex plugin and describes it as required; [tool resolver documentation](.devcontainer/link_review_tools.py) assumes its companion scripts. [D30](DESIGN.md#d30) now specifies direct CLI review. **Intent/outcome:** remove obsolete plugin provisioning and align descriptions with direct CLI dispatch. **Dependencies:** [D30](DESIGN.md#d30); inventory the resolver's unique behavior and consumers before narrowing it. **Direction:** remove plugin installation from new-container setup, preserving CLI discovery, stale-link recovery, shell-hook behavior and diagnostics that remain needed. **Non-goals:** uninstalling existing user plugins, changing authentication/model choices, unrelated dependency or worker-startup changes. **Validation:** safe tests with owned tool trees and fake commands, required application gates/review, and an isolated provisioning smoke check without host resources or real plugin installation. **Done:** fresh setup no longer requires the plugin, retained CLI resolution is verified, and documentation matches. This follow-up is recorded separately from the governance-only change; expand any unresolved implementation choices before execution.
-
 ### Nits
 
 #### N1 — Asset cleanup reconstructs the wrong case-sensitive paths
@@ -155,6 +151,8 @@ Other new entries are compact findings, not implementation assignments: expand e
 [D18](DESIGN.md#d18)–[D21](DESIGN.md#d21) settle the compatibility, resource ownership, settings lifetime, and worker-identity choices. NB25–NB27 are implemented; retain existing Python entry points and all previously accepted product behavior except the translation interfaces explicitly removed under [D23](DESIGN.md#d23)/[D24](DESIGN.md#d24).
 
 ## Deferred, accepted, and completed dispositions
+
+- NB33 is implemented: [the completed-work record](completed_work/NB33.md) preserves its boundary, changes, validation and review waiver. [Devcontainer setup](README.md#dev-container-recommended) owns the current installation instructions.
 
 - NB4 is implemented by [DESIGN.md](DESIGN.md), the user-requested owner for system design, product contracts and topic-grouped decisions; a separate USER_STORIES document is unnecessary. README retains operating instructions and TODO retains outstanding work. N3/N5/N8 are resolved in the same documentation reorganization: build-helper references match Compose, the filename limit is stated in UTF-8 bytes, and fresh Compose setup creates its required `.env` file.
 

@@ -24,7 +24,7 @@ This preserves an existing file's contents. An empty file is sufficient for non-
 
 ### Dev Container (recommended)
 
-Open the repository in VS Code and reopen in the Dev Container (`.devcontainer/`). The image installs the pinned dependencies from `requirements.txt` and the project. The creation hook then rewrites `requirements.txt` from the installed environment, installs the editable project's dev extras, and provisions review tooling. The hook still installs an obsolete review plugin; cleanup is tracked as NB33 in [TODO.md](TODO.md).
+Open the repository in VS Code and reopen in the Dev Container (`.devcontainer/`). The image installs the pinned dependencies from `requirements.txt` and the project. The creation hook then rewrites `requirements.txt` from the installed environment, installs the editable project's dev extras, and installs Claude Code and standalone Codex with their native installers. Codex installation is noninteractive; its installer owns command installation and shell PATH setup, and the hook verifies `codex --version`. Review tooling needs no Claude Code plugin or VS Code extension binary links. Sign in with `codex login` before using direct CLI review; [the review skill](.agents/skills/adversarial-review/SKILL.md#reviewer-session) owns dispatch and authentication checks.
 
 ### Full stack with Docker Compose
 
