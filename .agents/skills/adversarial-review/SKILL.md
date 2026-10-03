@@ -97,7 +97,9 @@ After handling the report, the main agent appends the integrity comparison and e
 
 ## Evidence Retention
 
-Keep one compact [review record](references/review-record.md) outside disposable scratch and link it in the handoff. Before delegating evidence work, create it at the user's requested location or, otherwise, a writable location outside the repository. A temporary-directory location is permitted; disclose its lifetime limitation. Link mutation evidence and reviewer reports from this record rather than creating competing summaries.
+During implementation and review, keep one compact [review record](references/review-record.md) outside disposable scratch and link it in the handoff. Before delegating evidence work, create it at the user's requested location or, otherwise, a writable location outside the repository. A temporary-directory location is permitted; disclose its lifetime limitation. Link mutation evidence and reviewer reports from this record rather than creating competing summaries.
+
+At task closure, the main agent archives the accepted boundary, disposition and essential evidence under [TODO's completion-record procedure](../../../TODO.md#maintaining-this-plan), then links the completed-work record in the handoff. Transfer essential evidence and replace temporary links with durable ones before cleanup; a completed record supersedes the working summary. The reviewer remains read-only against the repository.
 
 Follow the template for required contents; include mutation evidence only when required or performed. Preserve accepted boundaries before removing their TODO entries. Retain enough candidate content for follow-up diffs: a commit reference for committed inputs, and a patch or equivalent snapshot for uncommitted inputs.
 

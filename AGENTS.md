@@ -7,6 +7,7 @@ This file owns the working principles for this repository. All agents MUST follo
 - **[Adversarial review skill](.agents/skills/adversarial-review/SKILL.md):** how to conduct review, including dispatch, snapshots, investigation, triage, and reporting.
 - **[DESIGN.md](DESIGN.md):** current architecture, product contracts, design rationale, and accepted user decisions grouped by topic.
 - **[TODO.md](TODO.md):** future work, unresolved choices, dependencies, execution boundaries, and its own maintenance rules.
+- **[completed_work/](completed_work/):** completed-task boundaries, dispositions, validation evidence, review results, and limitations; [TODO maintenance](TODO.md#maintaining-this-plan) owns the archival procedure.
 - **[README.md](README.md):** project overview and build, run, configuration, usage, and test procedures.
 
 Link to the owning document instead of duplicating its procedure. Operational instructions do not override the safety and ownership principles here.
