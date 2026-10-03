@@ -5,8 +5,9 @@ This file owns the working principles for this repository. All agents MUST follo
 - **AGENTS.md:** concise working principles and required standards.
 - **[Grouped task execution skill](.agents/skills/grouped-task-execution/SKILL.md):** the recommended workflow for selecting and executing related TODO tasks and reviewing the integrated group.
 - **[Adversarial review skill](.agents/skills/adversarial-review/SKILL.md):** how to conduct review, including dispatch, snapshots, investigation, triage, and reporting.
-- **[TODO.md](TODO.md):** future work, accepted decisions, dependencies, execution boundaries, and its own maintenance rules.
-- **[README.md](README.md):** current architecture, dataflow, design assumptions, and build, run, and test procedures.
+- **[DESIGN.md](DESIGN.md):** current architecture, product contracts, design rationale, and accepted user decisions grouped by topic.
+- **[TODO.md](TODO.md):** future work, unresolved choices, dependencies, execution boundaries, and its own maintenance rules.
+- **[README.md](README.md):** project overview and build, run, configuration, usage, and test procedures.
 
 Link to the owning document instead of duplicating its procedure. Operational instructions do not override the safety and ownership principles here.
 
