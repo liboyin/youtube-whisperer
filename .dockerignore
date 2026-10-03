@@ -16,7 +16,7 @@ __pycache__/
 *$py.class
 *.so
 .coverage
-.coverage.*
+.coverage*
 .eggs/
 .mypy_cache/
 .pytest_cache/
