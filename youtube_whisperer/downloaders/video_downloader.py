@@ -1,3 +1,7 @@
+import os
+import shutil
+import stat
+import tempfile
 from pathlib import Path
 
 import yt_dlp
@@ -19,23 +23,60 @@ from youtube_whisperer.downloaders.utils import (
 
 def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> None:
     """
-    Downloads a video from a given URL and saves it to the target path.
+    Download to an owned stage and atomically publish the literal target path.
+
+    Failed downloads preserve previous output. NEVER and RENAME also preserve
+    competing files; approved replacements follow symlinks and retain mode bits.
+    The stage directory is removed on normal return and exception unwinding.
 
     Args:
         url (str): The URL of the video.
         target_path (Path): The path where the downloaded video will be saved.
         overwrite (OverwriteMode): Whether to overwrite existing video files.
+
+    Raises:
+        ValueError: If yt-dlp would expand environment variables in the stage path.
+        FileNotFoundError: If the download leaves no regular staged video.
+        OSError: If preparation, mode restoration, or atomic publication fails.
     """
     if target_path.is_file() and not overwrite_existing_path(target_path, overwrite):
         return
-    prepare_output_file(target_path)
-    ydl_opts = build_youtube_dl_options(is_firefox_cookies_available())
-    ydl_opts.update({
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
-        'outtmpl': str(target_path),
-    })
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    target = prepare_output_file(target_path).resolve()
+    prepare_output_file(target)
+    try:
+        mode = stat.S_IMODE(target.stat().st_mode)
+    except FileNotFoundError:
+        mode = None
+    # The generated stage name is safe, but its parent can contain expansions
+    # that yt-dlp cannot escape. Check before acquiring the stage directory.
+    template_parent = str(target.parent / 'video.mp4')
+    if os.path.expandvars(os.path.expanduser(template_parent)) != template_parent:
+        raise ValueError('yt-dlp would expand the video stage directory path')
+    stage_dir = Path(tempfile.mkdtemp(prefix='.video-', dir=target.parent))
+    stage = stage_dir / 'video.mp4'
+    try:
+        ydl_opts = build_youtube_dl_options(is_firefox_cookies_available())
+        ydl_opts.update({
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
+            'outtmpl': str(stage).replace('%', '%%'),
+        })
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        if not stage.is_file():
+            raise FileNotFoundError(f'Download did not produce a regular staged video: {stage}')
+        if mode is not None:
+            stage.chmod(mode)
+        if overwrite in (OverwriteMode.NEVER, OverwriteMode.RENAME):
+            try:
+                os.link(stage, target)
+            except FileExistsError:
+                if target.is_file():
+                    return
+                raise
+        else:
+            os.replace(stage, target)
+    finally:
+        shutil.rmtree(stage_dir)
 
 
 def download_video_with_default_title(url: str, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
