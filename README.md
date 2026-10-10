@@ -49,7 +49,7 @@ Use the container's Python 3.12 environment as the reference. The package declar
 
 ```sh
 pip install -r requirements.txt
-pip install -e .[dev]
+pip install -e '.[dev]'
 ```
 
 ### Running components directly
@@ -80,7 +80,7 @@ The API exposes `/tasks` (GET/POST/DELETE), `/dead-letters` (GET/DELETE), and `/
 
 ## Configuration
 
-Settings come from exported environment variables; Compose injects `.env` into application services. Azure credentials are needed only for Azure transcription. Each API/worker runtime owns a settings snapshot; see [settings and resource ownership](DESIGN.md#settings-and-runtime-ownership) for Python callers and injected resources.
+Direct launches read exported environment variables. Compose injects `.env` into application services, but explicit service `environment` values take precedence: the CPU file sets `WHISPER_USE_CUDA=0`, and the GPU override sets it to `1` for the API and Whisper worker. Azure credentials are needed only for Azure transcription. Each API/worker runtime owns a settings snapshot; see [settings and resource ownership](DESIGN.md#settings-and-runtime-ownership) for Python callers and injected resources.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -109,7 +109,6 @@ Compose also reads a few **interpolation** variables (host-side paths and build 
 | `PYPI_PROXY` | empty (none) | Optional PyPI proxy used during image build. |
 | `BUILD_COMMON_CONTEXT` | pinned Git URL (`docker-build-common.git#v1.1.0`) | Shared build-helper source; a local clone avoids fetching that context. |
 
-
 ## Updating dependencies
 
 `pyproject.toml` declares dependencies; `requirements.txt` is the frozen lock file. The devcontainer creation hook currently regenerates the lock before installing dev extras:
@@ -130,7 +129,7 @@ mypy youtube_whisperer
 ruff check .
 ```
 
-`check-coverage.sh` runs pytest and requires at least 80% statement and branch coverage for every measured file and the project. `COVERAGE_THRESHOLD` overrides the threshold; extra arguments pass through to pytest. Tests are intentionally outside the mypy gate.
+`check-coverage.sh` runs pytest and requires at least 80% statement and branch coverage for every measured file and the project. `COVERAGE_THRESHOLD` overrides the script threshold; pytest also retains its configured aggregate floor. Pass only whole-suite options such as `-x` or `-q` to this gate; selected test paths cannot certify per-file coverage. Tests are intentionally outside the mypy gate.
 
 Tests run in random order through `pytest-randomly`; reproduce an ordering failure with the printed `--randomly-seed=<seed>`. For focused checks, use `pytest --no-cov` to avoid the aggregate coverage failure caused by selecting only part of the suite.
 
@@ -141,7 +140,7 @@ Tests run in random order through `pytest-randomly`; reproduce an ordering failu
 - Run exactly one `youtube_worker`; parallel playlist expansion/download is unsupported.
 - Run one `whisper_worker` per GPU; the model stays resident per process.
 - Scale Azure workers within your Azure concurrency limit, for example `docker compose up --scale azure_worker=2`.
-- Consumer names default to container hostnames. `WORKER_SLOT_ID` gives `<role>-<value>`; CLI `--slot` supplies the full name and takes precedence.
+- Consumer names default to container hostnames. `WORKER_SLOT_ID` gives `<role>-<value>`; CLI `--slot` supplies the full name and takes precedence. Names must be unique among concurrent consumers of the same stream; leave `WORKER_SLOT_ID` unset for ordinary Compose scaling, or assign each replica its own value.
 - Keep `WORKER_CLAIM_MIN_IDLE_SECONDS` above the longest expected processing time. Stranded tasks remain active until eligible for reclamation (default six hours).
 - Queue and dead-letter clearing snapshots then deletes non-atomically; concurrent additions can be removed without appearing in the response. Clearing queues does not cancel work already running.
 - Older persisted payloads may require manual Redis repair; see [upgrade guidance](DESIGN.md#transcription-requests-and-upgrades) before switching versions.

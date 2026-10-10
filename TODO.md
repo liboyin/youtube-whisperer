@@ -22,29 +22,9 @@ Use the [grouped task execution skill](.agents/skills/grouped-task-execution/SKI
 
 ## Evidence provenance
 
-The inherited findings come from the 2026-07 full-project review recorded in the former `PLAN.md`. Every one of them was revalidated by source inspection on 2026-09-11 against commit 98c4518, in the project devcontainer on Python 3.12.3. All but the entries below are implemented; the legacy mapping records each disposition.
+Backlog entries retain their original assessment status, not a claim of current validation. **Validated** means source inspection or a recorded command supported the finding at the cited revision; **Not independently validated** means accepted from a user request without separate evidence. Revalidate before implementation. Historical line numbers are locators at their assessment revision, not current source links.
 
-Gate results at that revision: 197 tests pass, mypy reports no issues across 27 source files, `ruff check .` is clean, and total coverage is 98.5% statement and 92.5% branch. That revision predates the per-file branch coverage work, so its numbers do not describe the current tree.
-
-**Validated** means source inspection or a recorded command at that revision supported the finding. **Not independently validated** identifies work accepted from a user request without separate evidence. Revalidate affected claims and remedies against the execution revision.
-
-### Full-project assessment — 2026-09-12
-
-Reviewed tracked application code, tests, packaging, containers, shell helpers, and documentation at **2f784f2da4b61cf773041f1e90cc5262905c4c06**, in Docker on Python 3.12.3. Three independent assessment agents covered runtime/recovery/API, media/output correctness, and tests/build/operations; the main agent consolidated findings and independently checked the cited source. This was an assessment of existing behavior, not the formal pre-commit review of an application change.
-
-New entries below are **Validated** by source inspection at that revision; entries explicitly naming a reproduction also have bounded empirical evidence. Reproductions used extracted production functions, fake collaborators, installed dependency code, and test-owned temporary files. They covered recovery cursor forwarding, playlist follow-up loss, directory glob matches, suffix-case cleanup, language validation, filename collisions/templates, Azure cleanup, shell input handling, and invalid coverage thresholds. Redis scan semantics were checked against the [XAUTOCLAIM command reference](https://redis.io/docs/latest/commands/xautoclaim/). Temporary artifacts were removed.
-
-The full test suite and application gates were **not run**: B2 and NB12–NB13 identify ownership defects that must be addressed before treating such a run as compliant. No live YouTube, Azure, Redis, model, media-library, or browser-profile checks were performed. Container builds, dependency installation, Python 3.10 execution, and crash durability were not exercised. Installed dependency inspection supports the specific helper/library contracts cited below, not an end-to-end deployment claim. The pre-existing untracked `.devcontainer/devcontainer-lock.json` was excluded and preserved.
-
-**Review boundary:** record all supported findings without an issue-count cap; preserve accepted decisions and inherited IDs; change only this backlog. Findings do not authorize implementation, naming migrations, or new product contracts. Blocking entries identify unsafe validation or substantial loss/wrong-result risks in the existing application; they do not require implementing application fixes in this documentation-only review. Non-blocking entries remain real defects despite lower urgency. Behavior questions were put to the user before their disposition was recorded; the accepted decisions now in DESIGN distinguish accepted limitations from requested work. Implementation choices still called out in dependencies remain unselected.
-
-### Simplification and architecture assessment — 2026-09-14
-
-Dedicated follow-up at **ed9b3a1189c060adfc90e71d6a8658738cc89d31**, in the same Docker/Python 3.12.3 environment. Independent agents examined runtime architecture, media simplification, and test/build duplication; the main agent checked source dependencies and consolidated overlapping work. This pass distinguishes **validated structural observations** from **proposed improvements**: repeated code or coupling is evidenced, but a refactor's benefit is not a claim that the current behavior is incorrect or that a performance benchmark passed.
-
-Verification used tracked-source/AST inspection, comparison of duplicated helpers/options, exhaustive registered-language conversion comparisons, and synthetic PCM samples. The waveform experiment established equivalent float32 results and an avoidable intermediate copy, not a deployment memory or speed estimate. No application gates, image builds, service calls, application-resource initialization, or host-data access were performed. Previously documented test-ownership limitations remain in force. Only TODO changes; the pre-existing untracked devcontainer lock remains excluded.
-
-**Boundary and conclusions:** record concrete opportunities with preservation requirements and verification criteria; attach naming, SRT publication, and Azure lifecycle guidance to their existing findings rather than duplicate defects. Keep separate worker processes, the authoritative recovery/acknowledgement loop, concrete injected Redis clients, engine-specific conversions, the resident Whisper model, and pure playlist/SRT/rejection helpers. Their distinct behavior and test seams justify those boundaries. No evidence here calls for a new database, queue, plugin registry, generic engine hierarchy, or workflow framework. The user subsequently confirmed the compatibility, startup, settings-lifetime, and worker-identity directions in [D18](DESIGN.md#d18)–[D21](DESIGN.md#d21); NB25–NB27 record the resulting architecture work. Their source premises were rechecked against the working tree based on 09c1b36. Concurrent playlist work and its [D17](DESIGN.md#d17) disposition were preserved; this follow-up does not certify that work or its gates.
+See [historical assessments](completed_work/history.md#evidence-provenance) for the 2026-07/09 reviews, revisions, environments, methods and limitations. Their old gate results and test-ownership blockers do not certify or block today's tree.
 
 ## Design dependencies
 
@@ -55,6 +35,8 @@ Accepted decisions and system constraints live in [DESIGN.md](DESIGN.md), groupe
 NB2 must inventory the violations an expanded ruff selection produces before choosing the rule set; the entry does not authorize a wholesale reformat. NB3 must establish the true minimum Python version from the syntax and dependencies actually in use before changing `requires-python`. These investigations can expose new decisions; they do not authorize guessing.
 
 ## Active backlog
+
+Classification determines backlog priority, not a requirement to resolve unrelated findings in every change. Inline High/Medium/Low labels retain historical impact estimates; they do not override the Blocking/Non-blocking/Nit classification. A proposed simplification is not a runtime defect.
 
 ### Blocking
 
@@ -116,9 +98,9 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 **Severity: Medium. Validated — source inspection; requested under [D16](DESIGN.md#d16).** [Transcript lookup](youtube_whisperer/downloaders/transcript_downloader.py):89–117 handles disabled/missing transcripts but propagates other service failures through [download orchestration](youtube_whisperer/downloaders/__init__.py):26–28. After media has downloaded, the worker therefore dead-letters download-only work or skips its requested transcription fallback. **Outcome:** retain the successful media result, report the caption-service problem, and complete download-only work or enqueue the selected transcriber. **Acceptance:** listing/fetching service errors after successful download preserve the media and chosen fallback; genuine media-download, local output-write, and transcription failures still surface appropriately. **Dependencies:** [D16](DESIGN.md#d16); coordinate NB19 timeout handling and preserve the transcription-only task contract implemented by NB32, and preserve [D17](DESIGN.md#d17)'s per-video dead-lettering (a caption-service error currently dead-letters that one video). Do not catch all local/programming errors as though captions were merely unavailable.
 
-#### NB29 — Task preparation is embedded in the HTTP route
+#### NB29 — Task preparation remains coupled to the HTTP module
 
-**Severity: Low. Validated structural observation — source inspection at ed9b3a1 on 2026-09-14; proposed architecture improvement.** [add_tasks](youtube_whisperer/api/app.py):116–136 mixes pattern classification, filesystem expansion, response bookkeeping, and Redis submission. Its product rules can currently be exercised only through a module that imports FastAPI and the application's configured resources. **Outcome:** a small internal preparation operation returns routed tasks and failed patterns; the endpoint retains HTTP serialization and the existing queue adapter performs submission. **Acceptance:** preparation tests use owned files without FastAPI or Redis doubles; adapter tests preserve response/status, successful/failed ordering, URL-before-filesystem submission, metadata, and `none` handling. **Dependencies:** preserve the file-only, absolute-path resolution implemented by NB16/NB22 and preserve the [HTTP contract](DESIGN.md#http-contracts); preserve [D11](DESIGN.md#d11) best-effort submission and keep filesystem expansion in the API process. No new wire schema, workflow engine, or persisted state is proposed. Apply the same separation to per-video follow-up decisions only within NB24's assigned boundary; NB32 closes B4 through translation removal; preserve the resulting transcription-only contract under [D23](DESIGN.md#d23)/[D24](DESIGN.md#d24). `YouTubeWorker.process_video` already owns the per-video step under [D17](DESIGN.md#d17).
+**Severity: Low. Validated structural observation — source inspection at ed9b3a1 on 2026-09-14; proposed architecture improvement.** [add_tasks](youtube_whisperer/api/app.py) coordinates classification, filesystem resolution, response bookkeeping and Redis submission. **Revalidated by source inspection at d3a1c5b:** `resolve_filesystem_tasks` already separates glob expansion, and NB25 made ordinary API imports resource-inert. Preparation still lives in the FastAPI module; the remaining proposal is separation of that coordination from HTTP, not removal of import-time resource creation. **Outcome:** a small internal preparation operation returns routed tasks and failed patterns; the endpoint retains HTTP serialization and the existing queue adapter performs submission. **Acceptance:** preparation tests use owned files without FastAPI or Redis doubles; adapter tests preserve response/status, successful/failed ordering, URL-before-filesystem submission, metadata, and `none` handling. **Dependencies:** preserve the file-only, absolute-path resolution implemented by NB16/NB22 and preserve the [HTTP contract](DESIGN.md#http-contracts); preserve [D11](DESIGN.md#d11) best-effort submission and keep filesystem expansion in the API process. No new wire schema, workflow engine, or persisted state is proposed. Apply the same separation to per-video follow-up decisions only within NB24's assigned boundary; NB32 closes B4 through translation removal; preserve the resulting transcription-only contract under [D23](DESIGN.md#d23)/[D24](DESIGN.md#d24). `YouTubeWorker.process_video` already owns the per-video step under [D17](DESIGN.md#d17).
 
 #### NB31 — Compose repeats the shared application-service configuration
 
@@ -136,91 +118,24 @@ NB2 must inventory the violations an expanded ruff selection produces before cho
 
 #### N6 — Source docstrings retain obsolete worker and failure contracts
 
-**Severity: Low. Validated — source inspection.** [Worker entry point](youtube_whisperer/workers/__main__.py):48–58 describes slot-specific active queues and limits slot routing to Whisper/Azure, although all roles use Redis streams and the resolved consumer name. [Azure transcriber](youtube_whisperer/transcriber/azure_transcriber.py):70 says failures return `None`, although its handled failures raise. **Outcome:** describe current consumer identity and failure propagation. **Acceptance:** compare docstrings/CLI help with role dispatch and error branches. **Dependencies:** none; preserve runtime behavior.
+**Severity: Low. Validated — source inspection.** **Revalidated by source inspection at d3a1c5b:** `resolve_worker_slot` and `--slot` help in the [worker entry point](youtube_whisperer/workers/__main__.py), plus the [Azure worker constructor](youtube_whisperer/workers/azure_worker.py), still describe active queues or limit slots to Whisper/Azure. All roles use stream consumer identity; `process_queue` already describes that correctly. [Azure transcriber](youtube_whisperer/transcriber/azure_transcriber.py):70 says failures return `None`, although its handled failures raise. **Outcome:** describe current consumer identity and failure propagation. **Acceptance:** compare docstrings/CLI help with role dispatch and error branches. **Dependencies:** none; preserve runtime behavior.
 
 #### N10 — ISO conversion branches repeat the same transformation
 
 **Severity: Low. Validated — source and exhaustive registered-code comparison at ed9b3a1 on 2026-09-14.** The historical [LanguageCode](youtube_whisperer/adaptors/lang_code_adaptor.py) source conversion separately handles ISO and BCP strings, although both yield `code.split('-', 1)[0]` for every registered value. **Outcome:** remove the redundant membership branch in source ISO conversion; NB32 removed the target-conversion API under [D23](DESIGN.md#d23)/[D24](DESIGN.md#d24); the source-conversion branch remains unchanged. **Acceptance:** source output remains identical for all registered codes; retain whitelist validation, constructor/parsing normalization differences, and BCP-only conversion errors. **Dependencies:** preserve the source conversion methods retained by NB32 and keep this independent simplification distinguishable from the completed translation removal.
 
-## Ready for implementation
+## Readiness and unresolved choices
 
 NB2 and NB3 need their investigation gates cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
 
-Other new entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming must be settled before its dependent implementation; playlist continuation is settled by [D17](DESIGN.md#d17). [D14](DESIGN.md#d14)/[D16](DESIGN.md#d16) settle the configuration and caption-error outcomes; N7/N8 are resolved. Expand NB24's implementation boundary before changing code.
+All entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming must be settled before its dependent implementation; playlist continuation is settled by [D17](DESIGN.md#d17). [D14](DESIGN.md#d14)/[D16](DESIGN.md#d16) settle the configuration and caption-error outcomes; N7/N8 are resolved. Expand NB24's implementation boundary before changing code.
 
 [D18](DESIGN.md#d18)–[D21](DESIGN.md#d21) settle the compatibility, resource ownership, settings lifetime, and worker-identity choices. NB25–NB27 are implemented; retain existing Python entry points and all previously accepted product behavior except the translation interfaces explicitly removed under [D23](DESIGN.md#d23)/[D24](DESIGN.md#d24).
 
 ## Deferred, accepted, and completed dispositions
 
-New closures are indexed here by one-line summaries linking their records in [completed_work/](completed_work/). Earlier dispositions below retain their historical summaries; do not invent missing evidence when migrating them to records.
-
-- [NB33](completed_work/NB33.md) — Implemented: fresh devcontainer setup installs standalone Codex and removes obsolete plugin provisioning and extension-link repair.
-
-- NB4 is implemented by [DESIGN.md](DESIGN.md), the user-requested owner for system design, product contracts and topic-grouped decisions; a separate USER_STORIES document is unnecessary. README retains operating instructions and TODO retains outstanding work. N3/N5/N8 are resolved in the same documentation reorganization: build-helper references match Compose, the filename limit is stated in UTF-8 bytes, and fresh Compose setup creates its required `.env` file.
-
-- NB27, NB28 and N12 are implemented: the base worker owns built-in identity with compatible accessors, stream polling shares payload validation and missing-group recovery, and role-dispatch tests use explicit parameter cases. DESIGN’s [worker architecture](DESIGN.md#workers-as-separate-processes) owns the current structure; recovery, acknowledgement, role processing and runtime ownership contracts remain.
-
-- NB23, N4 and N9 are implemented: empty Whisper decoding fails before model/output work and follows durable dead-letter-before-acknowledgement handling; the decoder description reflects complete PCM buffering and its conversion avoids the redundant int16 copy. DESIGN's [Whisper input and model contract](DESIGN.md#the-whisper-model-is-kept-resident) owns the current behavior under [D15](DESIGN.md#d15).
-
-- NB6 and NB7 are implemented: orphan scans retain and reset their cursor across polling cycles, polling requires positive seconds, and negative claim-idle values are rejected. DESIGN’s [stream recovery](DESIGN.md#redis-streams-and-a-shared-consumer-group) and README’s [direct-run timing](README.md#running-components-directly) own the current behavior.
-
-- NB30 and N11 are implemented: title lookup, flat extraction and video download share fresh yt-dlp defaults; downloader tests use one function-scoped factory with independent records and retain option/call/result/error assertions. DESIGN's [project structure](DESIGN.md#project-structure) identifies the option-policy owner; the implementation commits record validation and mutation evidence.
-
-- NB16 and NB22 implement file-only glob expansion with absolute API-resolved sources under [D13](DESIGN.md#d13), preserving file symlink aliases, arbitrary extensions, glob order, metadata, and failed-pattern reporting. DESIGN's [data flow](DESIGN.md#data-flow) owns the current behavior; NB29 must retain this contract.
-
-- N7 is closed by NB25's [README configuration](README.md#configuration): direct Python/API/worker launches use exported environment variables, while Compose injects `.env` into application services under [D14](DESIGN.md#d14). N8 is closed by the explicit fresh-Compose `.env` creation step.
-
-- NB25 implements pure domain ownership, inert ordinary imports and explicit API/worker runtime resources under [D18](DESIGN.md#d18)–[D20](DESIGN.md#d20). DESIGN’s [architecture](DESIGN.md#architecture-and-resource-ownership), [configuration ownership](DESIGN.md#settings-and-runtime-ownership) and [resident model contract](DESIGN.md#the-whisper-model-is-kept-resident) own the current behavior.
-
-- NB26 implements neutral SRT formatting and selected-role worker loading under [D19](DESIGN.md#d19). DESIGN's [architecture](DESIGN.md#architecture-and-resource-ownership) and [SRT formatting contract](DESIGN.md#srt-as-the-output-format) own the current behavior.
-
-- NB32 implements translation removal under [D23](DESIGN.md#d23)–[D26](DESIGN.md#d26), closing B4 by removing its operation rather than repairing target-caption routing. Tasks carry one source language and reject obsolete `mode` fields and arrow forms; existing files and caption reuse remain supported. DESIGN's [transcription and upgrade guidance](DESIGN.md#transcription-requests-and-upgrades) owns the current interfaces and rollout constraints.
-
-- B7 is implemented: WAV conversion publishes only after successful owned ffmpeg completion, cancels/reaps interrupted children and cleans only owned stages; Azure preserves existing-good sidecar reuse and retries regenerate unpublished audio. DESIGN’s [Azure completion](DESIGN.md#azure-completion-is-synchronous-per-worker) and [atomic publication contract](DESIGN.md#srt-as-the-output-format) own the resulting behavior and [D22](DESIGN.md#d22) limits.
-
-- NB10 is implemented: Azure carries the caller’s overwrite policy through preflight and final SRT saving; DESIGN’s [Azure completion](DESIGN.md#azure-completion-is-synchronous-per-worker) describes the behavior. Final SRT publication follows the shared [atomic publication contract](DESIGN.md#srt-as-the-output-format); NB9 lifecycle cleanup remains separate work.
-
-- B1 is closed at the user's explicit direction on 2026-09-12: the Claude+Codex workflow was proven externally. No remaining setup blocker is carried forward.
-- B3 is implemented under [D17](DESIGN.md#d17): the YouTube worker enqueues each video's follow-up as soon as that video is downloaded and dead-letters a failed video under its own URL, so a later failure no longer discards earlier progress. DESIGN's [Playlist videos succeed or fail independently](DESIGN.md#playlist-videos-succeed-or-fail-independently) owns the resulting behavior.
-- The 2026-09-12 review accepts gap-bridging deduplication, dead-letter clearing races, production-worker startup in the devcontainer, best-effort batch enqueue, and manual repair of malformed Redis payloads under [D8](DESIGN.md#d8)–[D12](DESIGN.md#d12); these are not omitted defects awaiting an implicit fix.
-
-- Legacy finding 2, path traversal in `POST /assets`, is obsolete rather than fixed: the upload endpoint no longer exists, so no client-controlled filename reaches the filesystem. Revisit only if uploads return.
-- Legacy finding 11 is accepted without change under [D6](DESIGN.md#d6) and documented in its [queue contracts](DESIGN.md#http-contracts).
-- Legacy finding 25 is accepted under [D5](DESIGN.md#d5); DESIGN's security and trust model section owns it.
-- Legacy finding 9 is closed. The single remaining `assert` narrows a type and carries a comment saying so; it does not validate external input.
-- NB1 is implemented. The three files below the branch-coverage threshold are covered and `./check-coverage.sh` passes at the default threshold; the implementation commit holds the evidence.
-- B2 and NB12–NB13 are implemented as test-ownership work. Collection starts with synthetic configuration, API and Azure tests use temporary paths, tests use owned settings and clients, and Azure callback threads have owned cancellation and quiescence. README's [testing instructions](README.md#testing) cover the fresh-process requirement; the implementation commit holds current gate and mutation evidence.
-- NB14 is implemented. The Whisper cache test clears its fake model on every exit, including assertion failures; its separate implementation commit holds the evidence.
-- Legacy finding 26 remains open as NB5. Every other inherited finding is implemented.
-- `ISSUES.md` was deleted before the PLAN.md review; its still-open item became legacy finding 5 and is implemented.
-
-### Legacy finding mapping
-
-PLAN.md numbering is preserved for traceability. Disposition verified 2026-09-11 at 98c4518.
-
-| Legacy finding | Disposition |
-|---|---|
-| 1, 14 | Implemented; the transcriber raises and the worker calls it directly, so failures dead-letter |
-| 2 | Obsolete; the upload endpoint was removed |
-| 3 | Implemented; packaging includes only `youtube_whisperer*` |
-| 4 | Implemented; `Task.source` is required |
-| 5 | Implemented; per-replica consumer names plus an XAUTOCLAIM recovery pass |
-| 6 | Implemented; flat extraction branches on `entries` and skips unusable ones |
-| 7 | Implemented; the Azure timeout has a documented floor |
-| 8 | Implemented; `Settings.redis_host` replaces the hardcoded host |
-| 9 | Implemented; the remaining assert narrows a type only |
-| 10 | Implemented; the unreachable branch is gone |
-| 11 | Accepted without change; see [D6](DESIGN.md#d6) |
-| 12, 13 | Implemented; domain models live in `models.py` and the web layer is `api/` |
-| 15 | Implemented; the Whisper model is cached per process |
-| 16 | Implemented; the package logs and no longer prints |
-| 17, 18 | Implemented; the legacy repr parser and the dead helpers are removed |
-| 19 | Implemented; the test layout mirrors the package |
-| 20, 22, 23, 24 | Implemented; pinned Redis image, cache-friendly Dockerfile order, corrected ignore glob, healthcheck |
-| 21 | Implemented; host paths and proxies are environment-driven |
-| 25 | Accepted; see [D5](DESIGN.md#d5) |
-| 26 | Open; see NB5 |
-| 27 | Implemented; README was rewritten and documents the previously undocumented choices |
+- [NB33](completed_work/NB33.md) — Implemented: standalone Codex installation replaces plugin provisioning and extension-link repair.
+- [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance
 
@@ -228,4 +143,4 @@ Review integrated changes against [DESIGN](DESIGN.md) and the current README ope
 
 AGENTS owns the required gates and the review obligation. Supplement them with checks that match what changed: queue and dead-letter behavior for worker changes, extraction behavior for downloader changes, and an end-to-end compose smoke run for infrastructure changes. Clean static analysis is not proof of correct concurrent behavior.
 
-Keep live-service checks out of the automated suite. Exercising YouTube or Azure Speech needs explicit authorization and credentials, and must record no keys or personal media paths. Record evidence at its actual revision. Remove a completed entry in its implementation commit, keeping only the concise disposition that remaining work or traceability needs.
+Keep live-service checks out of the automated suite. Exercising YouTube or Azure Speech needs explicit authorization and credentials, and must record no keys or personal media paths. Record evidence at its actual revision. Close entries under [Maintaining this plan](#maintaining-this-plan).
