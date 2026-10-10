@@ -7,13 +7,92 @@ import youtube_whisperer.downloaders.transcript_downloader as testee
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 
 
-def test_get_video_id():
-    """Test that video IDs are extracted from short, watch, and live URLs, rejecting others."""
-    assert testee.get_video_id('https://youtu.be/n9xhJrPXop4?si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
-    assert testee.get_video_id('https://www.youtube.com/watch?v=n9xhJrPXop4&si=sXdajbZPk7Bn2OjD&t=30') == 'n9xhJrPXop4'
-    assert testee.get_video_id('https://www.youtube.com/live/3TufaG29B7w?si=b5DQpvYgzcKJjJ0L') == '3TufaG29B7w'
+@pytest.mark.parametrize("scheme", ["http", "https"])
+@pytest.mark.parametrize("host", ["youtube.com", "www.youtube.com", "m.youtube.com", "M.YouTube.COM:443"])
+@pytest.mark.parametrize("path", [
+    "/watch?v=n9xhJrPXop4",
+    "/watch?extra=ignored&v=n9xhJrPXop4&list=ignored",
+    "/live/n9xhJrPXop4",
+    "/live/n9xhJrPXop4/?extra=ignored",
+    "/shorts/n9xhJrPXop4",
+    "/shorts/n9xhJrPXop4/?extra=ignored",
+])
+def test_get_video_id_accepts_supported_youtube_forms(scheme, host, path):
+    """Supported hosts and watch/live/shorts paths resolve despite URL decorations."""
+    assert testee.get_video_id(f"{scheme}://{host}{path}#ignored") == "n9xhJrPXop4"
+
+
+@pytest.mark.parametrize(("url", "expected"), [
+    ("https://youtu.be/n9xhJrPXop4?si=ignored&t=30", "n9xhJrPXop4"),
+    ("http://YOUTU.BE:80/n9xhJrPXop4/?extra=ignored#fragment", "n9xhJrPXop4"),
+    ("https://youtu.be/0aA_-123456", "0aA_-123456"),
+    ("https://www.youtube.com/live/3TufaG29B7w?si=ignored", "3TufaG29B7w"),
+])
+def test_get_video_id_accepts_short_links_and_id_characters(url, expected):
+    """Short links accept one trailing slash and the full valid ID alphabet."""
+    assert testee.get_video_id(url) == expected
+
+
+@pytest.mark.parametrize("url", [
+    "https://example.com/watch?v=n9xhJrPXop4",
+    "https://youtube.com.example.com/watch?v=n9xhJrPXop4",
+    "https://music.youtube.com/watch?v=n9xhJrPXop4",
+    "https://youtube-nocookie.com/watch?v=n9xhJrPXop4",
+    "ftp://www.youtube.com/watch?v=n9xhJrPXop4",
+    "www.youtube.com/watch?v=n9xhJrPXop4",
+    "//youtu.be/n9xhJrPXop4",
+    "",
+    "https://[broken/watch?v=n9xhJrPXop4",
+    "https://www.youtube.com/watch",
+    "https://www.youtube.com/watch?extra=ignored",
+    "https://www.youtube.com/watch?v=",
+    "https://www.youtube.com/watch?v=short",
+    "https://www.youtube.com/watch?v=n9xhJrPXop44",
+    "https://www.youtube.com/watch?v=n9xhJrPXop!",
+    "https://www.youtube.com/watch?v=n9xhJrPXopé",
+    "https://youtu.be/",
+    "https://youtu.be/n9xhJrPXop4/extra",
+    "https://youtu.be/n9xhJrPXop4//",
+    "https://youtu.be//n9xhJrPXop4",
+    "https://www.youtube.com/live/",
+    "https://www.youtube.com/live/short",
+    "https://www.youtube.com/live/n9xhJrPXop4/extra",
+    "https://www.youtube.com/shorts/",
+    "https://www.youtube.com/shorts/n9xhJrPXop4//",
+    "https://www.youtube.com/shorts/n9xhJrPXop4/extra",
+    "https://www.youtube.com/playlist?v=n9xhJrPXop4",
+    "https://www.youtube.com/embed/n9xhJrPXop4",
+    "https://www.youtube.com/v/n9xhJrPXop4",
+    "https://www.youtube.com/",
+])
+def test_get_video_id_rejects_malformed_or_unsupported_urls(url):
+    """Malformed inputs uniformly raise ValueError rather than returning invalid IDs."""
     with pytest.raises(ValueError):
-        testee.get_video_id('https://example.com')
+        testee.get_video_id(url)
+
+
+@pytest.mark.parametrize("base", [
+    "https://youtu.be/n9xhJrPXop4",
+    "https://www.youtube.com/live/n9xhJrPXop4",
+    "https://m.youtube.com/shorts/n9xhJrPXop4",
+    "https://www.youtube.com/watch",
+])
+@pytest.mark.parametrize("suffix", [";x", "/;extra"])
+def test_get_video_id_rejects_path_parameters(base, suffix):
+    """Path parameters must not disappear during parsing and expose a valid ID."""
+    with pytest.raises(ValueError):
+        testee.get_video_id(f"{base}{suffix}?v=n9xhJrPXop4")
+
+
+@pytest.mark.parametrize("url", [
+    "https://youtu.be:abc/n9xhJrPXop4",
+    "https://youtube.com:65536/watch?v=n9xhJrPXop4",
+    "https://www.youtube.com:-1/live/n9xhJrPXop4",
+])
+def test_get_video_id_rejects_invalid_ports(url):
+    """Non-numeric, out-of-range and negative ports uniformly raise ValueError."""
+    with pytest.raises(ValueError):
+        testee.get_video_id(url)
 
 
 def test_get_first_matching_lang_code():
@@ -120,6 +199,22 @@ def test_download_delegates_to_listing_and_matching_helpers(mocker, downloader):
     assert result == expected_transcript
     mock_list_video_transcripts.assert_called_once_with(downloader.url)
     mock_fetch_matching.assert_called_once_with(transcripts, downloader.language, downloader.url)
+
+
+def test_download_short_url_lists_correct_video_and_fetches_matching_transcript():
+    """A shorts URL reaches the faked caption client with its parsed video ID."""
+    transcripts = MagicMock()
+    metadata = MagicMock(language_code='en')
+    transcripts.__iter__.return_value = iter([metadata])
+    expected = MagicMock()
+    transcripts.find_transcript.return_value.fetch.return_value = expected
+    downloader = testee.TranscriptDownloader('https://m.youtube.com/shorts/n9xhJrPXop4/', LanguageCode('en'))
+    with patch.object(testee, 'YouTubeTranscriptApi') as api:
+        api.return_value.list.return_value = transcripts
+        assert downloader.download() is expected
+    api.return_value.list.assert_called_once_with('n9xhJrPXop4')
+    transcripts.find_transcript.assert_called_once_with(['en'])
+    transcripts.find_transcript.return_value.fetch.assert_called_once_with()
 
 
 def test_download_as_srt_text_success(mocker, downloader):

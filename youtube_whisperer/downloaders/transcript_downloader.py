@@ -1,7 +1,8 @@
 import logging
+import re
 from collections.abc import Collection
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlsplit
 
 from pathlib_extensions import (
     OverwriteMode,
@@ -27,33 +28,43 @@ logger = logging.getLogger(__name__)
 
 
 def get_video_id(url: str) -> str:
-    """
-    Extracts the video ID from a YouTube video URL.
-    
-    Support URLs in the following formats:
+    """Extract a valid video ID from a supported single-video YouTube URL.
 
-        https://youtu.be/n9xhJrPXop4?si=sXdajbZPk7Bn2OjD&t=30
-        https://www.youtube.com/watch?v=n9xhJrPXop4&si=sXdajbZPk7Bn2OjD&t=30
-        https://www.youtube.com/live/3TufaG29B7w?si=b5DQpvYgzcKJjJ0L
+    Accept HTTP and HTTPS URLs for youtu.be/<id>, and /watch?v=<id>,
+    /live/<id> or /shorts/<id> on youtube.com, www.youtube.com or m.youtube.com.
+    Ignore extra query parameters and fragments, and tolerate one trailing
+    slash after a path ID. IDs must contain exactly 11 ASCII letters, digits,
+    underscores or hyphens. Path parameters are unsupported; supplied ports
+    must be numeric and in range.
 
     Args:
         url (str): The YouTube video URL.
-    
+
     Returns:
         str: The extracted video ID.
-    
+
     Raises:
-        ValueError: If the URL cannot be parsed.
+        ValueError: If the scheme, host, port, path or video ID is unsupported or malformed.
     """
-    parsed = urlparse(url)
-    if parsed.netloc == 'youtu.be':
-        return parsed.path.strip('/')
-    if parsed.netloc == 'www.youtube.com':
+    parsed = urlsplit(url)
+    # Reading the property validates ports that hostname alone would accept.
+    _ = parsed.port
+    if parsed.scheme not in ('http', 'https'):
+        raise ValueError(url)
+    if parsed.hostname == 'youtu.be':
+        video_id = parsed.path.removeprefix('/').removesuffix('/')
+    elif parsed.hostname in ('youtube.com', 'www.youtube.com', 'm.youtube.com'):
         if parsed.path == '/watch':
-            return parse_qs(parsed.query)['v'][0]
-        if parsed.path.startswith('/live/'):
-            return parsed.path[6:]
-    raise ValueError(url)
+            video_id = parse_qs(parsed.query).get('v', [''])[0]
+        elif parsed.path.startswith(('/live/', '/shorts/')):
+            video_id = parsed.path.split('/', 2)[2].removesuffix('/')
+        else:
+            raise ValueError(url)
+    else:
+        raise ValueError(url)
+    if re.fullmatch(r'[0-9A-Za-z_-]{11}', video_id) is None:
+        raise ValueError(url)
+    return video_id
 
 
 def get_first_matching_lang_code(candidates: Collection[str], requested: LanguageCode) -> str | None:

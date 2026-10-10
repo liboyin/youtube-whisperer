@@ -70,10 +70,6 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 **Severity: Medium. Validated — isolated Pydantic TypeAdapter reproduction and API exception-path inspection.** [LanguageCode deserialization](youtube_whisperer/adaptors/lang_code_adaptor.py):112 raises `TypeError` for numeric, null, or collection input. Current Pydantic propagates that error instead of turning it into validation failure; the API's general handler therefore produces 500 for malformed client input. The same reproduction gives `ValidationError` for unsupported string `fr`. **Outcome:** invalid language types produce the normal client-validation response. **Acceptance:** numeric/null/list/object inputs return 422 without enqueueing; registered strings and LanguageCode instances remain accepted. **Dependencies:** none; preserve the language whitelist.
 
-#### NB18 — Supported YouTube URL forms fail transcript ID extraction
-
-**Severity: Medium. Validated — pure parser reproductions and installed yt-dlp support inspection.** [get_video_id](youtube_whisperer/downloaders/transcript_downloader.py):48–56 rejects bare `youtube.com`, `m.youtube.com`, and `/shorts/` URLs. [Single-video extraction](youtube_whisperer/downloaders/playlist_downloader.py):58–62 preserves the original URL, so media download can succeed before caption routing fails and dead-letters the task, including download-only work. **Outcome:** supported video URLs resolve consistently across download and transcript stages. **Acceptance:** bare/mobile/shorts/watch/live/short-link cases and malformed input use fake metadata and no service calls. **Dependencies:** none; do not expand this into arbitrary-site support.
-
 #### NB19 — Transcript HTTP operations have no timeout
 
 **Severity: Medium. Validated — source and installed `youtube-transcript-api==1.2.4` inspection.** [Transcript listing/fetching](youtube_whisperer/downloaders/transcript_downloader.py):92,114 use the default client. Its ordinary requests session performs GET/POST without timeouts; the application supplies neither a bounded client nor an execution deadline. A stalled response can occupy the required single YouTube worker indefinitely. **Outcome:** bound stalled caption operations. **Acceptance:** a controlled stalled HTTP double reaches a bounded, observable completion/failure and releases the worker without real YouTube access. **Dependencies:** apply [D16](DESIGN.md#d16)/NB24 after successful media download; select an appropriate finite timeout before implementation. Adding a timeout does not authorize scaling the YouTube worker.
@@ -128,6 +124,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 
 - [NB8](completed_work/NB8.md) — Implemented: video titles and template metacharacters no longer alter download paths; titles never enter yt-dlp's output template.
 - [NB11](completed_work/NB11.md) — Implemented: authorized video replacement publishes atomically after a completed staged download; failed downloads keep the previous video.
+- [NB18](completed_work/NB18.md) — Implemented: watch, live, shorts and short-link URLs on bare, `www` and mobile hosts resolve to validated video IDs; malformed URLs raise `ValueError`.
 - [NB33](completed_work/NB33.md) — Implemented: standalone Codex installation replaces plugin provisioning and extension-link repair.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
