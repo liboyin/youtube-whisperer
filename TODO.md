@@ -107,10 +107,6 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 **Severity: Low. Validated — owned empty-directory shell reproduction.** [ls_mp4_without_srt.sh](ls_mp4_without_srt.sh):19 iterates an unmatched glob literally and prints `<directory>/*.mp4` with exit 0. **Outcome:** report only existing MP4 files missing SRT. **Acceptance:** empty directory produces no paths; missing/present SRT and filenames with spaces remain correct. **Dependencies:** none.
 
-#### N6 — Source docstrings retain obsolete worker and failure contracts
-
-**Severity: Low. Validated — source inspection.** **Revalidated by source inspection at d3a1c5b:** `resolve_worker_slot` and `--slot` help in the [worker entry point](youtube_whisperer/workers/__main__.py), plus the [Azure worker constructor](youtube_whisperer/workers/azure_worker.py), still describe active queues or limit slots to Whisper/Azure. All roles use stream consumer identity; `process_queue` already describes that correctly. [Azure transcriber](youtube_whisperer/transcriber/azure_transcriber.py):70 says failures return `None`, although its handled failures raise. **Outcome:** describe current consumer identity and failure propagation. **Acceptance:** compare docstrings/CLI help with role dispatch and error branches. **Dependencies:** none; preserve runtime behavior.
-
 #### N10 — ISO conversion branches repeat the same transformation
 
 **Severity: Low. Validated — source and exhaustive registered-code comparison at ed9b3a1 on 2026-09-14.** The historical [LanguageCode](youtube_whisperer/adaptors/lang_code_adaptor.py) source conversion separately handles ISO and BCP strings, although both yield `code.split('-', 1)[0]` for every registered value. **Outcome:** remove the redundant membership branch in source ISO conversion; NB32 removed the target-conversion API under [D23](DESIGN.md#d23)/[D24](DESIGN.md#d24); the source-conversion branch remains unchanged. **Acceptance:** source output remains identical for all registered codes; retain whitelist validation, constructor/parsing normalization differences, and BCP-only conversion errors. **Dependencies:** preserve the source conversion methods retained by NB32 and keep this independent simplification distinguishable from the completed translation removal.
@@ -125,6 +121,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 
 ## Deferred, accepted, and completed dispositions
 
+- [N6](completed_work/N6.md) — Implemented: worker docstrings and `--slot` help describe stream consumer identity for every role, and the Azure transcriber documents that failures raise rather than return `None`.
 - [NB8](completed_work/NB8.md) — Implemented: video titles and template metacharacters no longer alter download paths; titles never enter yt-dlp's output template.
 - [NB11](completed_work/NB11.md) — Implemented: authorized video replacement publishes atomically after a completed staged download; failed downloads keep the previous video.
 - [NB18](completed_work/NB18.md) — Implemented: watch, live, shorts and short-link URLs on bare, `www` and mobile hosts resolve to validated video IDs; malformed URLs raise `ValueError`.

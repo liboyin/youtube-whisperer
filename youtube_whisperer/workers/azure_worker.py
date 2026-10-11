@@ -19,7 +19,7 @@ class AzureWorker(TranscriptionWorker):
         """Initialize the Azure transcription worker.
 
         Args:
-            slot: The worker slot identifier determining which active queue to run under.
+            slot: The consumer identity this worker uses to claim and recover tasks.
             settings: Supplied snapshot, or invocation-time environment defaults.
             runtime: Borrowed runtime supplying resources and its snapshot.
             client: Redis client used for stream operations. Borrowed when supplied; otherwise owned by this worker.

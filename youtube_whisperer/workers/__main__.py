@@ -31,15 +31,16 @@ class WorkerRole(str, Enum):
 
 def resolve_worker_slot(slot: str | None, role_name: str, *, settings: Settings | None = None) -> str:
     """
-    Resolve the slot name a worker should use for active-queue ownership.
+    Resolve the slot name a worker uses as its Redis Stream consumer identity.
 
     Args:
-        slot: Explicit slot override, if provided.
-        role_name: Worker role name used when constructing the fallback slot name.
+        slot: Explicit slot override, used verbatim when non-empty.
+        role_name: Worker role name prefixed to the configured slot ID.
         settings: Supplied snapshot, or invocation-time environment defaults.
 
     Returns:
-        The resolved slot name from the explicit value, environment, or role-based default.
+        The explicit slot when non-empty; otherwise `<role_name>-<WORKER_SLOT_ID>`
+        when the slot ID is configured; otherwise the machine hostname.
     """
     if slot:
         return slot
@@ -170,7 +171,7 @@ def main() -> None:
     settings = Settings()
     parser = argparse.ArgumentParser()
     parser.add_argument('role', nargs='?', choices=WorkerRole.values(), default=settings.worker_role)
-    parser.add_argument('--slot', default=None, help="Active-slot identifier for whisper/Azure workers. Defaults to WORKER_SLOT_ID, then machine hostname.")
+    parser.add_argument('--slot', default=None, help="Consumer identity for the worker in its stream's consumer group. Defaults to <role>-<WORKER_SLOT_ID> when WORKER_SLOT_ID is set, then machine hostname.")
     parser.add_argument('--poll-interval-seconds', type=positive_poll_interval, default=5)
     args = parser.parse_args()
     process_queue(role=args.role, slot=args.slot, poll_interval_seconds=args.poll_interval_seconds, settings=settings)

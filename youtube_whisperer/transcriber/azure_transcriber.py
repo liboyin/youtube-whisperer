@@ -68,7 +68,20 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
         overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files at preflight and final saving. Defaults to `prompt`.
 
     Returns:
-        Path | None: Output SRT file path, or `None` if transcription failed.
+        Path | None: The output SRT file path. When the output already exists and
+        overwriting is declined, recognition is skipped and that existing path is
+        returned. Failures raise instead of returning `None`.
+
+    Raises:
+        TimeoutError: If recognition does not finish within the timeout, which is
+            1.5 times the audio duration but at least `MIN_AZURE_TIMEOUT_SECONDS`.
+            Recognition is stopped before the error propagates.
+        RuntimeError: If Azure cancels recognition with an error; the message is
+            Azure's error details. Recognition is stopped before the error
+            propagates.
+
+    Errors from Azure SDK setup, audio-duration inspection and SRT saving
+    propagate unchanged. No SRT file is written when recognition fails.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
     if output_file_path.is_file():
