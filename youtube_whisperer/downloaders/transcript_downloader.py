@@ -1,6 +1,7 @@
 import logging
 import re
 from collections.abc import Collection
+from functools import partialmethod
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -10,6 +11,7 @@ from pathlib_extensions import (
     replace_os_reserved_chars,
     truncate_filename,
 )
+from requests import Session
 from youtube_transcript_api import (
     FetchedTranscript,
     NoTranscriptFound,
@@ -25,6 +27,19 @@ from youtube_whisperer.config import Settings
 from youtube_whisperer.downloaders.utils import get_video_title
 
 logger = logging.getLogger(__name__)
+
+CAPTION_HTTP_TIMEOUT = (10, 30)
+
+
+class CaptionSession(Session):
+    """Default caption requests to finite connect/read timeouts.
+
+    Caller-supplied keyword timeouts take precedence over the default. The read
+    timeout limits silence between bytes, not the total transfer duration.
+    Ownership remains with the caller, which must close the session after fetch.
+    """
+
+    request = partialmethod(Session.request, timeout=CAPTION_HTTP_TIMEOUT)
 
 
 def get_video_id(url: str) -> str:
@@ -88,19 +103,27 @@ def get_first_matching_lang_code(candidates: Collection[str], requested: Languag
     return None
 
 
-def list_video_transcripts(url: str) -> TranscriptList | None:
+def list_video_transcripts(url: str, http_client: Session | None = None) -> TranscriptList | None:
     """
-    Lists available transcripts for a YouTube video.
+    List transcripts using a supplied session or a fresh timeout session.
+
+    A supplied session remains caller-owned and is not closed by this helper.
+    When omitted, a fresh CaptionSession stays with the returned transcript list
+    for later fetches, preserving the legacy default client's lifetime. This
+    helper does not close that default session before returning the list.
 
     Args:
         url (str): The YouTube video URL.
+        http_client (Session, optional): Borrowed session, or None to create a default.
 
     Returns:
         TranscriptList | None: The available transcripts, or `None` if transcripts are disabled for the video.
     """
     video_id = get_video_id(url)
+    if http_client is None:
+        http_client = CaptionSession()
     try:
-        return YouTubeTranscriptApi().list(video_id)
+        return YouTubeTranscriptApi(http_client=http_client).list(video_id)
     except TranscriptsDisabled:
         logger.info("Transcripts are disabled for %s", url)
     return None
@@ -142,13 +165,17 @@ class TranscriptDownloader:
 
     def download(self) -> FetchedTranscript | None:
         """
-        Downloads the transcript of a YouTube video.
+        Download captions with one owned session spanning listing and fetching.
+
+        Close the session on success, missing captions, or failure. Service errors
+        and timeouts propagate; media orchestration decides whether to fall back.
 
         Returns:
             FetchedTranscript | None: Downloaded transcript, or `None` if no transcript in the requested language is available.
         """
-        if (transcripts := list_video_transcripts(self.url)) is not None:
-            return fetch_matching_transcript(transcripts, self.language, self.url)
+        with CaptionSession() as http_client:
+            if (transcripts := list_video_transcripts(self.url, http_client)) is not None:
+                return fetch_matching_transcript(transcripts, self.language, self.url)
         return None
 
     def download_as_srt_text(self) -> str | None:

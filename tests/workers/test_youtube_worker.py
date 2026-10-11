@@ -2,8 +2,11 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+import requests
 from pathlib_extensions import OverwriteMode
+from youtube_transcript_api import RequestBlocked, VideoUnavailable
 
+import youtube_whisperer.downloaders as downloaders_testee
 import youtube_whisperer.workers.common as common_testee
 import youtube_whisperer.workers.youtube_worker as testee
 from youtube_whisperer.models import Task
@@ -118,6 +121,78 @@ def test_process_video_uses_supplied_snapshot_asset_path_after_environment_mutat
         worker.process_video(playlist_task)
         download.assert_called_with(playlist_task.source, playlist_task.language,
                                     target_dir=snapshot.whisper_assets_dir, overwrite=OverwriteMode.NEVER)
+
+
+@pytest.mark.parametrize("transcriber", [TranscriberType.WHISPER, TranscriberType.AZURE, TranscriberType.NONE])
+@pytest.mark.parametrize("phase", ['watch', 'caption'])
+@pytest.mark.parametrize("error_type", [RequestBlocked, VideoUnavailable, requests.ReadTimeout, requests.ConnectionError])
+def test_process_task_caption_service_failure_completes_or_enqueues_without_dead_letter(mocker, tmp_path, client, caption_http, transcriber, phase, error_type):
+    """Real caption failures retain media and preserve each selected transcriber's routing."""
+    url = 'https://youtu.be/n9xhJrPXop4'
+    task = Task(source=url, language='en', transcriber=transcriber)
+    media = tmp_path / 'media.mp4'
+    caption_http.failure_at = phase
+    caption_http.failure = error_type('n9xhJrPXop4')
+
+    def download_media(*args):
+        """Create owned media before the real orchestration attempts synthetic captions."""
+        media.write_bytes(b'owned media')
+        return media
+
+    mocker.patch.object(downloaders_testee, 'download_video_with_default_title', side_effect=download_media)
+    mocker.patch.object(testee, 'yield_flattened_video_urls', return_value=iter([url]))
+    queue = mocker.patch.object(testee, 'queue_transcription_tasks')
+    dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
+    worker = testee.YouTubeWorker('owned', client, settings=testee.Settings(whisper_assets_dir=tmp_path))
+    worker.process_task(task)
+    if transcriber == TranscriberType.NONE:
+        queue.assert_not_called()
+    else:
+        queue.assert_called_once_with(client, [task.model_copy(update={'source': str(media)})])
+    dead_letter.assert_not_called()
+    assert media.read_bytes() == b'owned media'
+    assert not media.with_suffix('.srt').exists()
+    assert caption_http.closed
+
+
+@pytest.mark.parametrize("failure", ['media', 'unsupported-url', 'publication', 'programming'])
+def test_process_task_local_failures_still_dead_letter_only_that_video(mocker, tmp_path, client, caption_http, failure):
+    """Media, unsupported URL, publication and programming failures retain D17 isolation."""
+    import youtube_whisperer.downloaders.transcript_downloader as caption_testee
+
+    url = 'https://youtu.be/n9xhJrPXop4' if failure != 'unsupported-url' else 'https://www.youtube.com/embed/n9xhJrPXop4'
+    task = Task(source=url, language='en', transcriber=TranscriberType.WHISPER)
+    media = tmp_path / 'media.mp4'
+
+    def download_media(*args):
+        """Raise an owned media failure or create the owned successful media output."""
+        if failure == 'media':
+            raise requests.ConnectionError('owned media failure')
+        media.write_bytes(b'owned media')
+        return media
+
+    mocker.patch.object(downloaders_testee, 'download_video_with_default_title', side_effect=download_media)
+    if failure == 'publication':
+        # NEVER publishes through a hard link; this fault follows the real caption fetch.
+        import youtube_whisperer.adaptors.srt_deduplicator as publication_testee
+        mocker.patch.object(publication_testee.os, 'link', side_effect=OSError('owned publication failure'))
+    elif failure == 'programming':
+        mocker.patch.object(caption_testee, 'get_first_matching_lang_code', side_effect=RuntimeError('owned programming failure'))
+    mocker.patch.object(testee, 'yield_flattened_video_urls', return_value=iter([url]))
+    queue = mocker.patch.object(testee, 'queue_transcription_tasks')
+    dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
+    worker = testee.YouTubeWorker('owned', client, settings=testee.Settings(whisper_assets_dir=tmp_path))
+    worker.process_task(task)
+    queue.assert_not_called()
+    dead_letter.assert_called_once()
+    assert dead_letter.call_args.args[:3] == (client, task, testee.YOUTUBE_STREAM)
+    assert dead_letter.call_args.args[3] == (url if failure == 'unsupported-url' else f'owned {failure} failure')
+    if failure == 'media':
+        assert not media.exists()
+        assert caption_http.calls == []
+    else:
+        assert media.read_bytes() == b'owned media'
+    assert not media.with_suffix('.srt').exists()
 
 
 def test_process_task_queues_follow_ups_only_for_videos_missing_a_transcript(mocker, client, playlist_task):

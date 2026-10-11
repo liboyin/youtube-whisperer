@@ -41,7 +41,8 @@ class YouTubeWorker(BaseWorker):
         The follow-up is enqueued for this video alone instead of being buffered until the
         playlist finishes, so a later video's failure cannot discard work this video already
         earned. A `none` transcriber requests download only, so no follow-up is enqueued
-        regardless of transcript presence.
+        regardless of transcript presence. Reported caption-service errors are treated as
+        missing captions, allowing download-only completion or the selected follow-up.
 
         Args:
             task: A task whose source is a single concrete video URL.
@@ -51,8 +52,9 @@ class YouTubeWorker(BaseWorker):
             Redis as side effects.
 
         Raises:
-            Exception: Any download, caption-lookup, or enqueue failure, so the caller can
-                dead-letter this one video rather than abandoning the rest of the playlist.
+            Exception: Media-download, local caption publication, unwrapped caption parser,
+                programming, or enqueue failures, so the caller can dead-letter this video.
+                Caption-service errors are reported and absorbed by download orchestration.
         """
         waveform_file_path, transcript_found = download_video_and_transcript_with_default_title(
             task.source,
@@ -69,8 +71,8 @@ class YouTubeWorker(BaseWorker):
         """Resolve a YouTube task into concrete transcription work items.
 
         The YouTube worker expands playlist or channel inputs into individual video URLs and
-        processes each one independently. A video that fails to download, look up captions, or
-        enqueue its follow-up is dead-lettered under its own concrete video URL, and the
+        processes each one independently. Media-download, local caption, unwrapped parser,
+        programming and enqueue failures dead-letter that concrete video URL, and the
         remaining videos are still attempted, so one private or unavailable video no longer
         strands an entire playlist. The parent task therefore completes once every expanded
         video has been attempted; a failure during expansion itself still propagates and

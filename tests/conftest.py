@@ -69,3 +69,88 @@ def owned_path_probes(tmp_path):
             yield
 
     return guard
+
+
+@pytest.fixture
+def caption_http(monkeypatch):
+    """Own caption sessions and a scripted adapter while forbidding real HTTP transport."""
+    import json
+
+    import requests
+    from requests.adapters import HTTPAdapter
+
+    import youtube_whisperer.downloaders.transcript_downloader as testee
+
+    class CaptionAdapter(HTTPAdapter):
+        """Serve synthetic watch, innertube and caption responses without sockets."""
+
+        def __init__(self):
+            """Initialize per-test request accounting and controlled failures."""
+            super().__init__()
+            self.calls = []
+            self.closed = False
+            self.failure_at = None
+            self.failure = None
+            self.disabled = False
+            self.language = 'en'
+
+        def send(self, request, **kwargs):
+            """Return controlled payloads or a finite-timeout simulated stall failure."""
+            assert not self.closed, 'Caption session closed before fetch completed'
+            phase = 'innertube' if request.method == 'POST' else 'caption' if request.url.startswith('https://captions.test.invalid/') else 'watch'
+            timeout = kwargs.get('timeout')
+            self.calls.append((phase, timeout))
+            # A missing timeout completes synthetically instead of hanging the test.
+            if (self.failure_at == phase and self.failure is not None
+                    and (not isinstance(self.failure, requests.Timeout) or timeout is not None)):
+                raise self.failure
+            response = requests.Response()
+            response.status_code = 200
+            response.url = request.url
+            response.request = request
+            if phase == 'watch':
+                text = '{"INNERTUBE_API_KEY": "owned-key"}'
+            elif phase == 'innertube':
+                data = {'playabilityStatus': {'status': 'OK'}}
+                if not self.disabled:
+                    data['captions'] = {'playerCaptionsTracklistRenderer': {'captionTracks': [{
+                        'baseUrl': 'https://captions.test.invalid/transcript',
+                        'name': {'runs': [{'text': 'Owned language'}]},
+                        'languageCode': self.language,
+                    }]}}
+                text = json.dumps(data)
+            else:
+                text = '<transcript><text start="0" dur="1">Owned captions</text></transcript>'
+            response._content = text.encode()
+            response.encoding = 'utf-8'
+            return response
+
+        def close(self):
+            """Record transport closure while releasing adapter resources."""
+            self.closed = True
+            super().close()
+
+    adapter = CaptionAdapter()
+    sessions = []
+    original_init = testee.CaptionSession.__init__
+
+    def owned_init(session):
+        """Mount the test-owned adapter on every caption session before requests."""
+        original_init(session)
+        session.trust_env = False
+        session.mount('https://', adapter)
+        session.mount('http://', adapter)
+        sessions.append(session)
+
+    def forbid_real_transport(*args, **kwargs):
+        """Fail before any HTTP transport can open a real socket."""
+        raise AssertionError('Real HTTP transport is forbidden by caption_http')
+
+    monkeypatch.setattr(testee.CaptionSession, '__init__', owned_init)
+    monkeypatch.setattr(HTTPAdapter, 'send', forbid_real_transport)
+    try:
+        yield adapter
+    finally:
+        for session in sessions:
+            session.close()
+        adapter.close()

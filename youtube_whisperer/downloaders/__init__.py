@@ -1,6 +1,9 @@
+import logging
 from pathlib import Path
 
 from pathlib_extensions import OverwriteMode
+from requests import RequestException
+from youtube_transcript_api import YouTubeTranscriptApiException
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.config import Settings
@@ -9,10 +12,16 @@ from youtube_whisperer.downloaders.video_downloader import (
     download_video_with_default_title,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def download_video_and_transcript_with_default_title(url: str, language: LanguageCode, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> tuple[Path, bool]:
     """
-    Downloads a YouTube video and its transcript from the given URL and saves it with a default title in the target directory.
+    Download media first, then attempt captions using the media file's default title.
+
+    Caption-service failures are logged with the URL and traceback, and treated
+    as missing captions so the caller can complete or request transcription.
+    Media-download, local publication, parser and programming errors propagate.
 
     Args:
         url (str): The URL of the video to download.
@@ -25,5 +34,9 @@ def download_video_and_transcript_with_default_title(url: str, language: Languag
     """
     target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir
     video_file_path = download_video_with_default_title(url, target_dir, overwrite)
-    transcript_flag = TranscriptDownloader(url, language).download_as_srt_file(video_file_path.with_suffix('.srt'), overwrite)
+    try:
+        transcript_flag = TranscriptDownloader(url, language).download_as_srt_file(video_file_path.with_suffix('.srt'), overwrite)
+    except (YouTubeTranscriptApiException, RequestException):
+        logger.warning("Caption service failed for %s; treating captions as missing", url, exc_info=True)
+        transcript_flag = False
     return video_file_path, transcript_flag
