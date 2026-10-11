@@ -26,14 +26,15 @@ import pytest
 def pytest_sessionfinish(session, exitstatus):
     """Verify exercised API provenance without preloading application modules."""
     scratch_root = Path(__file__).resolve().parents[1]
-    for name in ("youtube_whisperer.api.app",):
+    names = ("youtube_whisperer.api.app",)
+    for name in names:
         module = sys.modules.get(name)
         if module is None:
             raise pytest.UsageError(f"Expected exercised module is absent: {name}")
         location = Path(module.__file__).resolve()
         if not location.is_relative_to(scratch_root):
             raise pytest.UsageError(f"Application import escaped scratch: {name}: {location}")
-        print(f"ACTUAL_IMPORT_PROVENANCE {name}={location}")
+    print(f"ACTUAL_IMPORT_PROVENANCE scratch={scratch_root} verified={','.join(names)}")
 ```
 
 List only modules the selected tests are expected to exercise; modules intentionally kept absent MUST remain absent. If tests unload or replace modules, check provenance immediately after the relevant test-controlled import instead of relying on the session-end hook. For test-spawned child processes, add equivalent scratch-only location checks inside each child after its own configuration setup and controlled imports. A parent pytest check does not certify a child's imports. From the scratch root, a focused API run is:
@@ -46,3 +47,5 @@ PYTHONPATH="$PWD" PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/owned-temp" python -m p
 A run failing the import check is invalid evidence, rather than a surviving or killed mutant. Save required evidence outside disposable scratch before cleanup. `PYTHONPATH` and owned temporary paths do not replace the test bootstrap's settings isolation or service doubles.
 
 The focused command uses `--no-cov` because the repository's default pytest coverage threshold applies to the whole application. Preserve pytest-randomly's reported seed when reproducing a failure, and identify order-dependent results.
+
+Retain the provenance line and the pytest outcome line for every run. For mutants, also retain the mutant diff and the excerpt of the relevant behavioral failure; full passing output, repeated tracebacks and per-test progress lines are not evidence.
