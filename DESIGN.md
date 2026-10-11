@@ -169,6 +169,12 @@ The API only performs local filesystem glob expansion. All network-facing YouTub
 
 Caption listing and fetching share one `requests` session per video, closed when the lookup ends. Each caption HTTP request defaults to a 10-second connect and 30-second read timeout ([D38](#d38)), so a stalled caption response cannot hold the single YouTube worker indefinitely. The read timeout bounds silence between bytes, not total transfer time: a response that keeps trickling data remains unbounded. Video download and playlist expansion run through yt-dlp and are not covered by this timeout.
 
+### API requests do not block the event loop
+
+The API runs as one uvicorn process with a single event loop. Each endpoint remains an `async def` coroutine function ([D18](#d18)) and runs its blocking Redis, glob, directory-traversal and deletion work through one `starlette.concurrency.run_in_threadpool` call per request; FastAPI already runs the synchronous `get_redis_client`/`get_assets_dir` dependencies in the same threadpool. A stalled Redis call or a large traversal therefore holds one worker thread instead of the event loop, and independent requests keep completing. Exceptions from offloaded work still reach the sanitized 500 handler.
+
+Limitation: the threadpool uses anyio's default capacity limiter (40 tokens, shared with FastAPI's synchronous dependencies), which bounds how many requests can be blocked at once; further requests wait for a token. Per-request timeouts and threadpool sizing are not configured, and the Redis client keeps no socket read timeout (see [Settings and runtime ownership](#settings-and-runtime-ownership)). Because requests can now overlap, concurrent `DELETE /assets` requests may select the same file; the one that finds it already gone skips it, as described under [HTTP contracts](#http-contracts).
+
 ### Playlist videos succeed or fail independently
 
 A playlist or channel task fans out into many videos, and one unavailable video should not cost the others their work. The YouTube worker therefore enqueues each video's follow-up transcription task as soon as that video is downloaded, instead of buffering them until the whole playlist finishes. A video that fails is dead-lettered under its own concrete video URL, carrying `stream:youtube` as its origin queue, and expansion continues with the next video. The parent playlist task is acknowledged once every expanded video has been attempted, so `GET /dead-letters` lists exactly the videos that need attention and each can be resubmitted on its own.

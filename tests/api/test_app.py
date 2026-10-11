@@ -1,8 +1,10 @@
 import asyncio
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from redis import StrictRedis
@@ -530,6 +532,172 @@ def test_clean_assets_propagates_directory_listing_failure(tmp_path, owned_path_
 
     with owned_path_probes(), pytest.raises(FileNotFoundError, match="missing"):
         asyncio.run(testee.clean_assets(dir_path=missing_dir))
+
+
+# Bounds every wait in the concurrency tests so a blocking regression fails instead of hanging.
+SAFETY_TIMEOUT = 5.0
+EMPTY_QUEUES = TaskQueues(youtube=[], whisper_pending=[], whisper_active=[], azure_pending=[], azure_active=[])
+
+
+@pytest.fixture
+def owned_worker_threads():
+    """Join every thread the test started, so no threadpool worker outlives it, even after failures."""
+    before = set(threading.enumerate())
+    yield
+    started = [thread for thread in threading.enumerate() if thread not in before]
+    for thread in started:
+        thread.join(SAFETY_TIMEOUT)
+    assert not [thread.name for thread in started if thread.is_alive()]
+
+
+def run_on_one_loop(scenario):
+    """Run an async request scenario against the app on one event loop with an owned in-process client."""
+
+    async def main():
+        """Own the ASGI client for the scenario's lifetime; no network transport is used."""
+        transport = httpx.ASGITransport(app=testee.app)
+        async with httpx.AsyncClient(transport=transport, base_url='http://api.test') as api:
+            return await scenario(api)
+
+    return asyncio.run(main())
+
+
+def test_held_request_does_not_stall_independent_request(mocker, owned_worker_threads):
+    """While one request's Redis lookup waits at a barrier, an independent request on the same loop completes."""
+    entered, release = threading.Event(), threading.Event()
+
+    def held_lookup(redis_client):
+        """Block like a stalled Redis read until the test releases the barrier."""
+        entered.set()
+        if not release.wait(SAFETY_TIMEOUT):
+            raise TimeoutError('barrier was never released')
+        return EMPTY_QUEUES
+
+    mocker.patch.object(testee, 'list_task_queues', side_effect=held_lookup)
+    mocker.patch.object(testee, 'list_dead_letters', return_value=[])
+
+    async def scenario(api):
+        """Hold GET /tasks, complete GET /dead-letters, then release and await the held request."""
+        held = asyncio.create_task(api.get('/tasks'))
+        try:
+            assert await asyncio.to_thread(entered.wait, SAFETY_TIMEOUT), 'held request never reached the barrier'
+            independent = await asyncio.wait_for(api.get('/dead-letters'), SAFETY_TIMEOUT)
+            assert (independent.status_code, independent.json()) == (200, [])
+            assert not held.done(), 'held request finished before the barrier was released'
+            release.set()
+            response = await asyncio.wait_for(held, SAFETY_TIMEOUT)
+            assert (response.status_code, response.json()) == (200, EMPTY_QUEUES.model_dump(mode='json'))
+        finally:
+            release.set()
+            await asyncio.wait([held], timeout=SAFETY_TIMEOUT)
+            if held.done() and not held.cancelled():
+                held.exception()  # Retrieve a failure so it is reported by the assertion, not at GC.
+
+    run_on_one_loop(scenario)
+
+
+def configure_get_tasks(mocker, record, tmp_path, redis_client):
+    """Record the thread of the queue snapshot read."""
+    mocker.patch.object(testee, 'list_task_queues', side_effect=record('list_task_queues', EMPTY_QUEUES))
+    return 'get', '/tasks', None, {'list_task_queues'}
+
+
+def configure_add_tasks(mocker, record, tmp_path, redis_client):
+    """Record the threads of glob expansion and both queue submissions."""
+    media = tmp_path / 'audio.wav'
+    media.touch()
+    mocker.patch.object(preparation.glob, 'glob', side_effect=record('glob', [str(media)]))
+    mocker.patch.object(testee, 'queue_youtube_task', side_effect=record('queue_youtube_task'))
+    mocker.patch.object(testee, 'queue_transcription_tasks', side_effect=record('queue_transcription_tasks'))
+    body = [{'source': 'https://example.com/video'}, {'source': str(tmp_path / '*.wav')}]
+    return 'post', '/tasks', body, {'glob', 'queue_youtube_task', 'queue_transcription_tasks'}
+
+
+def configure_clear_tasks(mocker, record, tmp_path, redis_client):
+    """Record the thread of the queue snapshot and deletion."""
+    mocker.patch.object(testee, 'clear_task_queues', side_effect=record('clear_task_queues', EMPTY_QUEUES))
+    return 'delete', '/tasks', None, {'clear_task_queues'}
+
+
+def configure_get_dead_letters(mocker, record, tmp_path, redis_client):
+    """Record the thread of the dead-letter read."""
+    mocker.patch.object(testee, 'list_dead_letters', side_effect=record('list_dead_letters', []))
+    return 'get', '/dead-letters', None, {'list_dead_letters'}
+
+
+def configure_clear_dead_letters(mocker, record, tmp_path, redis_client):
+    """Record the threads of the dead-letter read and the queue deletion."""
+    mocker.patch.object(testee, 'list_dead_letters', side_effect=record('list_dead_letters', []))
+    redis_client.delete.side_effect = record('delete', 1)
+    return 'delete', '/dead-letters', None, {'list_dead_letters', 'delete'}
+
+
+def configure_list_assets(mocker, record, tmp_path, redis_client):
+    """Record the thread of the asset directory traversal."""
+    mocker.patch.object(testee, 'prepare_input_dir', side_effect=record('prepare_input_dir', tmp_path))
+    return 'get', '/assets', None, {'prepare_input_dir'}
+
+
+def configure_clean_assets(mocker, record, tmp_path, redis_client):
+    """Record the threads of the asset traversal and of deleting one owned redundant file."""
+    for name in ('video.mp4', 'video.srt', 'video.wav'):
+        (tmp_path / name).touch()
+    mocker.patch.object(testee, 'prepare_input_dir', side_effect=record('prepare_input_dir', tmp_path))
+    unlink = testee.Path.unlink
+    deleting = record('unlink')
+
+    def recording_unlink(path, *args, **kwargs):
+        """Record the deleting thread, then delete the owned file."""
+        assert path.is_relative_to(tmp_path), f'Unowned deletion: {path}'
+        deleting()
+        return unlink(path, *args, **kwargs)
+
+    mocker.patch.object(testee.Path, 'unlink', recording_unlink)
+    return 'delete', '/assets', None, {'prepare_input_dir', 'unlink'}
+
+
+@pytest.mark.parametrize('configure', [
+    configure_get_tasks, configure_add_tasks, configure_clear_tasks, configure_get_dead_letters,
+    configure_clear_dead_letters, configure_list_assets, configure_clean_assets,
+], ids=lambda configure: configure.__name__.removeprefix('configure_'))
+def test_endpoint_blocking_work_runs_off_event_loop(configure, mocker, monkeypatch, mock_redis_client, tmp_path, owned_worker_threads):
+    """Every endpoint's dependencies and blocking Redis or filesystem calls run outside the event-loop thread."""
+    threads = {}
+
+    def record(label, result=None):
+        """Build a side effect that records its first calling thread under label."""
+
+        def side_effect(*args, **kwargs):
+            """Record the calling thread and return the configured result."""
+            threads.setdefault(label, threading.get_ident())
+            return result
+
+        return side_effect
+
+    def redis_dependency():
+        """Generator dependency, like the real one, recording its thread."""
+        record('redis dependency')()
+        yield mock_redis_client
+
+    def assets_dependency():
+        """Plain dependency, like the real one, recording its thread."""
+        return record('assets dependency', tmp_path)()
+
+    monkeypatch.setitem(testee.app.dependency_overrides, testee.get_redis_client, redis_dependency)
+    monkeypatch.setitem(testee.app.dependency_overrides, testee.get_assets_dir, assets_dependency)
+    method, path, body, expected = configure(mocker, record, tmp_path, mock_redis_client)
+    dependency = 'assets dependency' if path == '/assets' else 'redis dependency'
+
+    async def scenario(api):
+        """Issue one request and report the event-loop thread with its response."""
+        response = await asyncio.wait_for(api.request(method, path, json=body), SAFETY_TIMEOUT)
+        return threading.get_ident(), response
+
+    loop_thread, response = run_on_one_loop(scenario)
+
+    assert response.status_code < 300, response.text
+    assert set(threads) == expected | {dependency}
+    assert loop_thread not in threads.values()
 
 
 def test_unhandled_exception_returns_sanitized_500(mocker):
