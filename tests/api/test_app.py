@@ -196,6 +196,22 @@ def test_add_tasks_rejects_arrow_languages_without_enqueueing(client, mocker, la
     transcription_enqueue.assert_not_called()
 
 
+@pytest.mark.parametrize('language', [123, 1.5, None, [], ['en'], {}, {'source': 'en'}, True])
+def test_add_tasks_rejects_non_string_languages_without_enqueueing(mocker, language):
+    """Test that malformed language JSON types produce 422 rather than 500, before queue submission."""
+    youtube_enqueue = mocker.patch.object(testee, 'queue_youtube_task')
+    transcription_enqueue = mocker.patch.object(testee, 'queue_transcription_tasks')
+    swallowing_client = TestClient(testee.app, raise_server_exceptions=False)
+
+    response = swallowing_client.post('/tasks', json=[{'source': 'https://example.com/video', 'language': language}])
+
+    assert response.status_code == 422
+    assert [item['loc'][-1] for item in response.json()['detail']] == ['language']
+    assert 'Unexpected language' in response.json()['detail'][0]['msg']
+    youtube_enqueue.assert_not_called()
+    transcription_enqueue.assert_not_called()
+
+
 def test_openapi_documents_source_language_without_mode_or_targets(client):
     """Test that the HTTP task schema cannot advertise the removed operation or arrow examples."""
     schemas = client.get('/openapi.json').json()['components']['schemas']

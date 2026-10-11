@@ -70,6 +70,9 @@ class LanguageCode:
         """
         Returns a Pydantic CoreSchema that defines how to validate and serialize a LanguageCode.
 
+        The validator raises `ValueError` for every rejected input, so Pydantic reports it as an ordinary
+        `ValidationError` (HTTP 422 through FastAPI) instead of propagating an unhandled exception.
+
         Args:
             _source_type (Any): The annotated source type (unused; required by the Pydantic hook).
             _handler (GetCoreSchemaHandler): The Pydantic schema handler (unused; required by the hook).
@@ -78,21 +81,22 @@ class LanguageCode:
             CoreSchema: A schema that validates strings/instances into `LanguageCode` and serializes them via `str`.
 
         Raises:
-            TypeError: If the input value is not a string or LanguageCode instance.
-            ValueError: If the input string is not a registered language code.
+            ValueError: From the validator, if the input is neither a string nor a LanguageCode instance, or is
+                a string that is malformed or not a registered language code.
         """
-        def deserialize(x: str | LanguageCode) -> LanguageCode:
+        def deserialize(x: object) -> LanguageCode:
             """Validate an incoming value into a LanguageCode instance.
 
             Args:
-                x (str | LanguageCode): An existing instance or a `__str__` form.
+                x (object): Untrusted input; only an existing instance or a `__str__` form is accepted.
 
             Returns:
                 LanguageCode: The validated language code.
 
             Raises:
-                TypeError: If `x` is neither a string nor a LanguageCode.
-                ValueError: If `x` is a string that is not a registered language code.
+                ValueError: If `x` is neither a string nor a LanguageCode (Pydantic does not wrap `TypeError`,
+                    so this must be `ValueError` to become a validation error), or is a string that is
+                    malformed or not a registered language code.
             """
             if isinstance(x, cls):
                 return x
@@ -101,7 +105,7 @@ class LanguageCode:
                     return cls.from_str(x)
                 except UnregisteredLanguageCode as e:
                     raise ValueError(f"Unregistered language code: '{e.args[0]}'") from e
-            raise TypeError(f"Unexpected language {x} of type {type(x)}")
+            raise ValueError(f"Unexpected language {x!r} of type {type(x).__name__}")
 
         return no_info_plain_validator_function(deserialize, serialization=to_string_ser_schema())
 

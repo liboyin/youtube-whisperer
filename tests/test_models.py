@@ -77,11 +77,14 @@ def test_task_language_rejects_translation_arrows(language):
         testee.Task(source='/tmp/audio.wav', language=language)
 
 
-def test_task_language_rejects_non_string_value():
-    """Test that non-string language values raise a direct TypeError."""
-    # Pydantic v2 does not wrap TypeError from plain validators, so it propagates directly
-    with pytest.raises(TypeError, match="Unexpected language"):
-        testee.Task(source="/tmp/audio.wav", language=123)
+@pytest.mark.parametrize('language, type_name', [
+    (123, 'int'), (1.5, 'float'), (None, 'NoneType'), ([], 'list'), (['en'], 'list'), ({}, 'dict'), (True, 'bool'),
+])
+def test_task_language_rejects_non_string_value_as_validation_error(language, type_name):
+    """Test that non-string language values fail ordinary validation and name the offending type."""
+    with pytest.raises(ValidationError, match=f'Unexpected language .* of type {type_name}') as error:
+        testee.Task(source="/tmp/audio.wav", language=language)
+    assert [item['loc'] for item in error.value.errors()] == [('language',)]
 
 
 def test_task_model_json_schema_exposes_language_as_documented_string():

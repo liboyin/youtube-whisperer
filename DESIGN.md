@@ -151,7 +151,7 @@ The [API](youtube_whisperer/api/app.py) uses the [task and response models](yout
 | `GET /assets` | Returns sorted paths of all entries recursively under the configured asset directory, including directories. |
 | `DELETE /assets` | Removes MKV/WAV/MP3 siblings of a completed MP4 + SRT pair and returns sorted removed paths; MP4/SRT files are retained. Mixed-case suffix reconstruction remains a known defect (N1). |
 
-Model validation errors return 422. Non-string language handling remains a known exception (NB17), so not every malformed request currently yields 422. Unexpected endpoint exceptions return a generic 500 response while the server logs the exception. Filesystem task sources are not restricted to the asset directory; this is part of the trusted deployment contract.
+Model validation errors return 422, including a `language` value that is not a string (number, `null`, list, object or boolean). Unexpected endpoint exceptions return a generic 500 response while the server logs the exception. Filesystem task sources are not restricted to the asset directory; this is part of the trusted deployment contract.
 
 ### Redis Streams and a shared consumer group
 
