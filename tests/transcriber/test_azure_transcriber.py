@@ -564,6 +564,7 @@ def test_transcribe_audio_file_times_out_and_stops_recognition(mocker, tmp_path,
     assert fake_speechsdk.created_recognizer.stop_calls == 1
     completion.wait.assert_called_once_with(60.0)
     assert callback_owner.cancelled.is_set()
+    assert not (tmp_path / "audio.srt").exists()
 
 
 @pytest.mark.parametrize("duration, expected_timeout", [(0, 60.0), (10, 60.0), (1000, 1500.0)])
@@ -622,6 +623,79 @@ def test_transcribe_audio_file_surfaces_azure_cancellation_error_without_timing_
 
     assert fake_speechsdk.created_recognizer is not None
     assert fake_speechsdk.created_recognizer.stop_calls == 1
+    save_mock.assert_not_called()
+
+
+def test_transcribe_audio_file_saves_results_after_non_error_cancellation(mocker, tmp_path, owned_path_probes):
+    """A cancellation without an error completes normally and saves the results received so far."""
+    def on_start(recognizer: FakeSpeechRecognizerSync) -> None:
+        """Deliver one result, then a cancellation whose reason is not an error."""
+        recognizer.recognized.emit(SimpleNamespace(result=MockSpeechRecognitionResult(0, 10_000_000, 'hello')))
+        recognizer.canceled.emit(SimpleNamespace(cancellation_details=SimpleNamespace(reason=object(), error_details='')))
+
+    fake_speechsdk = FakeSpeechSDK(on_start)
+    mocker.patch.object(testee, 'speechsdk', fake_speechsdk)
+    mocker.patch.object(testee, 'get_audio_duration_seconds', return_value=0)
+    output_path = tmp_path / 'audio.srt'
+
+    with owned_path_probes():
+        assert testee.transcribe_audio_file(tmp_path / 'audio.wav', LanguageCode(source='en-us')) == output_path
+
+    assert output_path.read_text() == '1\n00:00:00,000 --> 00:00:01,000\nhello\n'
+    assert fake_speechsdk.created_recognizer.stop_calls == 1
+
+
+def test_transcribe_audio_file_duration_failure_creates_no_recognizer(mocker, tmp_path, owned_path_probes):
+    """A duration-inspection failure propagates before any recognizer is created or started."""
+    fake_speechsdk = FakeSpeechSDK(lambda recognizer: recognizer.session_stopped.emit(SimpleNamespace()))
+    mocker.patch.object(testee, 'speechsdk', fake_speechsdk)
+    mocker.patch.object(testee, 'get_audio_duration_seconds', side_effect=RuntimeError('unreadable audio'))
+    save_mock = mocker.patch.object(testee, 'save_segments_as_srt')
+
+    with owned_path_probes(), pytest.raises(RuntimeError, match='unreadable audio'):
+        testee.transcribe_audio_file(tmp_path / 'audio.wav', LanguageCode(source='en-us'))
+
+    assert fake_speechsdk.created_recognizer is None
+    save_mock.assert_not_called()
+
+
+def test_transcribe_audio_file_startup_failure_stops_recognition_without_saving(mocker, tmp_path, owned_path_probes):
+    """A failure raised while starting recognition propagates after stop is attempted, without waiting or saving."""
+    def on_start(_recognizer: FakeSpeechRecognizerSync) -> None:
+        """Fail inside the SDK start call."""
+        raise RuntimeError('start failed')
+
+    fake_speechsdk = FakeSpeechSDK(on_start)
+    completion = mock.Mock()
+    mocker.patch.object(testee, 'speechsdk', fake_speechsdk)
+    mocker.patch.object(testee, 'threading', SimpleNamespace(Event=lambda: completion))
+    mocker.patch.object(testee, 'get_audio_duration_seconds', return_value=0)
+    save_mock = mocker.patch.object(testee, 'save_segments_as_srt')
+
+    with owned_path_probes(), pytest.raises(RuntimeError, match='start failed'):
+        testee.transcribe_audio_file(tmp_path / 'audio.wav', LanguageCode(source='en-us'))
+
+    assert fake_speechsdk.created_recognizer.stop_calls == 1
+    completion.wait.assert_not_called()
+    save_mock.assert_not_called()
+
+
+def test_transcribe_audio_file_interrupted_wait_stops_recognition_without_saving(mocker, tmp_path, owned_path_probes, callback_owner):
+    """An interruption while waiting stops recognition, joins pending callbacks and saves nothing."""
+    fake_speechsdk = FakeSpeechSDK(lambda recognizer: recognizer.owner.cancelled.wait(), callback_owner)
+    completion = mock.Mock()
+    completion.wait.side_effect = KeyboardInterrupt
+    mocker.patch.object(testee, 'speechsdk', fake_speechsdk)
+    mocker.patch.object(testee, 'threading', SimpleNamespace(Event=lambda: completion))
+    mocker.patch.object(testee, 'get_audio_duration_seconds', return_value=0)
+    save_mock = mocker.patch.object(testee, 'save_segments_as_srt')
+
+    with owned_path_probes(), pytest.raises(KeyboardInterrupt):
+        testee.transcribe_audio_file(tmp_path / 'audio.wav', LanguageCode(source='en-us'))
+
+    assert fake_speechsdk.created_recognizer.stop_calls == 1
+    completion.wait.assert_called_once_with(60.0)
+    assert callback_owner.cancelled.is_set()
     save_mock.assert_not_called()
 
 

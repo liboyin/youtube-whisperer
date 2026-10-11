@@ -51,6 +51,69 @@ def recognition_result_to_srt_block(segment: SpeechRecognitionResult) -> SrtBloc
     return timestamps_to_srt_block(start_seconds, end_seconds, segment.text)
 
 
+# The quoted SDK type keeps definition-time evaluation away from stubbed SDK modules in import-isolation tests.
+def _recognize_continuously(speech_recognizer: "speechsdk.SpeechRecognizer", timeout_seconds: float) -> list[SpeechRecognitionResult]:
+    """Run one continuous Azure recognition session and stop it on every exit path.
+
+    Callbacks are connected in the order recognized, canceled, session_stopped.
+    Starting happens inside the cleanup scope, so stopping is attempted after
+    any start attempt, including one that raised, and after success, timeout,
+    Azure cancellation or interruption. Callbacks only collect results and
+    errors; the caller writes output after this function returns.
+
+    Args:
+        speech_recognizer: Configured recognizer that has not been started.
+        timeout_seconds: Maximum time to wait for the session to finish.
+
+    Returns:
+        The non-empty recognition results in delivery order. A cancellation
+        without an error ends the session normally with the results so far.
+
+    Raises:
+        TimeoutError: If the session does not finish within `timeout_seconds`.
+        RuntimeError: If Azure cancels recognition with an error, raised after
+            recognition is stopped; the message is Azure's error details.
+    """
+    recognition_results: list[SpeechRecognitionResult] = []
+    done = threading.Event()
+    transcription_error: Exception | None = None
+
+    def stop_cb(evt: Any) -> None:
+        """Signal completion when Azure stops the recognition session."""
+        logger.debug("CLOSED: %s", evt)
+        done.set()
+
+    def recognized_cb(evt: Any) -> None:
+        """Collect each non-empty recognition result emitted by Azure."""
+        logger.debug("UPDATE: %s", evt)
+        if evt.result.text:  # sometimes there is an empty update at the end of the recognition
+            recognition_results.append(evt.result)
+
+    def canceled_cb(evt: Any) -> None:
+        """Record any Azure cancellation error and signal completion."""
+        nonlocal transcription_error
+        logger.debug("CANCELED: %s", evt)
+        if evt.cancellation_details.reason == speechsdk.CancellationReason.Error:
+            transcription_error = RuntimeError(evt.cancellation_details.error_details)
+        done.set()
+
+    speech_recognizer.recognized.connect(recognized_cb)
+    speech_recognizer.canceled.connect(canceled_cb)
+    speech_recognizer.session_stopped.connect(stop_cb)
+
+    logger.info("Starting transcription on Azure...")
+    try:
+        speech_recognizer.start_continuous_recognition()
+        if not done.wait(timeout_seconds):
+            raise TimeoutError(f"Transcription timed out after {timeout_seconds} seconds")
+    finally:
+        speech_recognizer.stop_continuous_recognition()
+
+    if transcription_error is not None:
+        raise transcription_error
+    return recognition_results
+
+
 def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, *, settings: Settings | None = None) -> Path | None:
     """
     Transcribes an audio file using Azure AI Speech service.
@@ -80,8 +143,11 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
             Azure's error details. Recognition is stopped before the error
             propagates.
 
-    Errors from Azure SDK setup, audio-duration inspection and SRT saving
-    propagate unchanged. No SRT file is written when recognition fails.
+    Audio-duration inspection runs before the recognizer is created, so its
+    errors and Azure SDK configuration errors propagate with nothing started.
+    Errors from starting recognition, and interruptions while waiting,
+    propagate after recognition is stopped. SRT saving errors propagate
+    unchanged. No SRT file is written when recognition fails.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
     if output_file_path.is_file():
@@ -90,50 +156,14 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
         if overwrite == OverwriteMode.PROMPT:
             overwrite = OverwriteMode.ALWAYS
     settings = settings if settings is not None else Settings()
+    # Time out after 1.5x audio duration, but never below the floor so short clips still allow startup.
+    # Inspect duration before creating the recognizer so an inspection failure leaves nothing started.
+    timeout_seconds = max(MIN_AZURE_TIMEOUT_SECONDS, get_audio_duration_seconds(input_file_path) * 1.5)
     speech_config = speechsdk.SpeechConfig(subscription=settings.azure_speech_api_key, region=settings.azure_service_region)
     speech_config.speech_recognition_language = language.get_source_as_BCP()
     audio_config = speechsdk.audio.AudioConfig(filename=str(input_file_path))
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-    recognition_results: list[SpeechRecognitionResult] = []
-    done = threading.Event()
-    transcription_error: Exception | None = None
-
-    def stop_cb(evt: Any) -> None:
-        """Signal completion when Azure stops the recognition session."""
-        logger.debug("CLOSED: %s", evt)
-        done.set()
-
-    def recognized_cb(evt: Any) -> None:
-        """Collect each non-empty recognition result emitted by Azure."""
-        logger.debug("UPDATE: %s", evt)
-        if evt.result.text:  # sometimes there is an empty update at the end of the recognition
-            recognition_results.append(evt.result)
-
-    def canceled_cb(evt: Any) -> None:
-        """Record any Azure cancellation error and signal completion."""
-        nonlocal transcription_error
-        logger.debug("CANCELED: %s", evt)
-        if evt.cancellation_details.reason == speechsdk.CancellationReason.Error:
-            transcription_error = RuntimeError(evt.cancellation_details.error_details)
-        done.set()
-
-    speech_recognizer.recognized.connect(recognized_cb)
-    speech_recognizer.canceled.connect(canceled_cb)
-    speech_recognizer.session_stopped.connect(stop_cb)
-
-    logger.info("Starting transcription on Azure...")
-    speech_recognizer.start_continuous_recognition()
-
-    # Time out after 1.5x audio duration, but never below the floor so short clips still allow startup.
-    timeout_seconds = max(MIN_AZURE_TIMEOUT_SECONDS, get_audio_duration_seconds(input_file_path) * 1.5)
-    try:
-        if not done.wait(timeout_seconds):
-            raise TimeoutError(f"Transcription timed out after {timeout_seconds} seconds")
-    finally:
-        speech_recognizer.stop_continuous_recognition()
-
-    if transcription_error is not None:
-        raise transcription_error
+    recognition_results = _recognize_continuously(speech_recognizer, timeout_seconds)
 
     save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True, overwrite=overwrite)
     return output_file_path
