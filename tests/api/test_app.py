@@ -44,6 +44,23 @@ def client():
     return TestClient(testee.app)
 
 
+def test_resolve_filesystem_tasks_is_reexported_preparation_function():
+    """Existing `api.app.resolve_filesystem_tasks` imports receive the preparation module's function."""
+    assert testee.resolve_filesystem_tasks is preparation.resolve_filesystem_tasks
+
+
+def test_unhandled_exception_returns_sanitized_500(mocker):
+    """The global exception handler must return 500 with a generic detail and not leak the original message."""
+    mocker.patch.object(testee, 'list_task_queues', side_effect=RuntimeError("internal connection string secret=hunter2"))
+    swallowing_client = TestClient(testee.app, raise_server_exceptions=False)
+
+    response = swallowing_client.get("/tasks")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Internal server error"}
+    assert "hunter2" not in response.text
+
+
 def test_get_assets_dir_returns_configured_directory(mock_assets_dir):
     """Test that the assets dependency returns the configured assets directory."""
     assert testee.get_assets_dir() == mock_assets_dir
@@ -86,11 +103,6 @@ def test_get_tasks_propagates_queue_lookup_failure(mocker):
 
     with pytest.raises(RuntimeError, match="redis down"):
         asyncio.run(testee.get_tasks(redis_client=redis_client))
-
-
-def test_resolve_filesystem_tasks_is_reexported_preparation_function():
-    """Existing `api.app.resolve_filesystem_tasks` imports receive the preparation module's function."""
-    assert testee.resolve_filesystem_tasks is preparation.resolve_filesystem_tasks
 
 
 def test_model_copy_preserves_non_source_fields():
@@ -160,7 +172,7 @@ def test_openapi_documents_source_language_without_mode_or_targets(client):
         assert schema['properties']['language']['examples'] == ['en', 'en-us']
 
 
-def test_add_tasks_routes_youtube_and_whisper_work(client, mocker, tmp_path, owned_path_probes):
+def test_add_tasks_submits_url_work_before_filesystem_work_keeping_response_order(client, mocker, tmp_path, owned_path_probes):
     """URL work is submitted before filesystem work while the response keeps input and expansion order."""
     first, second = tmp_path / 'first.wav', tmp_path / 'second.wav'
     first.touch()
@@ -534,6 +546,7 @@ def test_clean_assets_propagates_directory_listing_failure(tmp_path, owned_path_
         asyncio.run(testee.clean_assets(dir_path=missing_dir))
 
 
+# Cross-endpoint concurrency tests follow the last endpoint's tests, since they exercise every endpoint.
 # Bounds every wait in the concurrency tests so a blocking regression fails instead of hanging.
 SAFETY_TIMEOUT = 5.0
 EMPTY_QUEUES = TaskQueues(youtube=[], whisper_pending=[], whisper_active=[], azure_pending=[], azure_active=[])
@@ -698,18 +711,6 @@ def test_endpoint_blocking_work_runs_off_event_loop(configure, mocker, monkeypat
     assert response.status_code < 300, response.text
     assert set(threads) == expected | {dependency}
     assert loop_thread not in threads.values()
-
-
-def test_unhandled_exception_returns_sanitized_500(mocker):
-    """The global exception handler must return 500 with a generic detail and not leak the original message."""
-    mocker.patch.object(testee, 'list_task_queues', side_effect=RuntimeError("internal connection string secret=hunter2"))
-    swallowing_client = TestClient(testee.app, raise_server_exceptions=False)
-
-    response = swallowing_client.get("/tasks")
-
-    assert response.status_code == 500
-    assert response.json() == {"detail": "Internal server error"}
-    assert "hunter2" not in response.text
 
 
 def test_create_app_isolates_lifespan_snapshots_clients_and_asset_paths(tmp_path, monkeypatch, mocker):

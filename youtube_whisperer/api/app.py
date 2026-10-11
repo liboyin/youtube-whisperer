@@ -1,3 +1,10 @@
+"""REST API endpoints for task submission, queue inspection and asset maintenance.
+
+Endpoints stay coroutine functions (D18) but run their blocking Redis and filesystem work in the
+threadpool with one offload per request, so a stalled call does not stall the event loop. The
+underscore-prefixed synchronous functions are those endpoint bodies, not public API.
+"""
+
 import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Generator, Mapping
@@ -30,8 +37,6 @@ resolve_filesystem_tasks = task_preparation.resolve_filesystem_tasks
 
 # FastAPI requires a concrete Request annotation; None retains standalone calls.
 _NO_REQUEST = cast(Request, None)
-# Endpoints stay coroutine functions (D18) but run their blocking Redis and filesystem work in
-# the threadpool with one offload per request, so a stalled call does not stall the event loop.
 router = APIRouter()
 # Lowercase suffixes of a finished stem, and of the transient media it makes redundant.
 COMPLETED_MEDIA_SUFFIXES = frozenset({'.mp4', '.srt'})
@@ -103,7 +108,7 @@ async def get_tasks(redis_client: RedisClientDep) -> TaskQueues:
     return await run_in_threadpool(list_task_queues, redis_client)
 
 
-def submit_tasks(patterns: list[Task], redis_client: StrictRedis) -> AddTasksResponse:
+def _submit_tasks(patterns: list[Task], redis_client: StrictRedis) -> AddTasksResponse:
     """Prepare task patterns and submit the actionable ones, blocking on filesystem and Redis I/O.
 
     URL tasks are submitted one at a time in input order before one bulk submission of resolved
@@ -141,7 +146,7 @@ async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTa
                 (which only applies to downloadable URL sources)
         }
     """
-    return await run_in_threadpool(submit_tasks, patterns, redis_client)
+    return await run_in_threadpool(_submit_tasks, patterns, redis_client)
 
 
 @router.delete("/tasks", response_model=TaskQueues)
@@ -166,7 +171,7 @@ async def get_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
     return await run_in_threadpool(list_dead_letters, redis_client)
 
 
-def delete_dead_letters(redis_client: StrictRedis) -> list[DeadLetter]:
+def _delete_dead_letters(redis_client: StrictRedis) -> list[DeadLetter]:
     """Read and then delete the dead-letter queue, blocking on Redis I/O.
 
     The read and delete are not atomic (D9): a concurrent append may be removed unreported.
@@ -190,10 +195,10 @@ async def clear_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
     Returns:
         list[DeadLetter]: The dead-lettered tasks that were removed.
     """
-    return await run_in_threadpool(delete_dead_letters, redis_client)
+    return await run_in_threadpool(_delete_dead_letters, redis_client)
 
 
-def sorted_asset_paths(dir_path: Path) -> list[str]:
+def _sorted_asset_paths(dir_path: Path) -> list[str]:
     """List every entry recursively under dir_path, blocking on directory traversal.
 
     Args:
@@ -213,7 +218,7 @@ async def list_assets(dir_path: AssetsDirDep) -> list[str]:
     Returns:
         list[str]: Sorted paths of every entry found recursively under the asset directory.
     """
-    return await run_in_threadpool(sorted_asset_paths, dir_path)
+    return await run_in_threadpool(_sorted_asset_paths, dir_path)
 
 
 def group_files_by_stem(dir_path: Path) -> dict[Path, list[Path]]:
@@ -261,7 +266,7 @@ def redundant_media_paths(files_by_stem: Mapping[Path, Collection[Path]]) -> lis
     return redundant
 
 
-def remove_redundant_media(dir_path: Path) -> list[str]:
+def _remove_redundant_media(dir_path: Path) -> list[str]:
     """Delete redundant transient media under dir_path, blocking on traversal and deletion.
 
     A selected file that is already gone when it is deleted, for example because a concurrent
@@ -295,7 +300,7 @@ async def clean_assets(dir_path: AssetsDirDep) -> list[str]:
     Returns:
         list[str]: Sorted actual paths of the files this request removed.
     """
-    return await run_in_threadpool(remove_redundant_media, dir_path)
+    return await run_in_threadpool(_remove_redundant_media, dir_path)
 
 
 def create_app(

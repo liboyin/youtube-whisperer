@@ -42,7 +42,7 @@ These are the dispositions recorded in TODO before this archival move, except NB
 
 - NB30 and N11 are implemented: title lookup, flat extraction and video download share fresh yt-dlp defaults; downloader tests use one function-scoped factory with independent records and retain option/call/result/error assertions. DESIGN's [project structure](../DESIGN.md#project-structure) identifies the option-policy owner; the implementation commits record validation and mutation evidence.
 
-- NB16 and NB22 implement file-only glob expansion with absolute API-resolved sources under [D13](../DESIGN.md#d13), preserving file symlink aliases, arbitrary extensions, glob order, metadata, and failed-pattern reporting. DESIGN's [data flow](../DESIGN.md#data-flow) owns the current behavior; NB29 must retain this contract.
+- NB16 and NB22 implement file-only glob expansion with absolute API-resolved sources under [D13](../DESIGN.md#d13), preserving file symlink aliases, arbitrary extensions, glob order, metadata, and failed-pattern reporting. DESIGN's [data flow](../DESIGN.md#data-flow) owns the current behavior; NB29 had to retain this contract and did so ([NB29](NB29.md)).
 
 - N7 is closed by NB25's [README configuration](../README.md#configuration): direct Python/API/worker launches use exported environment variables, while Compose injects `.env` into application services under [D14](../DESIGN.md#d14). N8 is closed by the explicit fresh-Compose `.env` creation step.
 
