@@ -69,10 +69,12 @@ def test_get_source_as_bcp():
         testee.LanguageCode('en').get_source_as_BCP()
 
 
-def test_get_source_as_iso():
-    """Test that a BCP source is downcast to ISO 639-1 and an ISO source is unchanged."""
-    assert testee.LanguageCode('en-us').get_source_as_ISO() == 'en'
-    assert testee.LanguageCode('zh').get_source_as_ISO() == 'zh'
+def test_get_source_as_iso_converts_every_registered_code():
+    """Test that every registered BCP source is downcast to ISO 639-1 and every ISO source is unchanged."""
+    expected = {'en-us': 'en', 'zh-cn': 'zh', 'en': 'en', 'zh': 'zh'}
+    registered = testee.BCP_LANG_CODES | testee.ISO_LANG_CODES
+    assert registered == set(expected)
+    assert {source: testee.LanguageCode(source).get_source_as_ISO() for source in registered} == expected
 
 
 def test_get_source_as_bcp_and_iso():

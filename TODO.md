@@ -99,10 +99,6 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 **Severity: Low. Validated — owned empty-directory shell reproduction.** [ls_mp4_without_srt.sh](ls_mp4_without_srt.sh):19 iterates an unmatched glob literally and prints `<directory>/*.mp4` with exit 0. **Outcome:** report only existing MP4 files missing SRT. **Acceptance:** empty directory produces no paths; missing/present SRT and filenames with spaces remain correct. **Dependencies:** none.
 
-#### N10 — ISO conversion branches repeat the same transformation
-
-**Severity: Low. Validated — source and exhaustive registered-code comparison at ed9b3a1 on 2026-09-14.** The historical [LanguageCode](youtube_whisperer/adaptors/lang_code_adaptor.py) source conversion separately handles ISO and BCP strings, although both yield `code.split('-', 1)[0]` for every registered value. **Outcome:** remove the redundant membership branch in source ISO conversion; NB32 removed the target-conversion API under [D23](DESIGN.md#d23)/[D24](DESIGN.md#d24); the source-conversion branch remains unchanged. **Acceptance:** source output remains identical for all registered codes; retain whitelist validation, constructor/parsing normalization differences, and BCP-only conversion errors. **Dependencies:** preserve the source conversion methods retained by NB32 and keep this independent simplification distinguishable from the completed translation removal.
-
 ## Readiness and unresolved choices
 
 NB2 and NB3 need their investigation gates cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
@@ -114,6 +110,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 ## Deferred, accepted, and completed dispositions
 
 - [N6](completed_work/N6.md) — Implemented: worker docstrings and `--slot` help describe stream consumer identity for every role, and the Azure transcriber documents that failures raise rather than return `None`.
+- [N10](completed_work/N10.md) — Implemented: `LanguageCode.get_source_as_ISO` uses one split for BCP-47 and ISO 639-1 sources; output is unchanged for every registered code.
 - [NB8](completed_work/NB8.md) — Implemented: video titles and template metacharacters no longer alter download paths; titles never enter yt-dlp's output template.
 - [NB9](completed_work/NB9.md) — Implemented: every started Azure recognition session is stopped on success, timeout, cancellation, startup failure or interruption; duration inspection precedes recognizer creation, and failures write no SRT.
 - [NB11](completed_work/NB11.md) — Implemented: authorized video replacement publishes atomically after a completed staged download; failed downloads keep the previous video.

@@ -146,12 +146,15 @@ class LanguageCode:
         raise UnableToConvertLanguageCode(self.source)
     
     def get_source_as_ISO(self) -> str:
+        """Return the source language as an ISO 639-1 code.
+
+        A BCP-47 source is downcast to its primary language subtag; an ISO 639-1 source has no subtag and is
+        returned unchanged, so one split covers every registered code.
+
+        Returns:
+            str: The ISO 639-1 form of the source.
         """
-        Returns the source language as an ISO 639-1 code.
-        """
-        if self.is_source_BCP():
-            return self.source.split('-')[0]
-        return self.source
+        return self.source.split('-', 1)[0]
     
     def get_source_as_BCP_and_ISO(self) -> list[str]:
         """
