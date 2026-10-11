@@ -13,7 +13,7 @@ import youtube_whisperer.downloaders.video_downloader as testee
 def staged_youtube_dl_factory(mocker, tmp_path):
     """Evaluate real templates while replacing network I/O with owned writes."""
     real_youtube_dl = testee.yt_dlp.YoutubeDL
-    state = SimpleNamespace(instances=[], error=None, output='file', during_download=None)
+    state = SimpleNamespace(instances=[], error=None, output='file', during_download=None, exit_error=None)
 
     class OwnedYoutubeDL(real_youtube_dl):
         """Use the installed template evaluator without extraction or network I/O."""
@@ -30,9 +30,12 @@ def staged_youtube_dl_factory(mocker, tmp_path):
             state.instances.append(self)
 
         def __exit__(self, exc_type, exc, tb):
-            """Record the original exception and close the inert session."""
+            """Record the original exception, close the session and inject an exit failure."""
             self.exit_calls.append((exc_type, exc, tb))
-            return super().__exit__(exc_type, exc, tb)
+            result = super().__exit__(exc_type, exc, tb)
+            if state.exit_error is not None and exc_type is None:
+                raise state.exit_error
+            return result
 
         def download(self, urls):
             """Write synthetic bytes only where real template evaluation directs."""
@@ -336,6 +339,28 @@ def test_download_video_cleans_stage_on_interruption(tmp_path, staged_youtube_dl
     assert created.instances[0].exit_calls[0][:2] == (KeyboardInterrupt, interruption)
     assert target.read_bytes() == b'previous video'
     assert list(tmp_path.iterdir()) == [target]
+
+
+@pytest.mark.parametrize(('policy', 'existing'), [(OverwriteMode.ALWAYS, True), (OverwriteMode.NEVER, False)])
+def test_download_video_publishes_only_after_downloader_context_exit(policy, existing, tmp_path, staged_youtube_dl_factory):
+    """A failing downloader exit after a complete download publishes nothing and removes the stage."""
+    target = tmp_path / 'video.mp4'
+    if existing:
+        target.write_bytes(b'previous video')
+    created = staged_youtube_dl_factory(testee, cookies_available=False)
+    error = RuntimeError('downloader exit failed')
+    created.exit_error = error
+
+    with pytest.raises(RuntimeError) as caught:
+        testee.download_video('url', target, policy)
+
+    assert caught.value is error
+    assert created.instances[0].download_calls == [['url']]
+    if existing:
+        assert target.read_bytes() == b'previous video'
+        assert list(tmp_path.iterdir()) == [target]
+    else:
+        assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.parametrize('policy', [OverwriteMode.NEVER, OverwriteMode.ALWAYS])
