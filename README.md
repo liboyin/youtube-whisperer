@@ -129,7 +129,7 @@ mypy youtube_whisperer
 ruff check .
 ```
 
-`check-coverage.sh` runs pytest and requires at least 80% statement and branch coverage for every measured file and the project. `COVERAGE_THRESHOLD` overrides the script threshold; pytest also retains its configured aggregate floor. Pass only whole-suite options such as `-x` or `-q` to this gate; selected test paths cannot certify per-file coverage. Tests are intentionally outside the mypy gate.
+`check-coverage.sh` runs pytest and requires at least 80% statement and branch coverage for every measured file and the project. `COVERAGE_THRESHOLD` overrides the script threshold; pytest also retains its configured aggregate floor. Pass only whole-suite options such as `-x` or `-q` to this gate; selected test paths cannot certify per-file coverage. Coverage includes the application and the standalone [review snapshot helper](.agents/skills/adversarial-review/references/snapshot.py). Its tests load the script as `testee` by file path and use owned temporary Git repositories; the helper stays outside the application package. Tests are intentionally outside the mypy gate.
 
 Tests run in random order through `pytest-randomly`; reproduce an ordering failure with the printed `--randomly-seed=<seed>`. For focused checks, use `pytest --no-cov` to avoid the aggregate coverage failure caused by selecting only part of the suite.
 

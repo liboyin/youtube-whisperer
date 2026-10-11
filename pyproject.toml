@@ -47,7 +47,7 @@ warn_unused_ignores = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=youtube_whisperer --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=youtube_whisperer --cov=.agents/skills/adversarial-review/references --cov-report=term-missing --cov-fail-under=80"
 
 [tool.coverage.run]
 branch = true
