@@ -54,13 +54,19 @@ def ensure_consumer_group(redis_client: StrictRedis, stream_name: str, group_nam
     """
     Ensure the continuous Stream and Consumer Group topology is instantiated idempotently.
 
+    A missing group is created from the start of the stream (ID ``0``), not at its end, so
+    entries appended while the group was absent are still delivered. For example, a submission
+    racing `DELETE /tasks` can recreate a deleted stream without its group, and the recovering
+    worker must not skip that task. This is safe because workers acknowledge and delete every
+    processed entry, so any entry left in a stream is unprocessed. An existing group is unchanged.
+
     Args:
         redis_client (StrictRedis): The Redis client to issue the command on.
         stream_name (str): The stream the consumer group reads from.
         group_name (str): The consumer group to create if absent.
     """
     try:
-        redis_client.xgroup_create(stream_name, group_name, mkstream=True)
+        redis_client.xgroup_create(stream_name, group_name, id='0', mkstream=True)
     except redis.exceptions.ResponseError as e:
         if "BUSYGROUP" not in str(e):
             raise

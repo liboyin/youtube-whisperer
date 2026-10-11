@@ -29,10 +29,10 @@ def test_get_stream_name_returns_queue_for_supported_transcriber():
         testee.get_stream_name('remote')
 
 
-def test_ensure_consumer_group_creates_group(mock_redis):
-    """Test that a consumer group is properly created if it didn't exist."""
+def test_ensure_consumer_group_creates_missing_group_from_stream_start(mock_redis):
+    """A missing group starts at ID 0 so entries appended while it was absent are still delivered."""
     testee.ensure_consumer_group(mock_redis, 'stream:name', 'group_name')
-    mock_redis.xgroup_create.assert_called_once_with('stream:name', 'group_name', mkstream=True)
+    mock_redis.xgroup_create.assert_called_once_with('stream:name', 'group_name', id='0', mkstream=True)
 
 
 def test_ensure_consumer_group_ignores_busygroup(mock_redis):

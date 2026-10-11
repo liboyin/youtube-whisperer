@@ -110,6 +110,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB24](completed_work/NB24.md) — Implemented ([D16](DESIGN.md#d16), [D39](DESIGN.md#d39)): caption-service errors after a successful download are logged and treated as missing captions, so download-only work completes and Whisper/Azure follow-ups are queued; other failures still dead-letter that video.
 - [NB29](completed_work/NB29.md) — Implemented ([D42](DESIGN.md#d42)): `POST /tasks` preparation lives in the FastAPI/Redis-free `task_preparation` module; the endpoint keeps HTTP serialization and URL-before-filesystem submission, and `api.app.resolve_filesystem_tasks` forwards the same function.
 - [NB33](completed_work/NB33.md) — Implemented: standalone Codex installation replaces plugin provisioning and extension-link repair.
+- [NB35](completed_work/NB35.md) — Implemented ([D43](DESIGN.md#d43)): a missing consumer group is created from stream ID `0`, so a task appended to a stream recreated without its group (for example by a submission racing `DELETE /tasks`) is delivered instead of stranded as pending.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance
