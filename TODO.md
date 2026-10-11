@@ -91,10 +91,6 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 ### Nits
 
-#### N1 — Asset cleanup reconstructs the wrong case-sensitive paths
-
-**Severity: Low. Validated — source and owned-file reproduction.** [Suffix mapping/selection](youtube_whisperer/api/app.py):202,223 lowercases suffixes and reconstructs paths. On Linux, `video.mp4` + `video.srt` + `video.WAV` selects nonexistent `video.wav`, leaving the redundant WAV. **Outcome:** retain actual paths while matching suffixes case-insensitively. **Acceptance:** mixed-case extensions and coexisting case variants clean correctly, preserving MP4/SRT. **Dependencies:** none.
-
 #### N2 — Empty media directories produce a fictitious filename
 
 **Severity: Low. Validated — owned empty-directory shell reproduction.** [ls_mp4_without_srt.sh](ls_mp4_without_srt.sh):19 iterates an unmatched glob literally and prints `<directory>/*.mp4` with exit 0. **Outcome:** report only existing MP4 files missing SRT. **Acceptance:** empty directory produces no paths; missing/present SRT and filenames with spaces remain correct. **Dependencies:** none.
@@ -109,6 +105,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 
 ## Deferred, accepted, and completed dispositions
 
+- [N1](completed_work/N1.md) — Implemented: `DELETE /assets` removes the actual on-disk MKV/WAV/MP3 files of a complete MP4 + SRT stem, matching suffixes case-insensitively; a selected file already gone is skipped.
 - [N6](completed_work/N6.md) — Implemented: worker docstrings and `--slot` help describe stream consumer identity for every role, and the Azure transcriber documents that failures raise rather than return `None`.
 - [N10](completed_work/N10.md) — Implemented: `LanguageCode.get_source_as_ISO` uses one split for BCP-47 and ISO 639-1 sources; output is unchanged for every registered code.
 - [NB8](completed_work/NB8.md) — Implemented: video titles and template metacharacters no longer alter download paths; titles never enter yt-dlp's output template.

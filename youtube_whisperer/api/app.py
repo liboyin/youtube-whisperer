@@ -2,7 +2,7 @@ import glob
 import logging
 import os
 from collections import defaultdict
-from collections.abc import AsyncIterator, Generator
+from collections.abc import AsyncIterator, Collection, Generator, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, cast
@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 # FastAPI requires a concrete Request annotation; None retains standalone calls.
 _NO_REQUEST = cast(Request, None)
 router = APIRouter()
+# Lowercase suffixes of a finished stem, and of the transient media it makes redundant.
+COMPLETED_MEDIA_SUFFIXES = frozenset({'.mp4', '.srt'})
+TRANSIENT_MEDIA_SUFFIXES = frozenset({'.mkv', '.wav', '.mp3'})
 
 
 async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
@@ -202,44 +205,48 @@ async def list_assets(dir_path: AssetsDirDep) -> list[str]:
     return sorted(map(str, prepare_input_dir(dir_path).rglob("*")))
 
 
-def map_path_to_suffixes(dir_path: Path) -> dict[str, set[str]]:
-    """Recursively maps each file path without suffix to the set of lowercased suffixes under dir_path.
+def group_files_by_stem(dir_path: Path) -> dict[Path, list[Path]]:
+    """Recursively group the actual files under dir_path by their exact path without suffix.
+
+    File symlinks are included; directories and broken symlinks are skipped. Paths keep their
+    on-disk spelling, so case variants such as ``video.wav`` and ``video.WAV`` stay distinct.
 
     Args:
         dir_path: Root directory to scan. Must exist.
 
     Returns:
-        A dict mapping each file path without suffix to the set of lowercased suffixes found across all
-        files under dir_path (e.g. ``{"parent/video": {".mp4", ".srt"}}``).
+        A dict mapping each path without suffix to the files sharing it, in scan order
+        (e.g. ``{Path("parent/video"): [Path("parent/video.MP4"), Path("parent/video.srt")]}``).
 
     Raises:
         Exception: If dir_path does not exist or is not accessible.
     """
-    stem2suffixes: dict[str, set[str]] = defaultdict(set)
+    files_by_stem: dict[Path, list[Path]] = defaultdict(list)
     for file_path in prepare_input_dir(dir_path).rglob("*"):
         if file_path.is_file():
-            stem2suffixes[str(file_path.with_suffix(''))].add(file_path.suffix.lower())
-    return dict(stem2suffixes)
+            files_by_stem[file_path.with_suffix('')].append(file_path)
+    return dict(files_by_stem)
 
 
-def redundant_media_paths(stem_to_suffixes: dict[str, set[str]]) -> list[Path]:
+def redundant_media_paths(files_by_stem: Mapping[Path, Collection[Path]]) -> list[Path]:
     """Select transient media files made redundant by a finished MP4 + SRT pair.
 
-    A path stem is treated as complete only when both an ``.mp4`` and an ``.srt``
-    file exist for it; its source ``.mkv``/``.wav``/``.mp3`` siblings are then
-    redundant. The MP4 and SRT themselves are never selected.
+    A path stem is complete only when its files include an ``.mp4`` and an ``.srt``;
+    its ``.mkv``/``.wav``/``.mp3`` files are then redundant. Suffixes match
+    case-insensitively, while selected paths are returned exactly as supplied, so
+    every case variant is selected. The MP4 and SRT themselves are never selected.
 
     Args:
-        stem_to_suffixes: Mapping of each path without suffix to the set of
-            lowercased suffixes present for it (see ``map_path_to_suffixes``).
+        files_by_stem: Mapping of each path without suffix to its actual files
+            (see ``group_files_by_stem``).
 
     Returns:
-        list[Path]: Paths of redundant media files, in arbitrary order.
+        list[Path]: The supplied paths of redundant media files, in arbitrary order.
     """
     redundant: list[Path] = []
-    for stem, suffixes in stem_to_suffixes.items():
-        if suffixes >= {'.mp4', '.srt'}:
-            redundant.extend(Path(f"{stem}{suffix}") for suffix in ('.mkv', '.wav', '.mp3') if suffix in suffixes)
+    for files in files_by_stem.values():
+        if {path.suffix.lower() for path in files} >= COMPLETED_MEDIA_SUFFIXES:
+            redundant.extend(path for path in files if path.suffix.lower() in TRANSIENT_MEDIA_SUFFIXES)
     return redundant
 
 
@@ -248,16 +255,20 @@ async def clean_assets(dir_path: AssetsDirDep) -> list[str]:
     """
     Clean up redundant files in the specified directory.
 
-    If the same filename exists as MP4 and SRT, remove corresponding MKV/WAV/MP3 files.
+    If the same path without suffix exists as MP4 and SRT, remove its MKV/WAV/MP3 files,
+    matching suffixes case-insensitively. A selected file that is already gone when this
+    request deletes it is skipped and not reported; any other deletion error propagates.
 
     Returns:
-        list[str]: List of removed file paths.
+        list[str]: Sorted actual paths of the files this request removed.
     """
     removed_files: list[str] = []
-    for file_path in redundant_media_paths(map_path_to_suffixes(dir_path)):
-        if file_path.is_file():
+    for file_path in redundant_media_paths(group_files_by_stem(dir_path)):
+        try:
             file_path.unlink()
-            removed_files.append(str(file_path))
+        except FileNotFoundError:
+            continue
+        removed_files.append(str(file_path))
     return sorted(removed_files)
 
 

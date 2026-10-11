@@ -71,6 +71,7 @@ Standalone download/model-parameter/CUDA/Azure helpers resolve missing defaults 
 | <a id="d20"></a>D20 | Each API/worker process uses one settings snapshot; standalone Python helpers resolve defaults when called. This replaces the mixed import-time/per-task lookup policy, while preserving environment-only direct-run configuration (D14), explicit overrides, and the resident Whisper model. | NB25 |
 | <a id="d21"></a>D21 | Pass stream and consumer identity into the shared base worker as constructor data, eliminating repeated getter-only overrides. Retain the existing worker subclasses and authoritative recovery/acknowledgement loop; preserve compatible public accessors where needed under D18. | NB27 |
 | <a id="d27"></a>D27 | Accept without change the NB25 review's non-blocking race on concurrent first access to legacy `utils.REDIS_CLIENT`/`REDIS_POOL`. At acceptance, the user reported a clean deployment with no Redis entries and declined further work on this compatibility path. Empty Redis does not remove the Python first-access race; revisit if concurrent legacy callers require one shared client/pool pair. | NB25 compatibility exports; review at e8b34dd |
+| <a id="d42"></a>D42 | The user decided (2026-10-11) that the `DELETE /assets` helpers `map_path_to_suffixes` and `redundant_media_paths` are endpoint internals that D18 does not require preserving. N1 replaced them in place: `group_files_by_stem` groups actual files and `redundant_media_paths` selects actual paths, instead of keeping their lowercased-suffix signatures. Accepted future decision, not yet implemented: NB29 will move `POST /tasks` preparation into a new `youtube_whisperer/task_preparation.py` module, with `api.app.resolve_filesystem_tasks` remaining importable as the same object. Endpoint coroutines keep their names and parameters. | N1 (implemented); NB29 (planned) |
 
 ### Project Structure
 
@@ -149,7 +150,7 @@ The [API](youtube_whisperer/api/app.py) uses the [task and response models](yout
 | `GET /dead-letters` | Returns failed tasks in insertion order, each with `task`, origin `queue` and `error`. |
 | `DELETE /dead-letters` | Returns the list read before deletion; concurrent appends can be lost under D9. |
 | `GET /assets` | Returns sorted paths of all entries recursively under the configured asset directory, including directories. |
-| `DELETE /assets` | Removes MKV/WAV/MP3 siblings of a completed MP4 + SRT pair and returns sorted removed paths; MP4/SRT files are retained. Mixed-case suffix reconstruction remains a known defect (N1). |
+| `DELETE /assets` | Removes the actual MKV/WAV/MP3 files sharing a path without suffix with an MP4 + SRT pair, matching suffixes case-insensitively (every case variant, such as `video.wav` and `video.WAV`, is removed); stems themselves are compared exactly. Returns the sorted removed paths as spelled on disk; MP4/SRT files are retained. A selected file already gone at deletion is skipped and not reported; other deletion errors return 500. |
 
 Model validation errors return 422, including a `language` value that is not a string (number, `null`, list, object or boolean). Unexpected endpoint exceptions return a generic 500 response while the server logs the exception. Filesystem task sources are not restricted to the asset directory; this is part of the trusted deployment contract.
 

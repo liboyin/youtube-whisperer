@@ -464,106 +464,135 @@ def test_list_assets_propagates_directory_listing_failure(tmp_path, owned_path_p
         asyncio.run(testee.list_assets(dir_path=bad_dir))
 
 
-def test_map_path_to_suffixes_maps_paths_to_lowercase_suffixes(tmp_path):
-    """Test that map_path_to_suffixes collects lowercased suffixes per path without suffix."""
-    (tmp_path / "video.mp4").touch()
-    (tmp_path / "video.SRT").touch()
-    (tmp_path / "audio.WAV").touch()
-
-    result = testee.map_path_to_suffixes(tmp_path)
-
-    assert result[str(tmp_path / "video")] == {".mp4", ".srt"}
-    assert result[str(tmp_path / "audio")] == {".wav"}
+def touch_distinct(directory, names):
+    """Create the named files and assert the filesystem kept every case variant distinct."""
+    for name in names:
+        path = directory / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    actual = {str(path.relative_to(directory)) for path in directory.rglob('*') if path.is_file()}
+    assert actual == set(names), 'test requires a case-sensitive filesystem'
 
 
-def test_map_path_to_suffixes_recurses_into_subdirectories(tmp_path):
-    """Test that map_path_to_suffixes descends into subdirectories, keying by full path."""
+def test_group_files_by_stem_keeps_actual_case_variants(tmp_path):
+    """Files group by exact path without suffix, keeping each on-disk suffix spelling."""
+    touch_distinct(tmp_path, ['video.MP4', 'video.Srt', 'video.wav', 'video.WAV', 'Video.mp4'])
+
+    result = testee.group_files_by_stem(tmp_path)
+
+    assert {stem: sorted(files) for stem, files in result.items()} == {
+        tmp_path / 'video': sorted(tmp_path / name for name in ('video.MP4', 'video.Srt', 'video.wav', 'video.WAV')),
+        tmp_path / 'Video': [tmp_path / 'Video.mp4'],
+    }
+
+
+def test_group_files_by_stem_recurses_into_subdirectories(tmp_path):
+    """Test that group_files_by_stem descends into subdirectories, keying by full path."""
     subdir = tmp_path / "sub"
     subdir.mkdir()
     (tmp_path / "video.mp4").touch()
     (subdir / "video.srt").touch()
 
-    result = testee.map_path_to_suffixes(tmp_path)
+    result = testee.group_files_by_stem(tmp_path)
 
-    assert result[str(tmp_path / "video")] == {".mp4"}
-    assert result[str(subdir / "video")] == {".srt"}
-
-
-def test_map_path_to_suffixes_excludes_directories(tmp_path):
-    """Test that map_path_to_suffixes only maps files, not directory entries."""
-    subdir = tmp_path / "video"
-    subdir.mkdir()
-
-    result = testee.map_path_to_suffixes(tmp_path)
-
-    assert str(tmp_path / "video") not in result
+    assert result == {tmp_path / "video": [tmp_path / "video.mp4"], subdir / "video": [subdir / "video.srt"]}
 
 
-def test_map_path_to_suffixes_raises_for_missing_directory(tmp_path, owned_path_probes):
-    """Test that map_path_to_suffixes raises when the directory does not exist."""
+def test_group_files_by_stem_retains_file_symlinks_and_excludes_directories(tmp_path):
+    """Only files and file symlinks are grouped; directories and broken symlinks are skipped."""
+    (tmp_path / "video").mkdir()
+    (tmp_path / "audio.wav").touch()
+    (tmp_path / "alias.wav").symlink_to(tmp_path / "audio.wav")
+    (tmp_path / "broken.wav").symlink_to(tmp_path / "missing.wav")
+
+    result = testee.group_files_by_stem(tmp_path)
+
+    assert result == {tmp_path / "audio": [tmp_path / "audio.wav"], tmp_path / "alias": [tmp_path / "alias.wav"]}
+
+
+def test_group_files_by_stem_raises_for_missing_directory(tmp_path, owned_path_probes):
+    """Test that group_files_by_stem raises when the directory does not exist."""
     with owned_path_probes(), pytest.raises(FileNotFoundError, match="missing"):
-        testee.map_path_to_suffixes(tmp_path / "missing")
+        testee.group_files_by_stem(tmp_path / "missing")
 
 
-def test_redundant_media_paths_selects_transient_siblings_of_completed_stems():
-    """Test that only the present mkv/wav/mp3 siblings of a complete mp4+srt stem are selected."""
-    result = testee.redundant_media_paths({'/assets/video': {'.mp4', '.srt', '.mkv', '.wav', '.mp3'}})
+def test_redundant_media_paths_selects_actual_transient_paths_of_mixed_case_pairs():
+    """A mixed-case MP4 + SRT pair selects every transient case variant by its supplied path."""
+    stem = Path('/assets/video')
+    files = [stem.with_suffix(suffix) for suffix in ('.MP4', '.Srt', '.Mkv', '.wav', '.WAV', '.MP3', '.txt', '.m4a')]
 
-    assert sorted(result) == [Path('/assets/video.mkv'), Path('/assets/video.mp3'), Path('/assets/video.wav')]
+    result = testee.redundant_media_paths({stem: files})
+
+    assert sorted(result) == sorted(stem.with_suffix(suffix) for suffix in ('.Mkv', '.wav', '.WAV', '.MP3'))
 
 
 def test_redundant_media_paths_ignores_incomplete_stems():
     """Test that a stem missing either the mp4 or the srt keeps its transient files."""
     result = testee.redundant_media_paths({
-        '/assets/no_srt': {'.mp4', '.mkv'},
-        '/assets/no_mp4': {'.srt', '.wav'},
+        Path('/assets/no_srt'): [Path('/assets/no_srt.MP4'), Path('/assets/no_srt.mkv')],
+        Path('/assets/no_mp4'): [Path('/assets/no_mp4.SRT'), Path('/assets/no_mp4.wav')],
     })
 
     assert result == []
 
 
 def test_redundant_media_paths_never_selects_mp4_or_srt():
-    """Test that the source mp4 and srt of a completed stem are never marked redundant."""
-    result = testee.redundant_media_paths({'/assets/video': {'.mp4', '.srt'}})
+    """Test that the mp4 and srt of a completed stem are never marked redundant, in any case."""
+    stem = Path('/assets/video')
+
+    result = testee.redundant_media_paths({stem: [stem.with_suffix(suffix) for suffix in ('.mp4', '.MP4', '.srt', '.SRT')]})
 
     assert result == []
 
 
-def test_clean_assets(client, mock_assets_dir, mocker):
-    """Test that cleaning assets removes only transient media files."""
-    (mock_assets_dir / "video.mp4").touch()
-    (mock_assets_dir / "video.srt").touch()
-    (mock_assets_dir / "video.mkv").touch()
-    (mock_assets_dir / "video.wav").touch()
-    (mock_assets_dir / "video.mp3").touch()
-    (mock_assets_dir / "another.mp4").touch()
-    mocker.patch.object(testee, 'map_path_to_suffixes', return_value={
-        str(mock_assets_dir / 'video'): {'.mp4', '.srt', '.mkv', '.wav', '.mp3'},
-        str(mock_assets_dir / 'another'): {'.mp4'},
-    })
+def test_clean_assets_removes_actual_transient_files(client, mock_assets_dir):
+    """Cleaning removes every actual transient case variant of complete stems and nothing else."""
+    removed = ['video.mkv', 'video.wav', 'video.WAV', 'video.Mp3', 'sub/clip.Wav']
+    retained = [
+        'video.MP4', 'video.Srt', 'video.txt', 'sub/clip.mp4', 'sub/clip.SRT',
+        'Other.mp4', 'other.srt', 'other.wav', 'Other.wav', 'draft.mp4', 'draft.MKV', 'another.mp4',
+    ]
+    touch_distinct(mock_assets_dir, removed + retained)
 
     response = client.delete("/assets")
 
     assert response.status_code == 200
-    removed_files = response.json()
-    assert len(removed_files) == 3
-    assert str(mock_assets_dir / "video.mkv") in removed_files
-    assert str(mock_assets_dir / "video.wav") in removed_files
-    assert str(mock_assets_dir / "video.mp3") in removed_files
-    assert not (mock_assets_dir / "video.mkv").exists()
-    assert not (mock_assets_dir / "video.wav").exists()
-    assert not (mock_assets_dir / "video.mp3").exists()
-    assert (mock_assets_dir / "video.mp4").exists()
-    assert (mock_assets_dir / "video.srt").exists()
-    assert (mock_assets_dir / "another.mp4").exists()
+    assert response.json() == sorted(str(mock_assets_dir / name) for name in removed)
+    remaining = {str(path.relative_to(mock_assets_dir)) for path in mock_assets_dir.rglob('*') if path.is_file()}
+    assert remaining == set(retained)
 
 
-def test_clean_assets_propagates_directory_listing_failure(mocker, tmp_path):
+def test_clean_assets_skips_selected_file_that_vanished_before_deletion(client, mock_assets_dir, mocker):
+    """A selected file already removed before deletion is skipped without failing or being reported."""
+    vanished = mock_assets_dir / 'vanished.wav'
+    present = mock_assets_dir / 'present.wav'
+    present.touch()
+    assert not vanished.exists()
+    mocker.patch.object(testee, 'redundant_media_paths', return_value=[vanished, present])
+
+    response = client.delete("/assets")
+
+    assert response.status_code == 200
+    assert response.json() == [str(present)]
+    assert not present.exists()
+
+
+def test_clean_assets_propagates_other_deletion_failures(mock_assets_dir, mocker):
+    """Deletion failures other than an already-missing file propagate for the global 500 handler."""
+    blocked = mock_assets_dir / 'blocked.wav'
+    blocked.mkdir()  # unlink() of a directory raises IsADirectoryError, an OSError.
+    mocker.patch.object(testee, 'redundant_media_paths', return_value=[blocked])
+
+    with pytest.raises(IsADirectoryError):
+        asyncio.run(testee.clean_assets(dir_path=mock_assets_dir))
+    assert blocked.is_dir()
+
+
+def test_clean_assets_propagates_directory_listing_failure(tmp_path, owned_path_probes):
     """Test that asset-cleaning listing failures propagate so the global handler can convert them to 500."""
     missing_dir = tmp_path / "missing"
-    mocker.patch.object(testee, 'map_path_to_suffixes', side_effect=FileNotFoundError(missing_dir))
 
-    with pytest.raises(FileNotFoundError, match="missing"):
+    with owned_path_probes(), pytest.raises(FileNotFoundError, match="missing"):
         asyncio.run(testee.clean_assets(dir_path=missing_dir))
 
 
