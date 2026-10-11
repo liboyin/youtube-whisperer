@@ -1,6 +1,4 @@
-import glob
 import logging
-import os
 from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Generator, Mapping
 from contextlib import asynccontextmanager
@@ -12,8 +10,8 @@ from fastapi.responses import JSONResponse
 from pathlib_extensions import prepare_input_dir
 from redis import ConnectionPool, StrictRedis
 
+from youtube_whisperer import task_preparation
 from youtube_whisperer.config import Settings
-from youtube_whisperer.domain import TranscriberType, is_url
 from youtube_whisperer.models import AddTasksResponse, DeadLetter, Task, TaskQueues
 from youtube_whisperer.queueing import (
     DEAD_LETTER_QUEUE,
@@ -26,6 +24,8 @@ from youtube_whisperer.queueing import (
 from youtube_whisperer.runtime import Runtime
 
 logger = logging.getLogger(__name__)
+# Forward the same object for existing `api.app.resolve_filesystem_tasks` imports (D42).
+resolve_filesystem_tasks = task_preparation.resolve_filesystem_tasks
 
 # FastAPI requires a concrete Request annotation; None retains standalone calls.
 _NO_REQUEST = cast(Request, None)
@@ -100,25 +100,6 @@ async def get_tasks(redis_client: RedisClientDep) -> TaskQueues:
     return list_task_queues(redis_client)
 
 
-def resolve_filesystem_tasks(pattern: Task) -> list[Task]:
-    """Resolve a filesystem pattern into absolute file tasks in glob order.
-
-    Paths are anchored to the API working directory without resolving symlink aliases.
-    File symlinks are retained; directories and other non-file matches are skipped.
-
-    Args:
-        pattern (Task): A task whose `source` is a glob pattern over the local filesystem.
-
-    Returns:
-        list[Task]: One copy of `pattern` per matched file, with `source` set to that file path.
-    """
-    return [
-        pattern.model_copy(update={'source': str(Path(path).absolute())})
-        for path in glob.glob(os.path.expanduser(pattern.source))
-        if Path(path).is_file()
-    ]
-
-
 @router.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
 async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTasksResponse:
     """
@@ -135,28 +116,12 @@ async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTa
                 (which only applies to downloadable URL sources)
         }
     """
-    successful_tasks: list[Task] = []
-    failed_tasks: list[Task] = []
-    youtube_tasks: list[Task] = []
-    transcription_tasks: list[Task] = []
-    for pattern in patterns:
-        if is_url(pattern.source):
-            successful_tasks.append(pattern)
-            youtube_tasks.append(pattern)
-        elif pattern.transcriber == TranscriberType.NONE:
-            # `none` means "download only"; a local file has nothing to download and, without
-            # transcription, no output would be produced, so the task is not actionable.
-            failed_tasks.append(pattern)
-        elif resolved_tasks := resolve_filesystem_tasks(pattern):
-            successful_tasks.extend(resolved_tasks)
-            transcription_tasks.extend(resolved_tasks)
-        else:
-            failed_tasks.append(pattern)
-    for task in youtube_tasks:
+    prepared = task_preparation.prepare_tasks(patterns)
+    for task in prepared.youtube:
         queue_youtube_task(redis_client, task)
-    if transcription_tasks:
-        queue_transcription_tasks(redis_client, transcription_tasks)
-    return AddTasksResponse(successful=successful_tasks, failed=failed_tasks)
+    if prepared.transcription:
+        queue_transcription_tasks(redis_client, list(prepared.transcription))
+    return AddTasksResponse(successful=list(prepared.successful), failed=list(prepared.failed))
 
 
 @router.delete("/tasks", response_model=TaskQueues)
