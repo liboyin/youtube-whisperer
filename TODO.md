@@ -42,7 +42,7 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 #### B5 — Title-only filenames silently alias different videos
 
-**Severity: High. Validated — source and isolated equal-title reproduction.** [Video naming](youtube_whisperer/downloaders/video_downloader.py):55–58 and [transcript naming](youtube_whisperer/downloaders/transcript_downloader.py):186–187 derive identity solely from sanitized/truncated titles. Distinct video IDs can share MP4/SRT paths. Under worker `NEVER` semantics, the second video reuses the first media; if the first SRT is absent, captions can be paired with the wrong video. **Outcome:** preserve distinct video identities and safe repeat processing of the same video. **Acceptance:** equal titles, sanitization collisions, truncation collisions, and repeat downloads cannot substitute unrelated content. **Dependencies:** user naming/migration decision before implementation; preserve the human-browsable media-library contract and the literal-path staged video publication implemented by [NB8](completed_work/NB8.md)/[NB11](completed_work/NB11.md). **Simplification review — 2026-09-14:** after that naming decision, use one pure naming rule for standalone MP4/SRT and combined-download paths, preserving suffixes, UTF-8 limits, and human-readable titles. The two current sanitization/truncation implementations should not evolve independently.
+**Severity: High. Validated — source and isolated equal-title reproduction.** [Video naming](youtube_whisperer/downloaders/video_downloader.py):95–96 and [transcript naming](youtube_whisperer/downloaders/transcript_downloader.py):228–229 derive identity solely from sanitized/truncated titles. Distinct video IDs can share MP4/SRT paths. Under worker `NEVER` semantics, the second video reuses the first media; if the first SRT is absent, captions can be paired with the wrong video. **Outcome:** preserve distinct video identities and safe repeat processing of the same video. **Acceptance:** equal titles, sanitization collisions, truncation collisions, and repeat downloads cannot substitute unrelated content. **Dependencies:** user naming/migration decision before implementation; preserve the human-browsable media-library contract and the literal-path staged video publication implemented by [NB8](completed_work/NB8.md)/[NB11](completed_work/NB11.md). **Simplification review — 2026-09-14:** after that naming decision, use one pure naming rule for standalone MP4/SRT and combined-download paths, preserving suffixes, UTF-8 limits, and human-readable titles. The two current sanitization/truncation implementations should not evolve independently.
 
 ### Non-blocking
 
@@ -85,6 +85,17 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 #### NB31 — Compose repeats the shared application-service configuration
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** [D10](DESIGN.md#d10) intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
+
+#### NB34 — Staged-file publication is hand-copied in three places
+
+**Severity: Low. Validated structural observation — Claude Opus 5.5 re-review of `5fdb927` and main-agent source comparison at `a424a2b` on 2026-10-11; proposed simplification.**
+
+- **Duplication:** [video download](youtube_whisperer/downloaders/video_downloader.py) (`download_video`), [SRT publication](youtube_whisperer/adaptors/srt_deduplicator.py) (`publish_srt_text`) and [WAV conversion](youtube_whisperer/transcriber/waveform_loader.py) (`save_as_wav_file`) each repeat the same steps: mode capture, `chmod`, `os.link` create-if-absent for `NEVER`/`RENAME` with the file-collision rule, and atomic replacement otherwise. The WAV copy already expresses the collision branch differently.
+- **Risk:** a future fix to one copy of this data-loss-sensitive protocol can miss the others.
+- **Outcome:** one staged-file publication helper owns the shared [completion contract](DESIGN.md#srt-as-the-output-format) and [D22](DESIGN.md#d22). Each caller keeps its own stage creation and cleanup.
+- **Acceptance:** the existing video, SRT and WAV publication tests pass unchanged. Mutation evidence shows that the helper's collision, mode and replacement rules are protected through every caller.
+- **Dependencies:** none.
+- **Revisit trigger:** the next change to any publication path.
 
 ### Nits
 

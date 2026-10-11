@@ -78,6 +78,27 @@ Reviewer: Codex session `01a1264d-7588-7200-999f-5417e4bda0e8` (`gpt-6.1-sol`, h
 
 **Verdict: no blocking findings; no Non-blocking findings or Nits.** With no findings, nothing needed a disposition. The main agent's post-review integrity comparison matched the pre-review snapshot exactly: HEAD, status, empty staged diff, modes and hashes.
 
+## Re-review
+
+- **Why:** the user requested a fresh adversarial review with Claude Opus 5.5 (2026-10-11), because the original implementer and reviewer were both Codex `gpt-6.1-sol`.
+- **Reviewer:** a Claude Opus 5.5 subagent (Claude Code Agent tool), started without the main agent's conversation and using the dispatch rules of the [review skill](../.agents/skills/adversarial-review/SKILL.md). The first dispatch failed with an API certificate error before doing any work, and it was relaunched once unchanged.
+- **Target:** commit `5fdb927`, as a full first assessment.
+- **Gates (main agent):** run on a `git archive 5fdb927` export with `PYTHONPATH` set to it. `./check-coverage.sh` gave 635 passed (seed 1900862736), total 99.5% statement / 97.2% branch; mypy and ruff were clean.
+- **Reviewer verification:** reviewer scratch export, devcontainer, Python 3.12.3, yt-dlp 2026.08.19, with network connections blocked by a scratch-only socket guard.
+  - **Path probe:** 1,463 parent-directory names ran through the real `download_video` and the real `prepare_filename`. 80 were rejected before staging and 1,383 were published at the literal target.
+  - **Merge probe:** a real format-selection and FFmpeg-merge run with synthetic media fixtures.
+  - **Mutants:** supplied mutants a–f were accepted, and b and e were replayed and killed. The reviewer's own mutants g (title enters the template), i (swallow every `FileExistsError`) and k (`RENAME` loses create-if-absent) were killed. Mutant j (second `prepare_output_file` removed) survived and was investigated: it affects only a dangling symlink whose destination parent is missing, and it mirrors the SRT path. No finding was raised.
+- **Findings:**
+  1. **Non-blocking:** video publication is a third hand-copied implementation of the staged-file protocol shared with SRT and WAV.
+     - **Validated** by source comparison.
+     - **Disposition:** deferred as [TODO NB34](../TODO.md#nb34--staged-file-publication-is-hand-copied-in-three-places), because it needs a three-module refactor outside this boundary. Revisit trigger: the next change to any publication path.
+  2. **Nit:** the DESIGN contract that publication follows downloader context exit had no protecting test. Mutant h, which publishes inside the `with` block, passed all 55 tests.
+     - **Validated and fixed** by `test_download_video_publishes_only_after_downloader_context_exit` (`ALWAYS` over an existing file, `NEVER` into an absent target).
+     - **Main-agent mutation evidence:** a scratch export of the follow-up candidate, seed 424242, with provenance verified for `video_downloader`. Baseline 57 passed; mutant h failed 2 (`assert b'new video' == b'previous video'`); after restoring the source, 57 passed.
+     - **Reviewer check:** the reviewer also killed variants that published early only through `os.replace` and only through `os.link`.
+  3. **Nit:** TODO B5 cited stale line references (`video_downloader.py:55–58`). **Validated and fixed**, together with the stale transcript reference in the same sentence.
+- **Verdict:** the follow-up assessment found no blocking findings and nothing new. The first assessment and the follow-up left HEAD, status and the candidate diff unchanged.
+
 ## Limitations and cleanup
 
 - No live extraction, browser-cookie loading, network transfer or FFmpeg merge was exercised. Tests exercise yt-dlp's template evaluation and file processing with synthetic metadata.
