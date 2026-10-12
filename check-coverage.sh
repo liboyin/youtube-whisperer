@@ -10,10 +10,27 @@
 # meaningless, so pass options (e.g. -x, -q), not test paths.
 #
 # Environment:
-#   COVERAGE_THRESHOLD  Minimum percentage per file and for the total. Defaults to 80.
+#   COVERAGE_THRESHOLD  Minimum percentage per file and for the total, from 0 to 100 inclusive.
+#                       Defaults to 80 when unset or empty; an invalid value fails before pytest runs.
 set -uo pipefail
 
 threshold="${COVERAGE_THRESHOLD:-80}"
+# Reject an unusable threshold before running the suite: NaN compares false against every
+# percentage, and an out-of-range value makes the per-file comparisons pass or fail vacuously.
+python3 - "$threshold" <<'PY' || exit 1
+"""Exit with a message unless the threshold is a number in [0, 100]."""
+import sys
+
+raw_threshold = sys.argv[1]
+try:
+    threshold = float(raw_threshold)
+except ValueError:
+    threshold = float('nan')
+# The chained comparison is false for NaN and both infinities, so it also enforces finiteness.
+if not 0 <= threshold <= 100:
+    sys.exit(f"check-coverage: COVERAGE_THRESHOLD must be a number from 0 to 100, got {raw_threshold!r}")
+PY
+
 report="$(mktemp -t coverage-XXXXXXXX.json)"
 trap 'rm -f "$report"' EXIT
 
