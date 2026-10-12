@@ -1,32 +1,18 @@
 """Exercise the MP4-without-SRT listing script in owned temporary directories."""
 
-import os
-import shutil
-import subprocess
+import functools
 from pathlib import Path
 
 import pytest
 
 # Shell scripts are not importable, so the script under test is named by path instead of `testee`.
 SCRIPT = Path(__file__).resolve().parents[2] / 'ls_mp4_without_srt.sh'
-BASH = shutil.which('bash')
 
 
 @pytest.fixture
-def run_script(tmp_path):
-    """Run the script in a fresh bash process with a minimal environment owned by the test."""
-    assert BASH is not None, 'bash is required to exercise the shell script'
-    home = tmp_path / 'home'
-    temp = tmp_path / 'temp'
-    home.mkdir()
-    temp.mkdir()
-    env = {'PATH': os.defpath, 'HOME': str(home), 'TMPDIR': str(temp), 'LC_ALL': 'C.UTF-8'}
-
-    def run(*args):
-        """Return the completed process for one script invocation rooted in the test directory."""
-        return subprocess.run([BASH, str(SCRIPT), *args], cwd=tmp_path, env=env, check=False, capture_output=True, text=True, timeout=10)
-
-    return run
+def run_script(run_shell_script):
+    """Run this script through the shared owned-subprocess runner, which roots it in ``tmp_path``."""
+    return functools.partial(run_shell_script, SCRIPT)
 
 
 def test_missing_argument_prints_usage_and_exits_one(run_script):

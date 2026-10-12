@@ -145,4 +145,4 @@ Tests run in random order through `pytest-randomly`; reproduce an ordering failu
 - Queue and dead-letter clearing snapshots then deletes non-atomically; concurrent additions can be removed without appearing in the response. Clearing queues does not cancel work already running.
 - Older persisted payloads may require manual Redis repair; see [upgrade guidance](DESIGN.md#transcription-requests-and-upgrades) before switching versions.
 
-The repository also includes `extract_subtitle_text.sh` to strip SRT timestamps and `ls_mp4_without_srt.sh` to find videos without sibling subtitles. Known defects and accepted limitations are tracked in [TODO.md](TODO.md) and [DESIGN.md](DESIGN.md).
+The repository also includes `extract_subtitle_text.sh` to print an SRT file's cue text without its indexes, timing lines or blank lines, from LF or CRLF input, and `ls_mp4_without_srt.sh` to find videos without sibling subtitles. Known defects and accepted limitations are tracked in [TODO.md](TODO.md) and [DESIGN.md](DESIGN.md).
