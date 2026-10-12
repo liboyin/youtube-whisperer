@@ -1,9 +1,9 @@
 """Concrete ownership of a runtime's settings, paths and Redis resources."""
 
 from types import TracebackType
+from typing import Self
 
 import redis
-from typing_extensions import Self
 
 from youtube_whisperer.config import Settings
 from youtube_whisperer.utils import create_redis_pool

@@ -263,6 +263,7 @@ Compose supplies the helpers as a named build context (`build_common`) pinned to
 |---|---|---|
 | <a id="d10"></a>D10 | Opening the devcontainer is intended to start the application workers against the configured queue and volumes. | Development startup; automated-test ownership rules still apply |
 | <a id="d14"></a>D14 | Document current configuration behavior: Compose injects `.env`, direct invocations need exported variables, and fresh Compose setup must create the required file. Do not add automatic dotenv loading. | N7/N8 (closed) |
+| <a id="d45"></a>D45 | The user decided (2026-10-12) to raise `requires-python` to `>=3.12` instead of determining the lowest compatible version or adding a CI version matrix. The source imports `typing.Self`, so 3.10 was never supported, and 3.12 is the only version any repository environment runs: the devcontainer and the Ubuntu 24.04 image's system `python3`. Ruff infers its target version from this floor, so `runtime.py` imports `Self` from `typing` instead of the undeclared `typing_extensions`. Supporting an older version would need its own verification. | NB3 (closed); [README local install](README.md#local-install) |
 
 ## Engineering governance
 
@@ -272,7 +273,7 @@ These decisions record accepted policy and its rationale; [AGENTS](AGENTS.md), t
 
 | ID | Accepted decision and rationale | Applies to |
 |---|---|---|
-| <a id="d1"></a>D1 | Tests are not type-checked. The mypy gate covers `youtube_whisperer` only, and widening it is not planned work. | NB3 |
+| <a id="d1"></a>D1 | Tests are not type-checked. The mypy gate covers `youtube_whisperer` only, and widening it is not planned work. | mypy gate |
 | <a id="d4"></a>D4 | `check-coverage.sh` owns the executable coverage policy. `pyproject.toml` keeps the pytest and aggregate coverage configuration. | Coverage policy |
 
 ### Tooling and review

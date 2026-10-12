@@ -45,7 +45,7 @@ See [build-helper design](DESIGN.md#build-helpers-come-from-a-shared-repository)
 
 ### Local install
 
-Use the container's Python 3.12 environment as the reference. The package declares Python ≥3.10, but current source imports `typing.Self`, which is unavailable in 3.10; the supported minimum remains unresolved under NB3 in [TODO.md](TODO.md). Direct launches also need ffmpeg and a reachable Redis server (`REDIS_HOST`/`REDIS_PORT`).
+The package requires Python 3.12 or later, the version the container provides ([D45](DESIGN.md#d45)). Direct launches also need ffmpeg and a reachable Redis server (`REDIS_HOST`/`REDIS_PORT`).
 
 ```sh
 pip install -r requirements.txt

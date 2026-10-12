@@ -32,7 +32,7 @@ Accepted decisions and system constraints live in [DESIGN.md](DESIGN.md), groupe
 
 ### Investigation gates
 
-NB2 must inventory the violations an expanded ruff selection produces before choosing the rule set; the entry does not authorize a wholesale reformat. NB3 must establish the true minimum Python version from the syntax and dependencies actually in use before changing `requires-python`. These investigations can expose new decisions; they do not authorize guessing.
+NB2 must inventory the violations an expanded ruff selection produces before choosing the rule set; the entry does not authorize a wholesale reformat. That investigation can expose new decisions; it does not authorize guessing.
 
 ## Active backlog
 
@@ -49,10 +49,6 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 #### NB2 — Ruff runs with its default rule set
 
 **Validated — no `[tool.ruff]` configuration exists at 98c4518.** Only the default `E4`, `E7`, `E9`, and `F` rules are active, so nothing enforces line length, import ordering, docstring style, or common-bug patterns. AGENTS requires narrow, justified lint exceptions, but almost nothing currently produces one. **Paths:** [pyproject.toml](pyproject.toml). **Direction:** after the inventory required by the investigation gate, select a broader set. Pydocstyle with the Google convention would mechanize the docstring rule that AGENTS states in prose. **Acceptance:** `ruff check .` passes under the expanded selection and every `noqa` carries the rationale AGENTS requires. **Non-goals:** restructuring code beyond what the selected rules demand. **Current inventory — 2026-09-12:** source still uses `Any` in language-schema hooks, playlist metadata, Azure callbacks, and model parameters; several source classes lack docstrings. Tests also retain string-based patches (for example `tests/transcriber/test_model_parameters.py:7`) and alternate import forms. Inventory these separately from runtime defects, and distinguish rules Ruff can enforce from typing or test-structure work; do not claim broader lint selection alone resolves them.
-
-#### NB3 — The declared Python floor is incompatible with the source
-
-**Validated — source inspection at 2f784f2 on 2026-09-12.** `requires-python = ">=3.10"`, but [lang_code_adaptor.py](youtube_whisperer/adaptors/lang_code_adaptor.py) imports `Self` from `typing` at line 3; that symbol was introduced in Python 3.11. The task models and API/worker import chains therefore fail on the declared 3.10 floor. This is stronger evidence than the inherited unverified-support finding; no Python 3.10 run was performed. The devcontainer runs 3.12.3, and no environment in the repository exercises 3.10 or 3.11. The repository has no continuous integration at all, so the gates run only where an agent or the user runs them. **Paths:** [pyproject.toml](pyproject.toml), [Dockerfile](Dockerfile), [.devcontainer/](.devcontainer/). **Direction:** determine the real minimum from the code and dependencies, then either correct `requires-python` or verify the floor with a GitHub Actions matrix running the three gates across the supported versions. **Acceptance:** the declared floor is either verified by a matrix run or corrected to what is actually supported. Note [D1](DESIGN.md#d1): any CI job runs mypy against the package only.
 
 #### NB5 — Lock-file regeneration is a side effect of creating the container
 
@@ -75,7 +71,7 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 ## Readiness and unresolved choices
 
-NB2 and NB3 need their investigation gates cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
+NB2 needs its investigation gate cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
 
 All entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming must be settled before its dependent implementation; playlist continuation is settled by [D17](DESIGN.md#d17). [D14](DESIGN.md#d14)/[D16](DESIGN.md#d16) settle the configuration and caption-error outcomes; N7/N8 are resolved; NB24 implemented D16.
 
@@ -89,6 +85,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [N10](completed_work/N10.md) — Implemented: `LanguageCode.get_source_as_ISO` uses one split for BCP-47 and ISO 639-1 sources; output is unchanged for every registered code.
 - [N13](completed_work/N13.md) — Implemented: the four synchronous API endpoint bodies are underscore-prefixed internals, API tests follow source order, and archive mentions link their completion records.
 - [N14](completed_work/N14.md) — Implemented: the shell-tool tests share one owned bash-subprocess fixture, and README describes what `extract_subtitle_text.sh` removes.
+- [NB3](completed_work/NB3.md) — Implemented ([D45](DESIGN.md#d45)): `requires-python` is `>=3.12`, the only version any repository environment runs; the former `>=3.10` floor was incompatible with the source's `typing.Self` import.
 - [NB8](completed_work/NB8.md) — Implemented: video titles and template metacharacters no longer alter download paths; titles never enter yt-dlp's output template.
 - [NB9](completed_work/NB9.md) — Implemented: every started Azure recognition session is stopped on success, timeout, cancellation, startup failure or interruption; duration inspection precedes recognizer creation, and failures write no SRT.
 - [NB11](completed_work/NB11.md) — Implemented: authorized video replacement publishes atomically after a completed staged download; failed downloads keep the previous video.
