@@ -15,6 +15,9 @@ if [ ! -d "$directory_path" ]; then
   exit 1
 fi
 
+# Make an unmatched glob expand to nothing instead of the literal pattern
+shopt -s nullglob
+
 # Loop through all .mp4 files in the provided directory
 for mp4_file in "$directory_path"/*.mp4; do
 

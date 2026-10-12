@@ -77,12 +77,6 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 - **Dependencies:** none.
 - **Revisit trigger:** the next change to any publication path.
 
-### Nits
-
-#### N2 — Empty media directories produce a fictitious filename
-
-**Severity: Low. Validated — owned empty-directory shell reproduction.** [ls_mp4_without_srt.sh](ls_mp4_without_srt.sh):19 iterates an unmatched glob literally and prints `<directory>/*.mp4` with exit 0. **Outcome:** report only existing MP4 files missing SRT. **Acceptance:** empty directory produces no paths; missing/present SRT and filenames with spaces remain correct. **Dependencies:** none.
-
 ## Readiness and unresolved choices
 
 NB2 and NB3 need their investigation gates cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
@@ -94,6 +88,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 ## Deferred, accepted, and completed dispositions
 
 - [N1](completed_work/N1.md) — Implemented: `DELETE /assets` removes the actual on-disk MKV/WAV/MP3 files of a complete MP4 + SRT stem, matching suffixes case-insensitively; a selected file already gone is skipped.
+- [N2](completed_work/N2.md) — Implemented: `ls_mp4_without_srt.sh` enables `nullglob`, so a directory without MP4 files prints nothing instead of a literal `*.mp4` path.
 - [N6](completed_work/N6.md) — Implemented: worker docstrings and `--slot` help describe stream consumer identity for every role, and the Azure transcriber documents that failures raise rather than return `None`.
 - [N10](completed_work/N10.md) — Implemented: `LanguageCode.get_source_as_ISO` uses one split for BCP-47 and ISO 639-1 sources; output is unchanged for every registered code.
 - [N13](completed_work/N13.md) — Implemented: the four synchronous API endpoint bodies are underscore-prefixed internals, API tests follow source order, and archive mentions link their completion records.
