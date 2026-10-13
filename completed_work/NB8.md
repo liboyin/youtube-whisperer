@@ -91,7 +91,7 @@ Reviewer: Codex session `01a1264d-7588-7200-999f-5417e4bda0e8` (`gpt-6.1-sol`, h
 - **Findings:**
   1. **Non-blocking:** video publication is a third hand-copied implementation of the staged-file protocol shared with SRT and WAV.
      - **Validated** by source comparison.
-     - **Disposition:** deferred as [TODO NB34](../TODO.md#nb34--staged-file-publication-is-hand-copied-in-three-places), because it needs a three-module refactor outside this boundary. Revisit trigger: the next change to any publication path.
+     - **Disposition:** deferred as NB34, because it needed a three-module refactor outside this boundary; later implemented, see [NB34](NB34.md).
   2. **Nit:** the DESIGN contract that publication follows downloader context exit had no protecting test. Mutant h, which publishes inside the `with` block, passed all 55 tests.
      - **Validated and fixed** by `test_download_video_publishes_only_after_downloader_context_exit` (`ALWAYS` over an existing file, `NEVER` into an absent target).
      - **Main-agent mutation evidence:** a scratch export of the follow-up candidate, seed 424242, with provenance verified for `video_downloader`. Baseline 57 passed; mutant h failed 2 (`assert b'new video' == b'previous video'`); after restoring the source, 57 passed.

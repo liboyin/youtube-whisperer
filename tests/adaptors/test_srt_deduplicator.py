@@ -389,7 +389,7 @@ def test_publish_srt_text_new_file_mode_matches_ordinary_creation(tmp_path):
     reference = tmp_path / "reference.txt"
     reference.write_text("reference")
     output = tmp_path / "output.srt"
-    with patch.object(testee.os, "umask", side_effect=AssertionError("global umask accessed")):
+    with patch.object(os, "umask", side_effect=AssertionError("global umask accessed")):
         testee.publish_srt_text(output, "complete")
     assert output.stat().st_mode & 0o777 == reference.stat().st_mode & 0o777
 
@@ -406,7 +406,7 @@ def test_publish_srt_text_never_preserves_competing_output_at_publication(tmp_pa
         return original_link(source, destination)
 
     collision = None
-    with patch.object(testee.os, 'link', competing_link):
+    with patch.object(os, 'link', competing_link):
         try:
             testee.publish_srt_text(output, "candidate", overwrite=overwrite)
         except FileExistsError as error:
@@ -430,7 +430,7 @@ def test_publish_srt_text_no_clobber_accepts_late_symlink_to_completed_file(tmp_
         return original_link(source, destination)
 
     collision = None
-    with patch.object(testee.os, 'link', competing_link):
+    with patch.object(os, 'link', competing_link):
         try:
             testee.publish_srt_text(output, "candidate", overwrite=overwrite)
         except FileExistsError as error:
@@ -453,7 +453,7 @@ def test_publish_srt_text_no_clobber_rejects_late_directory_and_allows_retry(tmp
         output.mkdir()
         return original_link(source, destination)
 
-    with patch.object(testee.os, 'link', competing_link), pytest.raises(FileExistsError):
+    with patch.object(os, 'link', competing_link), pytest.raises(FileExistsError):
         testee.publish_srt_text(output, "candidate", overwrite=overwrite)
     assert output.is_dir()
     assert list(output.iterdir()) == []
@@ -476,7 +476,7 @@ def test_publish_srt_text_no_clobber_rejects_late_dangling_symlink_and_allows_re
         output.symlink_to(missing.name)
         return original_link(source, destination)
 
-    with patch.object(testee.os, 'link', competing_link), pytest.raises(FileExistsError):
+    with patch.object(os, 'link', competing_link), pytest.raises(FileExistsError):
         testee.publish_srt_text(output, "candidate", overwrite=overwrite)
     assert output.is_symlink()
     assert output.readlink() == Path(missing.name)
@@ -547,7 +547,7 @@ def test_publish_srt_text_no_clobber_preserves_competitor_created_after_stage_cl
 def test_publish_srt_text_link_failure_cleans_stage_and_allows_retry(tmp_path):
     """Unsupported no-clobber publication propagates without creating a completion marker."""
     output = tmp_path / "output.srt"
-    with patch.object(testee.os, 'link', side_effect=OSError("unsupported link")), pytest.raises(OSError, match="unsupported link"):
+    with patch.object(os, 'link', side_effect=OSError("unsupported link")), pytest.raises(OSError, match="unsupported link"):
         testee.publish_srt_text(output, "candidate", overwrite=OverwriteMode.NEVER)
     assert list(tmp_path.iterdir()) == []
     testee.publish_srt_text(output, "complete", overwrite=OverwriteMode.NEVER)

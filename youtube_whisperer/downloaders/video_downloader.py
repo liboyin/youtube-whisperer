@@ -1,6 +1,5 @@
 import os
 import shutil
-import stat
 import tempfile
 from pathlib import Path
 
@@ -18,6 +17,10 @@ from youtube_whisperer.downloaders.utils import (
     build_youtube_dl_options,
     get_video_title,
     is_firefox_cookies_available,
+)
+from youtube_whisperer.publication import (
+    publish_staged_file,
+    resolve_publication_target,
 )
 
 
@@ -41,12 +44,7 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
     """
     if target_path.is_file() and not overwrite_existing_path(target_path, overwrite):
         return
-    target = prepare_output_file(target_path).resolve()
-    prepare_output_file(target)
-    try:
-        mode = stat.S_IMODE(target.stat().st_mode)
-    except FileNotFoundError:
-        mode = None
+    target, mode = resolve_publication_target(prepare_output_file(target_path))
     # The generated stage name is safe, but its parent can contain expansions
     # that yt-dlp cannot escape. Check before acquiring the stage directory.
     template_parent = str(target.parent / 'video.mp4')
@@ -64,17 +62,7 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
             ydl.download([url])
         if not stage.is_file():
             raise FileNotFoundError(f'Download did not produce a regular staged video: {stage}')
-        if mode is not None:
-            stage.chmod(mode)
-        if overwrite in (OverwriteMode.NEVER, OverwriteMode.RENAME):
-            try:
-                os.link(stage, target)
-            except FileExistsError:
-                if target.is_file():
-                    return
-                raise
-        else:
-            os.replace(stage, target)
+        publish_staged_file(stage, target, mode, overwrite)
     finally:
         shutil.rmtree(stage_dir)
 

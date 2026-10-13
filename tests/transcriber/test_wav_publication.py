@@ -344,7 +344,7 @@ def test_save_as_wav_file_publication_failure_cleans_stage_without_fallback(conv
         output.write_bytes(b'previous good audio')
         mocker.patch.object(testee.Path, 'replace', side_effect=PermissionError('publication failed'))
     else:
-        mocker.patch.object(testee.os, 'link', side_effect=OSError(errno.EOPNOTSUPP, 'publication failed'))
+        mocker.patch.object(os, 'link', side_effect=OSError(errno.EOPNOTSUPP, 'publication failed'))
     with pytest.raises(OSError, match='publication failed'):
         testee.save_as_wav_file(conversion.source, output, policy)
     if policy == OverwriteMode.ALWAYS:

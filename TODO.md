@@ -58,17 +58,6 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** [D10](DESIGN.md#d10) intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
 
-#### NB34 — Staged-file publication is hand-copied in three places
-
-**Severity: Low. Validated structural observation — Claude Opus 5.5 re-review of `5fdb927` and main-agent source comparison at `a424a2b` on 2026-10-11; proposed simplification.**
-
-- **Duplication:** [video download](youtube_whisperer/downloaders/video_downloader.py) (`download_video`), [SRT publication](youtube_whisperer/adaptors/srt_deduplicator.py) (`publish_srt_text`) and [WAV conversion](youtube_whisperer/transcriber/waveform_loader.py) (`save_as_wav_file`) each repeat the same steps: mode capture, `chmod`, `os.link` create-if-absent for `NEVER`/`RENAME` with the file-collision rule, and atomic replacement otherwise. The WAV copy already expresses the collision branch differently.
-- **Risk:** a future fix to one copy of this data-loss-sensitive protocol can miss the others.
-- **Outcome:** one staged-file publication helper owns the shared [completion contract](DESIGN.md#srt-as-the-output-format) and [D22](DESIGN.md#d22). Each caller keeps its own stage creation and cleanup.
-- **Acceptance:** the existing video, SRT and WAV publication tests pass unchanged. Mutation evidence shows that the helper's collision, mode and replacement rules are protected through every caller.
-- **Dependencies:** none.
-- **Revisit trigger:** the next change to any publication path.
-
 ## Readiness and unresolved choices
 
 NB2 needs its investigation gate cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
@@ -98,6 +87,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB24](completed_work/NB24.md) — Implemented ([D16](DESIGN.md#d16), [D39](DESIGN.md#d39)): caption-service errors after a successful download are logged and treated as missing captions, so download-only work completes and Whisper/Azure follow-ups are queued; other failures still dead-letter that video.
 - [NB29](completed_work/NB29.md) — Implemented ([D42](DESIGN.md#d42)): `POST /tasks` preparation lives in the FastAPI/Redis-free `task_preparation` module; the endpoint keeps HTTP serialization and URL-before-filesystem submission, and `api.app.resolve_filesystem_tasks` forwards the same function.
 - [NB33](completed_work/NB33.md) — Implemented: standalone Codex installation replaces plugin provisioning and extension-link repair.
+- [NB34](completed_work/NB34.md) — Implemented: `youtube_whisperer/publication.py` owns target resolution, mode retention, create-if-absent and replacement for video, SRT and WAV publication; each caller keeps its stage creation and cleanup.
 - [NB35](completed_work/NB35.md) — Implemented ([D43](DESIGN.md#d43)): a missing consumer group is created from stream ID `0`, so a task appended to a stream recreated without its group (for example by a submission racing `DELETE /tasks`) is delivered instead of stranded as pending.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 

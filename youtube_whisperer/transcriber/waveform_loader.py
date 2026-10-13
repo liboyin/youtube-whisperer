@@ -1,6 +1,4 @@
 import logging
-import os
-import stat
 from pathlib import Path
 from uuid import uuid4
 
@@ -11,6 +9,11 @@ from pathlib_extensions import (
     overwrite_existing_path,
     prepare_input_file,
     prepare_output_file,
+)
+
+from youtube_whisperer.publication import (
+    publish_staged_file,
+    resolve_publication_target,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,12 +119,7 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
     if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
         return None
     output_file_path = prepare_output_file(output_file_path)
-    target = output_file_path.resolve()
-    prepare_output_file(target)
-    try:
-        mode = stat.S_IMODE(target.stat().st_mode)
-    except FileNotFoundError:
-        mode = None
+    target, mode = resolve_publication_target(output_file_path)
     stage = target.parent / f'.wav-{uuid4().hex}{output_file_path.suffix}'
     owned = False
     try:
@@ -130,16 +128,7 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
         owned = True
         writer.close()
         _convert_audio_to_stage(input_file_path, stage)
-        if mode is not None:
-            stage.chmod(mode)
-        if overwrite in (OverwriteMode.NEVER, OverwriteMode.RENAME):
-            try:
-                os.link(stage, target)
-            except FileExistsError:
-                if not target.is_file():
-                    raise
-        else:
-            stage.replace(target)
+        publish_staged_file(stage, target, mode, overwrite)
     except ffmpeg.Error as e:
         logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise

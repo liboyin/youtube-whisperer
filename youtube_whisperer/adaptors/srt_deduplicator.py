@@ -1,6 +1,4 @@
 import logging
-import os
-import stat
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +9,11 @@ from pathlib_extensions import (
     overwrite_existing_path,
     prepare_input_file,
     prepare_output_file,
+)
+
+from youtube_whisperer.publication import (
+    publish_staged_file,
+    resolve_publication_target,
 )
 
 logger = logging.getLogger(__name__)
@@ -210,12 +213,7 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwriteMode = Over
             including unsupported hard-link publication. Owned stages are removed
             on unwinding; exclusive-creation collisions are never removed.
     """
-    target = prepare_output_file(file_path).resolve()
-    prepare_output_file(target)
-    try:
-        mode = stat.S_IMODE(target.stat().st_mode)
-    except FileNotFoundError:
-        mode = None
+    target, mode = resolve_publication_target(prepare_output_file(file_path))
     stage = target.parent / f'.srt-{uuid4().hex}.tmp'
     owned = False
     try:
@@ -224,17 +222,7 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwriteMode = Over
         owned = True
         with stream as writer:
             writer.write(text)
-        if mode is not None:
-            stage.chmod(mode)
-        if overwrite in (OverwriteMode.NEVER, OverwriteMode.RENAME):
-            try:
-                os.link(stage, target)
-            except FileExistsError:
-                if target.is_file():
-                    return
-                raise
-        else:
-            stage.replace(target)
+        publish_staged_file(stage, target, mode, overwrite)
     finally:
         if owned:
             stage.unlink(missing_ok=True)

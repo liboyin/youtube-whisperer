@@ -174,7 +174,7 @@ def test_process_task_local_failures_still_dead_letter_only_that_video(mocker, t
     mocker.patch.object(downloaders_testee, 'download_video_with_default_title', side_effect=download_media)
     if failure == 'publication':
         # NEVER publishes through a hard link; this fault follows the real caption fetch.
-        import youtube_whisperer.adaptors.srt_deduplicator as publication_testee
+        import youtube_whisperer.publication as publication_testee
         mocker.patch.object(publication_testee.os, 'link', side_effect=OSError('owned publication failure'))
     elif failure == 'programming':
         mocker.patch.object(caption_testee, 'get_first_matching_lang_code', side_effect=RuntimeError('owned programming failure'))
