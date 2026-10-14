@@ -93,6 +93,105 @@ def test_get_video_title_omits_cookies_when_unavailable(youtube_dl_factory):
     assert "cookiesfrombrowser" not in created.instances[0].options
 
 
+def test_get_video_title_and_id_reads_both_from_one_metadata_request(youtube_dl_factory):
+    """Title and ID come from a single simulated yt-dlp extraction."""
+    created = youtube_dl_factory(testee, cookies_available=False, extract_info_result={'title': 'Owned Title', 'id': 'n9xhJrPXop4'})
+    assert testee.get_video_title_and_id('https://example.com/watch?v=3') == ('Owned Title', 'n9xhJrPXop4')
+    assert len(created.instances) == 1
+    assert created.instances[0].options['simulate'] is True
+    assert created.instances[0].extract_info_calls == [('https://example.com/watch?v=3', False)]
+
+
+def test_default_media_filename_tags_title_with_video_id():
+    """Equal titles of different videos get different names, with reserved characters replaced."""
+    first = testee.default_media_filename('Same: Title', 'aaaaaaaaaaa', '.mp4')
+    second = testee.default_media_filename('Same: Title', 'bbbbbbbbbbb', '.mp4')
+    assert first == 'Same_ Title [aaaaaaaaaaa].mp4'
+    assert second == 'Same_ Title [bbbbbbbbbbb].mp4'
+
+
+def test_default_media_filename_keeps_id_and_suffix_when_truncating_long_titles():
+    """Titles equal up to the byte limit still differ by ID, and dots stay title text."""
+    title = 'Mr. Smith Goes to Washington ' + 'x' * 300
+    first = testee.default_media_filename(title + ' part 1', 'aaaaaaaaaaa', '.srt')
+    second = testee.default_media_filename(title + ' part 2', 'bbbbbbbbbbb', '.srt')
+    assert first == title[:220 - len(' [aaaaaaaaaaa].srt')] + ' [aaaaaaaaaaa].srt'
+    assert second.endswith(' [bbbbbbbbbbb].srt')
+    assert len(first.encode('utf-8')) == len(second.encode('utf-8')) == 220
+
+
+def test_default_media_filename_replaces_reserved_characters_in_id():
+    """An extractor ID containing a path separator cannot create a subdirectory."""
+    assert testee.default_media_filename('Title', 'a/b', '.mp4') == 'Title [a_b].mp4'
+
+
+def test_legacy_media_filename_matches_pre_id_naming():
+    """The legacy name is the sanitized title, truncated to 220 bytes, plus the suffix."""
+    assert testee.legacy_media_filename('Bad: Title', '.mp4') == 'Bad_ Title.mp4'
+    assert testee.legacy_media_filename('y' * 300, '.srt') == 'y' * 216 + '.srt'
+
+
+def test_legacy_media_filename_is_none_when_no_legacy_name_could_exist():
+    """A title the old truncation rejected has no legacy file to look for."""
+    assert testee.legacy_media_filename('x.' + 'a' * 300, '.mp4') is None
+
+
+def test_resolve_default_media_path_uses_id_tagged_name_by_default(tmp_path):
+    """Without existing files the ID-tagged path is chosen."""
+    assert testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4') == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+
+
+def test_resolve_default_media_path_reuses_existing_legacy_file(tmp_path):
+    """A title-only file from before IDs were added is reused when the tagged name is absent."""
+    (tmp_path / 'Title.srt').write_text('legacy')
+    assert testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.srt') == tmp_path / 'Title.srt'
+
+
+def test_resolve_default_media_path_prefers_existing_id_tagged_file(tmp_path):
+    """When both names exist, the ID-tagged file wins over the legacy one."""
+    (tmp_path / 'Title.mp4').write_text('legacy')
+    (tmp_path / 'Title [aaaaaaaaaaa].mp4').write_text('tagged')
+    assert testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4') == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+
+
+def test_resolve_default_media_path_ignores_legacy_directory(tmp_path):
+    """Only a legacy regular file is reused, never a directory with that name."""
+    (tmp_path / 'Title.mp4').mkdir()
+    assert testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4') == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+
+
+def test_resolve_default_media_path_uses_tagged_name_when_no_legacy_name_could_exist(tmp_path):
+    """A title the old naming rejected resolves straight to its ID-tagged name."""
+    title = 'x.' + 'a' * 300
+    assert testee.resolve_default_media_path(tmp_path, title, 'aaaaaaaaaaa', '.mp4') == tmp_path / (title[:220 - len(' [aaaaaaaaaaa].mp4')] + ' [aaaaaaaaaaa].mp4')
+
+
+@pytest.mark.parametrize('suffix', ['.mp4', '.srt'])
+def test_resolve_default_media_path_never_reuses_another_videos_tagged_file(tmp_path, suffix):
+    """A title ending in another video's ID tag cannot pick up that video's file as legacy output."""
+    (tmp_path / f'Title [aaaaaaaaaaa]{suffix}').write_text('video a')
+    result = testee.resolve_default_media_path(tmp_path, 'Title [aaaaaaaaaaa]', 'bbbbbbbbbbb', suffix)
+    assert result == tmp_path / f'Title [aaaaaaaaaaa] [bbbbbbbbbbb]{suffix}'
+
+
+def test_resolve_default_media_path_reuses_legacy_file_tagged_with_its_own_id(tmp_path):
+    """A legacy name ending in this video's own ID tag is still this video's file."""
+    (tmp_path / 'Title [bbbbbbbbbbb].mp4').write_text('legacy')
+    assert testee.resolve_default_media_path(tmp_path, 'Title [bbbbbbbbbbb]', 'bbbbbbbbbbb', '.mp4') == tmp_path / 'Title [bbbbbbbbbbb].mp4'
+
+
+def test_resolve_default_media_path_reuses_legacy_file_whose_tag_is_followed_by_a_newline(tmp_path):
+    """Only a tag at the very end of the stem blocks reuse, not one before a trailing newline."""
+    (tmp_path / 'Title [aaaaaaaaaaa]\n.mp4').write_text('legacy')
+    assert testee.resolve_default_media_path(tmp_path, 'Title [aaaaaaaaaaa]\n', 'bbbbbbbbbbb', '.mp4') == tmp_path / 'Title [aaaaaaaaaaa]\n.mp4'
+
+
+def test_resolve_default_media_path_reuses_legacy_file_with_non_id_bracket(tmp_path):
+    """Ordinary bracketed title text does not block reuse of a legacy file."""
+    (tmp_path / 'Song [Official Video].mp4').write_text('legacy')
+    assert testee.resolve_default_media_path(tmp_path, 'Song [Official Video]', 'bbbbbbbbbbb', '.mp4') == tmp_path / 'Song [Official Video].mp4'
+
+
 def test_is_firefox_cookies_available_detects_cookie_file(monkeypatch, tmp_path, caplog):
     """Test that a cookies.sqlite under the Firefox profile is detected."""
     monkeypatch.setenv("HOME", str(tmp_path))

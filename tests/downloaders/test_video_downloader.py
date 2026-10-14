@@ -408,39 +408,53 @@ def test_download_video_resolves_symlink_and_leaves_hardlinked_alias_unchanged(t
     assert list(real.parent.iterdir()) == [real]
 
 
-def test_download_video_with_default_title_sanitizes_title_and_downloads(mocker, tmp_path):
-    """Test that the video title is sanitized into the output filename before downloading."""
-    mocker.patch.object(testee, "get_video_title", return_value="bad:/title")
-    mocker.patch.object(testee, "replace_os_reserved_chars", return_value="bad_title")
-    mocker.patch.object(
-        testee,
-        "truncate_filename",
-        side_effect=lambda path, max_length: path,
-    )
-    mock_download = mocker.patch.object(testee, "download_video")
+def test_download_video_with_default_title_names_file_after_title_and_id(mocker, tmp_path):
+    """The default name is the sanitized title tagged with the video ID."""
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=('bad:/title', 'n9xhJrPXop4'))
+    mock_download = mocker.patch.object(testee, 'download_video')
 
-    result = testee.download_video_with_default_title(
-        "https://example.com/watch?v=3",
-        target_dir=tmp_path,
-        overwrite=OverwriteMode.NEVER,
-    )
+    result = testee.download_video_with_default_title('https://example.com/watch?v=3', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
 
-    expected_path = tmp_path / "bad_title.mp4"
-    assert result == expected_path
-    mock_download.assert_called_once_with(
-        "https://example.com/watch?v=3",
-        expected_path,
-        overwrite=OverwriteMode.NEVER,
-    )
+    assert result == tmp_path / 'bad__title [n9xhJrPXop4].mp4'
+    mock_download.assert_called_once_with('https://example.com/watch?v=3', result, overwrite=OverwriteMode.NEVER)
+
+
+def test_download_video_with_default_title_reuses_existing_title_only_video(mocker, tmp_path):
+    """A video downloaded before IDs were added to names is reused under its old name."""
+    legacy = tmp_path / 'Title.mp4'
+    legacy.write_bytes(b'legacy video')
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=('Title', 'n9xhJrPXop4'))
+    mock_download = mocker.patch.object(testee, 'download_video')
+
+    result = testee.download_video_with_default_title('https://example.com/watch?v=5', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
+
+    assert result == legacy
+    mock_download.assert_called_once_with('https://example.com/watch?v=5', legacy, overwrite=OverwriteMode.NEVER)
 
 
 def test_download_video_with_default_title_truncates_long_dotted_title_keeping_mp4_suffix(mocker, tmp_path):
-    """A long title containing dots is truncated to 220 bytes and keeps its .mp4 suffix."""
+    """A long title containing dots is truncated to 220 bytes and keeps its ID tag and .mp4 suffix."""
     title = 'Mr. Smith Goes to Washington ' + 'x' * 300
-    mocker.patch.object(testee, 'get_video_title', return_value=title)
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=(title, 'n9xhJrPXop4'))
     mock_download = mocker.patch.object(testee, 'download_video')
 
     result = testee.download_video_with_default_title('https://example.com/watch?v=4', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
 
-    assert result == tmp_path / (title[:216] + '.mp4')
+    assert result == tmp_path / (title[:220 - len(' [n9xhJrPXop4].mp4')] + ' [n9xhJrPXop4].mp4')
     mock_download.assert_called_once_with('https://example.com/watch?v=4', result, overwrite=OverwriteMode.NEVER)
+
+
+def test_download_video_with_default_title_keeps_videos_apart_when_title_ends_in_another_id(mocker, tmp_path):
+    """Video B titled like video A's tagged name gets its own file, not A's media."""
+    metadata = {'url-a': ('Title', 'aaaaaaaaaaa'), 'url-b': ('Title [aaaaaaaaaaa]', 'bbbbbbbbbbb')}
+    mocker.patch.object(testee, 'get_video_title_and_id', side_effect=metadata.__getitem__)
+    downloads = mocker.patch.object(testee, 'download_video', side_effect=lambda url, path, overwrite: path.write_text(url))
+
+    first = testee.download_video_with_default_title('url-a', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
+    second = testee.download_video_with_default_title('url-b', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
+
+    assert first == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+    assert second == tmp_path / 'Title [aaaaaaaaaaa] [bbbbbbbbbbb].mp4'
+    assert first.read_text() == 'url-a'
+    assert second.read_text() == 'url-b'
+    assert downloads.call_count == 2

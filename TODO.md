@@ -40,9 +40,7 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 ### Blocking
 
-#### B5 — Title-only filenames silently alias different videos
-
-**Severity: High. Validated — source and isolated equal-title reproduction.** [Video naming](youtube_whisperer/downloaders/video_downloader.py):95–96 and [transcript naming](youtube_whisperer/downloaders/transcript_downloader.py):228–229 derive identity solely from sanitized/truncated titles. Distinct video IDs can share MP4/SRT paths. Under worker `NEVER` semantics, the second video reuses the first media; if the first SRT is absent, captions can be paired with the wrong video. **Outcome:** preserve distinct video identities and safe repeat processing of the same video. **Acceptance:** equal titles, sanitization collisions, truncation collisions, and repeat downloads cannot substitute unrelated content. **Dependencies:** user naming/migration decision before implementation; preserve the human-browsable media-library contract and the literal-path staged video publication implemented by [NB8](completed_work/NB8.md)/[NB11](completed_work/NB11.md). **Simplification review — 2026-09-14:** after that naming decision, use one pure naming rule for standalone MP4/SRT and combined-download paths, preserving suffixes, UTF-8 limits, and human-readable titles. The two current sanitization/truncation implementations should not evolve independently.
+None open.
 
 ### Non-blocking
 
@@ -62,12 +60,13 @@ Classification determines backlog priority, not a requirement to resolve unrelat
 
 NB2 needs its investigation gate cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
 
-All entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming must be settled before its dependent implementation; playlist continuation is settled by [D17](DESIGN.md#d17). [D14](DESIGN.md#d14)/[D16](DESIGN.md#d16) settle the configuration and caption-error outcomes; N7/N8 are resolved; NB24 implemented D16.
+All entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming is settled by [D47](DESIGN.md#d47); playlist continuation is settled by [D17](DESIGN.md#d17). [D14](DESIGN.md#d14)/[D16](DESIGN.md#d16) settle the configuration and caption-error outcomes; N7/N8 are resolved; NB24 implemented D16.
 
 [D18](DESIGN.md#d18)–[D21](DESIGN.md#d21) settle the compatibility, resource ownership, settings lifetime, and worker-identity choices. NB25–NB27 are implemented; retain existing Python entry points and all previously accepted product behavior except the translation interfaces explicitly removed under [D23](DESIGN.md#d23)/[D24](DESIGN.md#d24).
 
 ## Deferred, accepted, and completed dispositions
 
+- [B5](completed_work/B5.md) — Implemented ([D47](DESIGN.md#d47)): default downloads are named `Title [videoID].ext`, so different videos with equal or equally truncated titles get different files; an existing title-only file is still reused under its old name.
 - [N1](completed_work/N1.md) — Implemented: `DELETE /assets` removes the actual on-disk MKV/WAV/MP3 files of a complete MP4 + SRT stem, matching suffixes case-insensitively; a selected file already gone is skipped.
 - [N2](completed_work/N2.md) — Implemented: `ls_mp4_without_srt.sh` enables `nullglob`, so a directory without MP4 files prints nothing instead of a literal `*.mp4` path.
 - [N6](completed_work/N6.md) — Implemented: worker docstrings and `--slot` help describe stream consumer identity for every role, and the Azure transcriber documents that failures raise rather than return `None`.

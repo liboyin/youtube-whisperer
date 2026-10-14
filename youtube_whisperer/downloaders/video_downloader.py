@@ -8,17 +8,16 @@ from pathlib_extensions import (
     OverwriteMode,
     prepare_output_file,
     publish_staged_file,
-    replace_os_reserved_chars,
     resolve_overwrite_mode,
     resolve_publication_target,
-    truncate_filename,
 )
 
 from youtube_whisperer.config import Settings
 from youtube_whisperer.downloaders.utils import (
     build_youtube_dl_options,
-    get_video_title,
+    get_video_title_and_id,
     is_firefox_cookies_available,
+    resolve_default_media_path,
 )
 
 
@@ -68,7 +67,10 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
 
 def download_video_with_default_title(url: str, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
     """
-    Downloads a video from the given URL and saves it with a default title in the target directory.
+    Download a video into the target directory under its default name, 'Title [videoID].mp4'.
+
+    An existing title-only file from before video IDs were added is reused instead
+    (see `resolve_default_media_path`).
 
     Args:
         url (str): The URL of the video to download.
@@ -79,7 +81,7 @@ def download_video_with_default_title(url: str, target_dir: Path | None = None, 
         Path: The path to the downloaded video file.
     """
     target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir
-    title = replace_os_reserved_chars(get_video_title(url))
-    target_path = truncate_filename(target_dir / f'{title}.mp4', max_length=220)
+    title, video_id = get_video_title_and_id(url)
+    target_path = resolve_default_media_path(target_dir, title, video_id, '.mp4')
     download_video(url, target_path, overwrite=overwrite)
     return target_path

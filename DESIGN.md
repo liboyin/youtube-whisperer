@@ -93,7 +93,7 @@ youtube_whisperer/
 │   ├── playlist_downloader.py  # Expand playlists/channels into video URLs
 │   ├── transcript_downloader.py# Fetch an existing YouTube transcript as SRT
 │   ├── video_downloader.py     # Download video/audio via yt-dlp
-│   └── utils.py                # Shared yt-dlp defaults, title lookup, Firefox cookie detection
+│   └── utils.py                # Shared yt-dlp defaults, title/ID lookup, default filenames, Firefox cookie detection
 ├── transcriber/
 │   ├── whisper_transcriber.py  # faster-whisper transcription (process-wide cached model)
 │   ├── azure_transcriber.py    # Azure Speech transcription
@@ -222,9 +222,11 @@ The project started as a privacy-focused transcriber using Whisper. Azure Speech
 
 Some Whisper runs occasionally emit a known nonsense phrase instead of a real transcription. Those phrases are listed in `REJECTED_SUBSTRINGS` in `transcriber/rejection_policy.py` (currently two recurring Chinese hallucination phrases). If any Whisper segment contains one, the whole run is rejected, no SRT is written, and the failure is raised so the worker dead-letters the task. Extend the list by editing that tuple.
 
-### Filenames are truncated
+### Filenames carry the title and video ID
 
-Downloaded media and transcripts are named after the video title, with OS-reserved characters replaced and the full filename truncated to 220 UTF-8 bytes (`video_downloader.py`, `transcript_downloader.py`) so long titles do not exceed filesystem name limits. pathlib-extensions' `truncate_filename` keeps only the trailing run of extension-like suffixes, such as `.mp4` or `.srt`, and truncates the rest at a UTF-8 character boundary, so a dot inside a long title no longer makes the download fail ([D46](#d46)).
+Downloaded media and transcripts are named `Title [videoID].ext`, such as `Mr. Smith Goes to Washington [n9xhJrPXop4].mp4` ([D47](#d47)). The title keeps the library browsable, and the ID, which yt-dlp returns from the same metadata request as the title, keeps videos with equal or equally truncated titles apart. One rule in `downloaders/utils.py` names standalone video and caption downloads; the combined download derives its SRT path from the video path, so a video and its captions share a stem. OS-reserved characters in the title and ID are replaced, and pathlib-extensions' `build_filename` truncates only the title, at a UTF-8 character boundary, so the whole name fits in 220 bytes and the ID tag and suffix always survive ([D46](#d46)). A title with no character left to keep, such as an empty one, raises `ValueError`.
+
+Files downloaded before IDs were added are named after the title alone. When the ID-tagged name does not exist but such a title-only file does, it is reused under its old name, so earlier downloads are not repeated. That match is by title alone and can still pair a different video with the same title with an existing file; the user accepted this for files that already exist. A title-only name ending in an 11-character ID-shaped tag that is not this video's own ID, such as `Title [aaaaaaaaaaa].mp4` for a video titled `Title [aaaaaaaaaaa]`, is never reused, because it can be another video's ID-tagged file; an old file of a video whose real title ends that way is downloaded again under the new name. No files are renamed.
 
 Video downloads use a fixed `video.mp4` filename inside a freshly created hidden `.video-<random>` directory beside the resolved destination. Titles never enter yt-dlp's output template, and percent signs in directory components are escaped, so publication honors the literal requested filename. A parent path that yt-dlp would change through environment-variable or home expansion is rejected before creating the stage or constructing the downloader; variables in the title do not impose that limitation. Only a regular staged file after successful download and downloader context exit permits atomic publication. Failed downloads and interruption unwinding preserve previous output and remove the owned stage directory, including partial downloads and auxiliary files.
 
@@ -245,8 +247,9 @@ This protects completion markers from process interruption, without guaranteeing
 | <a id="d8"></a>D8 | Preserve deduplication that bridges silent gaps between consecutive identical text; that behavior is intentional. | `yield_deduplicated_srt_blocks` |
 | <a id="d15"></a>D15 | Empty decoded audio must be reported as a failed task rather than acknowledged without output. | NB23; supersedes the documented successful skip |
 | <a id="d22"></a>D22 | Publish completed artifacts by atomic inode replacement, preserving ordinary permission bits and following symlink targets. Hardlinked aliases retain the old contents; ownership, ACLs, and extended attributes may change. The user accepted these metadata limits because an interrupted write must not expose a false completion marker or truncate prior valid output. Scope is process interruption, without power-loss durability or stale-stage scavenging. | Video, SRT, and WAV publication (implemented) |
+| <a id="d47"></a>D47 | The user decided (2026-10-14) to name default downloads `Title [videoID].ext`, so equal titles, sanitization collisions and truncation collisions can no longer make two videos share a file, while the library stays browsable by title. ID-only names were rejected for losing browsability, and adding the ID only on collision for needing ownership metadata the project does not keep. Existing title-only files are not renamed: when the ID-tagged name is absent and a title-only file exists, it is reused, which avoids repeated downloads but keeps title-only aliasing for those existing files. A one-off rename script was rejected because files that already collided cannot be told apart. After review showed that a title ending in another video's tag, such as `Title [aaaaaaaaaaa]`, would match that video's new ID-tagged file as its title-only name, the user decided (2026-10-14) that a title-only name ending in an 11-character ID-shaped tag other than the video's own ID is never reused; the rare old file whose real title ends that way is downloaded again. | B5; `resolve_default_media_path` |
 
-Consecutive identical subtitle blocks intentionally merge across silent gaps (D8). Title-derived filenames can collide across different videos; naming and migration remain unresolved in B5, so existing-file reuse is not a guarantee of video identity.
+Consecutive identical subtitle blocks intentionally merge across silent gaps (D8). New default names include the video ID ([D47](#d47)); only reuse of a title-only file from before that change can still pair a video with another video's file.
 
 ## Deployment and configuration
 

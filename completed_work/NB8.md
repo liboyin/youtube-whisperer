@@ -27,7 +27,7 @@ The user then amended `e3648cc` into `81b99de`. The diff touched only governance
 
 - [video_downloader.py](../youtube_whisperer/downloaders/video_downloader.py): `download_video` now stages and publishes as described above. Cookie discovery at invocation, fresh options, the exact format selection, context-exit exception identity, the early refusal, and `download_video_with_default_title`'s naming and return value are unchanged.
 - [test_video_downloader.py](../tests/downloaders/test_video_downloader.py): tests now use a per-test subclass of the real `YoutubeDL` (`auto_init=False`). It evaluates templates with the installed library and writes synthetic bytes only where `prepare_filename` directs, inside `tmp_path`.
-- [DESIGN](../DESIGN.md#filenames-are-truncated) documents video staging and the hidden-stage limitation, extends the completion contract and D22 to video, and leaves naming solely with B5.
+- [DESIGN](../DESIGN.md#filenames-carry-the-title-and-video-id) documents video staging and the hidden-stage limitation, extends the completion contract and D22 to video, and leaves naming solely with B5.
 
 **Integration notes:** API glob resolution (`glob.glob`) does not descend into hidden stage directories unless a pattern names them. Asset cleanup only selects `.mkv/.wav/.mp3` siblings of a stem that has both `.mp4` and `.srt`. `list_assets` can show a stage while a download is running or after an abrupt exit.
 

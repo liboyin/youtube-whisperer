@@ -378,35 +378,44 @@ def test_download_as_srt_file_returns_true_when_file_exists_and_no_overwrite(tmp
 
 
 def test_download_as_srt_file_with_default_title_success(mocker, tmp_path, downloader):
-    """Test with custom parameters."""
-    mock_title = "Test Video"
-    output_path = tmp_path / f"{mock_title}.srt"
-    mocker.patch.object(testee, 'get_video_title', return_value=mock_title)
+    """The SRT is named after the video title tagged with its ID."""
+    output_path = tmp_path / "Test Video [n9xhJrPXop4].srt"
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=("Test Video", "n9xhJrPXop4"))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
     result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
     assert result == output_path
-    testee.get_video_title.assert_called_once_with(downloader.url)
+    testee.get_video_title_and_id.assert_called_once_with(downloader.url)
     downloader.download_as_srt_file.assert_called_once_with(output_path, overwrite=OverwriteMode.NEVER)
 
 
 def test_download_as_srt_file_with_default_title_failure(mocker, downloader):
     """Test failure case."""
-    mocker.patch.object(testee, 'get_video_title', return_value="Test Video")
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=("Test Video", "n9xhJrPXop4"))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=False)
     result = downloader.download_as_srt_file_with_default_title(overwrite=OverwriteMode.NEVER)
     assert result is None
     downloader.download_as_srt_file.assert_called()
 
 
+def test_download_as_srt_file_with_default_title_reuses_existing_title_only_srt(mocker, tmp_path, downloader):
+    """An SRT downloaded before IDs were added to names is reused under its old name."""
+    legacy = tmp_path / "Test Video.srt"
+    legacy.write_text("legacy captions")
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=("Test Video", "n9xhJrPXop4"))
+    mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
+    assert downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER) == legacy
+    downloader.download_as_srt_file.assert_called_once_with(legacy, overwrite=OverwriteMode.NEVER)
+
+
 def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, tmp_path, downloader):
     """Test with a long title containing invalid characters."""
     long_title = "a/b\\c?d*e:f|g<h>i\"j" * 20
-    mocker.patch.object(testee, 'get_video_title', return_value=long_title)
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=(long_title, "n9xhJrPXop4"))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
     result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
     assert result is not None
-    assert len(result.name) <= 220
-    assert result.name.endswith('.srt')
+    assert len(result.name.encode('utf-8')) <= 220
+    assert result.name.endswith(' [n9xhJrPXop4].srt')
     # Check that invalid characters are replaced
     assert '/' not in result.name
     assert '\\' not in result.name
@@ -420,10 +429,22 @@ def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, 
 
 
 def test_download_as_srt_file_with_default_title_truncates_long_dotted_title_keeping_srt_suffix(mocker, tmp_path, downloader):
-    """A long title containing dots is truncated to 220 bytes and keeps its .srt suffix."""
+    """A long title containing dots is truncated to 220 bytes and keeps its ID tag and .srt suffix."""
     title = 'Mr. Smith Goes to Washington ' + 'x' * 300
-    mocker.patch.object(testee, 'get_video_title', return_value=title)
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=(title, 'n9xhJrPXop4'))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
     result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
-    assert result == tmp_path / (title[:216] + '.srt')
+    assert result == tmp_path / (title[:220 - len(' [n9xhJrPXop4].srt')] + ' [n9xhJrPXop4].srt')
     downloader.download_as_srt_file.assert_called_once_with(result, overwrite=OverwriteMode.NEVER)
+
+
+def test_download_as_srt_file_with_default_title_never_reuses_another_videos_tagged_srt(mocker, tmp_path, downloader):
+    """Captions for a title ending in another video's ID tag get their own file."""
+    other = tmp_path / 'Title [aaaaaaaaaaa].srt'
+    other.write_text('captions of video a')
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=('Title [aaaaaaaaaaa]', 'bbbbbbbbbbb'))
+    mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
+    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
+    assert result == tmp_path / 'Title [aaaaaaaaaaa] [bbbbbbbbbbb].srt'
+    downloader.download_as_srt_file.assert_called_once_with(result, overwrite=OverwriteMode.NEVER)
+    assert other.read_text() == 'captions of video a'

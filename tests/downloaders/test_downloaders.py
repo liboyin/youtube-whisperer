@@ -48,6 +48,25 @@ def test_download_video_and_transcript_with_default_title_delegates(mocker, tmp_
     )
 
 
+
+def test_combined_download_keeps_videos_apart_when_title_ends_in_another_id(mocker, tmp_path):
+    """Video B titled like video A's tagged name gets its own media and SRT, not A's."""
+    import youtube_whisperer.downloaders.video_downloader as video_testee
+
+    metadata = {'url-a': ('Title', 'aaaaaaaaaaa'), 'url-b': ('Title [aaaaaaaaaaa]', 'bbbbbbbbbbb')}
+    mocker.patch.object(video_testee, 'get_video_title_and_id', side_effect=metadata.__getitem__)
+    mocker.patch.object(video_testee, 'download_video', side_effect=lambda url, path, overwrite: path.write_text(url))
+    captions = mocker.patch.object(testee, 'TranscriptDownloader').return_value
+    captions.download_as_srt_file.side_effect = lambda path, overwrite: path.write_text('captions') or True
+
+    first, _ = testee.download_video_and_transcript_with_default_title('url-a', LANGUAGE, tmp_path, OverwriteMode.NEVER)
+    second, _ = testee.download_video_and_transcript_with_default_title('url-b', LANGUAGE, tmp_path, OverwriteMode.NEVER)
+
+    assert first == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+    assert second == tmp_path / 'Title [aaaaaaaaaaa] [bbbbbbbbbbb].mp4'
+    assert (first.read_text(), second.read_text()) == ('url-a', 'url-b')
+    assert [call.args[0] for call in captions.download_as_srt_file.call_args_list] == [first.with_suffix('.srt'), second.with_suffix('.srt')]
+
 @pytest.mark.parametrize("phase", ['watch', 'caption'])
 @pytest.mark.parametrize("error_type", [RequestBlocked, VideoUnavailable, requests.ReadTimeout, requests.ConnectionError])
 def test_caption_service_failure_preserves_media_returns_missing_and_warns(mocker, tmp_path, caption_http, caplog, phase, error_type):

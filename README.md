@@ -76,6 +76,8 @@ curl -X POST http://localhost:8001/tasks \
 
 Use a YouTube URL as `source` to download and transcribe, or choose `"transcriber":"none"` for download only. Filesystem paths refer to the API's filesystem. Use BCP-47 `en-us` or `zh-cn` for either engine; Whisper also accepts `en` or `zh`. Translation and the old `mode` field are unsupported.
 
+Downloads are saved in the media library as `Title [videoID].mp4`, with captions and transcripts beside them as `Title [videoID].srt`. Long titles are shortened, never the ID or extension. Files downloaded before IDs were added keep their title-only names and are normally reused rather than downloaded again; see [filenames](DESIGN.md#filenames-carry-the-title-and-video-id) for the exact rules.
+
 The API exposes `/tasks` (GET/POST/DELETE), `/dead-letters` (GET/DELETE), and `/assets` (GET/DELETE). See [HTTP contracts](DESIGN.md#http-contracts) for response shapes, clearing semantics and asset cleanup, and [upgrade guidance](DESIGN.md#transcription-requests-and-upgrades) for obsolete clients and persisted payloads.
 
 ## Configuration

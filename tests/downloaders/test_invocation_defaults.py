@@ -31,7 +31,7 @@ def test_video_title_download_observes_current_asset_directory(mocker, monkeypat
     """Video default titles preserve explicit paths and resolve missing paths at invocation."""
     import youtube_whisperer.downloaders.video_downloader as testee
 
-    mocker.patch.object(testee, 'get_video_title', return_value='owned-title')
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=('owned-title', 'owned-id'))
     download = mocker.patch.object(testee, 'download_video')
     for name in ['first', 'second']:
         target = tmp_path / name
@@ -41,7 +41,7 @@ def test_video_title_download_observes_current_asset_directory(mocker, monkeypat
                 result = testee.download_video_with_default_title('owned-url', target, OverwriteMode.NEVER)
         else:
             result = testee.download_video_with_default_title('owned-url', overwrite=OverwriteMode.NEVER)
-        assert result == target / 'owned-title.mp4'
+        assert result == target / 'owned-title [owned-id].mp4'
         download.assert_called_with('owned-url', result, overwrite=OverwriteMode.NEVER)
 
 
@@ -50,7 +50,7 @@ def test_transcript_title_download_observes_current_asset_directory(mocker, monk
     """Transcript default titles preserve explicit paths and resolve missing paths at invocation."""
     import youtube_whisperer.downloaders.transcript_downloader as testee
 
-    mocker.patch.object(testee, 'get_video_title', return_value='owned-title')
+    mocker.patch.object(testee, 'get_video_title_and_id', return_value=('owned-title', 'owned-id'))
     download = mocker.patch.object(testee.TranscriptDownloader, 'download_as_srt_file', return_value=True)
     downloader = testee.TranscriptDownloader('https://youtu.be/owned', LanguageCode('en'))
     for name in ['first', 'second']:
@@ -61,7 +61,7 @@ def test_transcript_title_download_observes_current_asset_directory(mocker, monk
                 result = downloader.download_as_srt_file_with_default_title(target, OverwriteMode.NEVER)
         else:
             result = downloader.download_as_srt_file_with_default_title(overwrite=OverwriteMode.NEVER)
-        assert result == target / 'owned-title.srt'
+        assert result == target / 'owned-title [owned-id].srt'
         download.assert_called_with(result, overwrite=OverwriteMode.NEVER)
 
 

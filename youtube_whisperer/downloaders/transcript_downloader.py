@@ -7,9 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from pathlib_extensions import (
     OverwriteMode,
-    replace_os_reserved_chars,
     resolve_overwrite_mode,
-    truncate_filename,
 )
 from requests import Session
 from youtube_transcript_api import (
@@ -24,7 +22,10 @@ from youtube_transcript_api.formatters import SRTFormatter
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import publish_srt_text
 from youtube_whisperer.config import Settings
-from youtube_whisperer.downloaders.utils import get_video_title
+from youtube_whisperer.downloaders.utils import (
+    get_video_title_and_id,
+    resolve_default_media_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +217,10 @@ class TranscriptDownloader:
     
     def download_as_srt_file_with_default_title(self, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
         """
-        Downloads the transcript of a YouTube video as an SRT file named after the video title.
+        Download the transcript as an SRT file under its default name, 'Title [videoID].srt'.
+
+        An existing title-only SRT from before video IDs were added is reused instead
+        (see `resolve_default_media_path`).
 
         Args:
             target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to settings resolved at invocation.
@@ -226,8 +230,8 @@ class TranscriptDownloader:
             Path | None: The path to the downloaded SRT file if successful, otherwise 'None'.
         """
         target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir
-        title = replace_os_reserved_chars(get_video_title(self.url))
-        output_file_path = truncate_filename(target_dir / f'{title}.srt', max_length=220)
+        title, video_id = get_video_title_and_id(self.url)
+        output_file_path = resolve_default_media_path(target_dir, title, video_id, '.srt')
         if self.download_as_srt_file(output_file_path, overwrite=overwrite):
             return output_file_path
         return None
