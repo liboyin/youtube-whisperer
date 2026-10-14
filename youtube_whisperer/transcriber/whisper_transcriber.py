@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
-from pathlib_extensions import OverwriteMode, overwrite_existing_path
+from pathlib_extensions import OverwriteMode, resolve_overwrite_mode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import (
@@ -128,15 +128,13 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
             so callers (e.g. the worker loop) can dead-letter the task instead of silently dropping it.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
-    if output_file_path.is_file():
-        if not overwrite_existing_path(output_file_path, overwrite):
-            return output_file_path
-        if overwrite == OverwriteMode.PROMPT:
-            overwrite = OverwriteMode.ALWAYS
+    policy = resolve_overwrite_mode(output_file_path, overwrite)
+    if policy is None:
+        return output_file_path
     waveform = load_whisper_waveform_from_file(input_file_path)
     if len(waveform) == 0:
         raise ValueError(f"No audio samples decoded from {input_file_path}; check that the file contains a decodable audio track.")
     segments = transcribe_waveform_with_default_model(waveform, language) if settings is None else transcribe_waveform_with_default_model(waveform, language, settings=settings)
     segments_generator = reject_bad_segments(segments)
-    save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
+    save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=policy)
     return output_file_path

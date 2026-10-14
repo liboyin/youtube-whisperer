@@ -417,3 +417,13 @@ def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, 
     assert '<' not in result.name
     assert '>' not in result.name
     assert '"' not in result.name
+
+
+def test_download_as_srt_file_with_default_title_truncates_long_dotted_title_keeping_srt_suffix(mocker, tmp_path, downloader):
+    """A long title containing dots is truncated to 220 bytes and keeps its .srt suffix."""
+    title = 'Mr. Smith Goes to Washington ' + 'x' * 300
+    mocker.patch.object(testee, 'get_video_title', return_value=title)
+    mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
+    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
+    assert result == tmp_path / (title[:216] + '.srt')
+    downloader.download_as_srt_file.assert_called_once_with(result, overwrite=OverwriteMode.NEVER)

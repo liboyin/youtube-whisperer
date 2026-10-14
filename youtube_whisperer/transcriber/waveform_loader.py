@@ -6,13 +6,10 @@ import ffmpeg
 import numpy as np
 from pathlib_extensions import (
     OverwriteMode,
-    overwrite_existing_path,
     prepare_input_file,
     prepare_output_file,
-)
-
-from youtube_whisperer.publication import (
     publish_staged_file,
+    resolve_overwrite_mode,
     resolve_publication_target,
 )
 
@@ -116,7 +113,8 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
     """
     input_file_path = prepare_input_file(input_file_path)
     output_file_path = output_file_path or input_file_path.with_suffix('.wav')
-    if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
+    policy = resolve_overwrite_mode(output_file_path, overwrite)
+    if policy is None:
         return None
     output_file_path = prepare_output_file(output_file_path)
     target, mode = resolve_publication_target(output_file_path)
@@ -128,7 +126,7 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
         owned = True
         writer.close()
         _convert_audio_to_stage(input_file_path, stage)
-        publish_staged_file(stage, target, mode, overwrite)
+        publish_staged_file(stage, target, mode, policy)
     except ffmpeg.Error as e:
         logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise

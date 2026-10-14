@@ -6,13 +6,10 @@ from uuid import uuid4
 
 from pathlib_extensions import (
     OverwriteMode,
-    overwrite_existing_path,
     prepare_input_file,
     prepare_output_file,
-)
-
-from youtube_whisperer.publication import (
     publish_staged_file,
+    resolve_overwrite_mode,
     resolve_publication_target,
 )
 
@@ -241,12 +238,13 @@ def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicat
         deduplicate (bool, optional): Whether to merge consecutive blocks with identical content. Defaults to True.
         overwrite (OverwriteMode, optional): Whether to overwrite an existing file. Defaults to `prompt`.
     """
-    if file_path.is_file() and not overwrite_existing_path(file_path, overwrite):
+    policy = resolve_overwrite_mode(file_path, overwrite)
+    if policy is None:
         return
     file_path = prepare_output_file(file_path)
     if deduplicate:
         blocks = yield_deduplicated_srt_blocks(blocks)
-    publish_srt_text(file_path, convert_srt_blocks_to_str(blocks), overwrite=overwrite)
+    publish_srt_text(file_path, convert_srt_blocks_to_str(blocks), overwrite=policy)
 
 
 def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
@@ -266,12 +264,13 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
     """
     logger.info("Deduplicating SRT file: %s", input_file_path)
     output_file_path = output_file_path or input_file_path
-    if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
+    policy = resolve_overwrite_mode(output_file_path, overwrite)
+    if policy is None:
         return output_file_path
     output_file_path = prepare_output_file(output_file_path)
     assert isinstance(output_file_path, Path)  # narrow down type from `Path | None` to `Path`
     with prepare_input_file(input_file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
-    publish_srt_text(output_file_path, convert_srt_blocks_to_str(blocks), overwrite=overwrite)
+    publish_srt_text(output_file_path, convert_srt_blocks_to_str(blocks), overwrite=policy)
     return output_file_path

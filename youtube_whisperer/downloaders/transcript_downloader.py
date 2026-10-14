@@ -7,8 +7,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from pathlib_extensions import (
     OverwriteMode,
-    overwrite_existing_path,
     replace_os_reserved_chars,
+    resolve_overwrite_mode,
     truncate_filename,
 )
 from requests import Session
@@ -204,13 +204,14 @@ class TranscriptDownloader:
         Returns:
             bool: Whether the download is successful.
         """
-        if output_file_path.is_file() and not overwrite_existing_path(output_file_path, overwrite):
+        policy = resolve_overwrite_mode(output_file_path, overwrite)
+        if policy is None:
             return True
         srt_text = self.download_as_srt_text()
         if srt_text is None:
             return False
         logger.info("About to write to SRT file: %s", output_file_path)
-        publish_srt_text(output_file_path, srt_text, overwrite=overwrite)
+        publish_srt_text(output_file_path, srt_text, overwrite=policy)
         return True
     
     def download_as_srt_file_with_default_title(self, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:

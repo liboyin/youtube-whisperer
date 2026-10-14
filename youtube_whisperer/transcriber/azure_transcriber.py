@@ -6,7 +6,7 @@ from typing import Any
 import azure.cognitiveservices.speech as speechsdk
 import soundfile as sf
 from azure.cognitiveservices.speech import SpeechRecognitionResult
-from pathlib_extensions import OverwriteMode, overwrite_existing_path
+from pathlib_extensions import OverwriteMode, resolve_overwrite_mode
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import (
@@ -150,11 +150,9 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     unchanged. No SRT file is written when recognition fails.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
-    if output_file_path.is_file():
-        if not overwrite_existing_path(output_file_path, overwrite):
-            return output_file_path
-        if overwrite == OverwriteMode.PROMPT:
-            overwrite = OverwriteMode.ALWAYS
+    policy = resolve_overwrite_mode(output_file_path, overwrite)
+    if policy is None:
+        return output_file_path
     settings = settings if settings is not None else Settings()
     # Time out after 1.5x audio duration, but never below the floor so short clips still allow startup.
     # Inspect duration before creating the recognizer so an inspection failure leaves nothing started.
@@ -165,5 +163,5 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     recognition_results = _recognize_continuously(speech_recognizer, timeout_seconds)
 
-    save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True, overwrite=overwrite)
+    save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True, overwrite=policy)
     return output_file_path

@@ -6,9 +6,11 @@ from pathlib import Path
 import yt_dlp
 from pathlib_extensions import (
     OverwriteMode,
-    overwrite_existing_path,
     prepare_output_file,
+    publish_staged_file,
     replace_os_reserved_chars,
+    resolve_overwrite_mode,
+    resolve_publication_target,
     truncate_filename,
 )
 
@@ -17,10 +19,6 @@ from youtube_whisperer.downloaders.utils import (
     build_youtube_dl_options,
     get_video_title,
     is_firefox_cookies_available,
-)
-from youtube_whisperer.publication import (
-    publish_staged_file,
-    resolve_publication_target,
 )
 
 
@@ -42,7 +40,8 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
         FileNotFoundError: If the download leaves no regular staged video.
         OSError: If preparation, mode restoration, or atomic publication fails.
     """
-    if target_path.is_file() and not overwrite_existing_path(target_path, overwrite):
+    policy = resolve_overwrite_mode(target_path, overwrite)
+    if policy is None:
         return
     target, mode = resolve_publication_target(prepare_output_file(target_path))
     # The generated stage name is safe, but its parent can contain expansions
@@ -62,7 +61,7 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
             ydl.download([url])
         if not stage.is_file():
             raise FileNotFoundError(f'Download did not produce a regular staged video: {stage}')
-        publish_staged_file(stage, target, mode, overwrite)
+        publish_staged_file(stage, target, mode, policy)
     finally:
         shutil.rmtree(stage_dir)
 

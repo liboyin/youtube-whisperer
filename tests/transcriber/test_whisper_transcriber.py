@@ -204,7 +204,7 @@ def test_transcribe_file_with_default_model_returns_existing_output_when_overwri
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     output_path.write_text("existing")
-    mock_overwrite = mocker.patch.object(testee, "overwrite_existing_path", return_value=False)
+    mock_overwrite = mocker.patch.object(testee, "resolve_overwrite_mode", wraps=testee.resolve_overwrite_mode)
     mock_load = mocker.patch.object(testee, "load_whisper_waveform_from_file")
 
     result = testee.transcribe_file_with_default_model(

@@ -41,7 +41,7 @@ mutagen==1.48.1
 numpy==2.5.3
 onnxruntime==1.30.0
 packaging==26.3
-pathlib-extensions @ git+https://github.com/liboyin/pathlib-extensions.git@3f39af6199d558036ac19e6d4eb8fa8a79612a46
+pathlib-extensions @ git+https://github.com/liboyin/pathlib-extensions.git@88aba06067be9848933af628328b15fb3a24d085
 protobuf==7.36.2
 pycparser==3.0
 pycryptodomex==3.23.0

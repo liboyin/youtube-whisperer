@@ -645,9 +645,10 @@ def test_save_segments_as_srt_prompt_is_decided_once_before_lazy_work(tmp_path, 
         consumed.append(True)
         yield testee.SrtBlock("00:00:00,000", "00:00:01,000", ["candidate"])
 
-    with patch.object(testee, 'overwrite_existing_path', return_value=approved) as preflight:
+    import pathlib_extensions.overwrite as helpers
+    with patch.object(helpers, 'user_confirms_overwrite', return_value=approved) as preflight:
         testee.save_segments_as_srt(blocks(), output, overwrite=OverwriteMode.PROMPT)
-    preflight.assert_called_once_with(output, OverwriteMode.PROMPT)
+    preflight.assert_called_once_with(output)
     assert consumed == ([True] if approved else [])
     assert output.read_text() == ("1\n00:00:00,000 --> 00:00:01,000\ncandidate\n" if approved else "original")
 

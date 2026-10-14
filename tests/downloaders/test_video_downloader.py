@@ -111,7 +111,7 @@ def test_download_video_returns_early_when_existing_file_should_not_be_overwritt
     """Test that an existing file is not re-downloaded when overwrite is denied."""
     target_path = tmp_path / "video.mp4"
     target_path.write_text("existing")
-    mock_overwrite = mocker.patch.object(testee, "overwrite_existing_path", return_value=False)
+    mock_overwrite = mocker.patch.object(testee, "resolve_overwrite_mode", wraps=testee.resolve_overwrite_mode)
     mock_prepare = mocker.patch.object(testee, "prepare_output_file")
     mock_ydl = mocker.patch.object(testee.yt_dlp, "YoutubeDL")
 
@@ -222,7 +222,9 @@ def test_download_video_replaces_authorized_existing_file_and_preserves_mode(pol
     target.write_bytes(b'previous video')
     target.chmod(0o640)
     created = staged_youtube_dl_factory(testee, cookies_available=False)
-    consent = mocker.patch.object(testee, 'overwrite_existing_path', return_value=True)
+    import pathlib_extensions.overwrite as helpers
+    mocker.patch.object(helpers, 'user_confirms_overwrite', return_value=True)
+    consent = mocker.patch.object(testee, 'resolve_overwrite_mode', wraps=testee.resolve_overwrite_mode)
 
     def observe_previous_output():
         """Check that the old video survives until download completion."""
@@ -430,3 +432,15 @@ def test_download_video_with_default_title_sanitizes_title_and_downloads(mocker,
         expected_path,
         overwrite=OverwriteMode.NEVER,
     )
+
+
+def test_download_video_with_default_title_truncates_long_dotted_title_keeping_mp4_suffix(mocker, tmp_path):
+    """A long title containing dots is truncated to 220 bytes and keeps its .mp4 suffix."""
+    title = 'Mr. Smith Goes to Washington ' + 'x' * 300
+    mocker.patch.object(testee, 'get_video_title', return_value=title)
+    mock_download = mocker.patch.object(testee, 'download_video')
+
+    result = testee.download_video_with_default_title('https://example.com/watch?v=4', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
+
+    assert result == tmp_path / (title[:216] + '.mp4')
+    mock_download.assert_called_once_with('https://example.com/watch?v=4', result, overwrite=OverwriteMode.NEVER)
