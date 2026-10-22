@@ -1,14 +1,11 @@
 import os
-import shutil
-import tempfile
 from pathlib import Path
 
 import yt_dlp
 from pathlib_extensions import (
     OverwritePolicy,
+    StagedFile,
     prepare_output_file,
-    publish_staged_file,
-    resolve_publication_target,
 )
 
 from youtube_whisperer.config import Settings
@@ -23,11 +20,14 @@ from youtube_whisperer.overwrite import require_supported_policy, resolve_output
 
 def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> None:
     """
-    Download to an owned stage and atomically publish the literal target path.
+    Download into a `StagedFile` and atomically publish the literal target path.
 
     Failed downloads preserve previous output. NEVER also preserves competing
-    files; ALWAYS replacements follow symlinks and retain mode bits.
-    The stage directory is removed on normal return and exception unwinding.
+    files; ALWAYS replacements follow symlinks and retain mode bits. yt-dlp
+    writes a fixed `video.mp4` inside the private stage directory, because a
+    title in its output template would be expanded; the result is renamed to
+    the staged name before publication. The stage directory, with any partial
+    or auxiliary downloader files, is removed on every exit.
 
     Args:
         url (str): The URL of the video.
@@ -41,27 +41,25 @@ def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> N
     """
     if resolve_output_path(target_path, overwrite) is None:
         return
-    target, mode = resolve_publication_target(prepare_output_file(target_path), overwrite)
-    # The generated stage name is safe, but its parent can contain expansions
-    # that yt-dlp cannot escape. Check before acquiring the stage directory.
-    template_parent = str(target.parent / 'video.mp4')
+    destination = prepare_output_file(target_path)
+    # The generated stage directory name is safe, but its parent can contain expansions
+    # that yt-dlp cannot escape. Check before the stage directory is created.
+    template_parent = str(destination.resolve().parent / 'video.mp4')
     if os.path.expandvars(os.path.expanduser(template_parent)) != template_parent:
         raise ValueError('yt-dlp would expand the video stage directory path')
-    stage_dir = Path(tempfile.mkdtemp(prefix='.video-', dir=target.parent))
-    stage = stage_dir / 'video.mp4'
-    try:
+    with StagedFile(destination, overwrite) as staged:
+        download = staged.path.parent / 'video.mp4'
         ydl_opts = build_youtube_dl_options(is_firefox_cookies_available())
         ydl_opts.update({
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
-            'outtmpl': str(stage).replace('%', '%%'),
+            'outtmpl': str(download).replace('%', '%%'),
         })
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-        if not stage.is_file():
-            raise FileNotFoundError(f'Download did not produce a regular staged video: {stage}')
-        publish_staged_file(stage, target, mode, overwrite)
-    finally:
-        shutil.rmtree(stage_dir)
+        if not download.is_file():
+            raise FileNotFoundError(f'Download did not produce a regular staged video: {download}')
+        if download != staged.path:
+            download.rename(staged.path)
 
 
 def download_video_with_default_title(url: str, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path:

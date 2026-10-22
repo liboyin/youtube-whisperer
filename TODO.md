@@ -56,13 +56,9 @@ None open.
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** [D10](DESIGN.md#d10) intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
 
-#### NB39 — Callers still hand-roll their publication stages
-
-**Severity: Low. Proposed simplification ([D48](DESIGN.md#d48)).** Video, SRT and WAV each create, track and remove their own stage before calling the library's publication functions. **Outcome:** all three publish through `StagedFile`; yt-dlp keeps writing a fixed `video.mp4` inside the stage directory so titles never enter its output template. **Acceptance:** the completion contract and [D22](DESIGN.md#d22) hold for all three callers, with mutation evidence per caller; DESIGN describes the new stage directories. **Dependencies:** [NB38](completed_work/NB38.md) (implemented).
-
 #### NB40 — The publication forwarder imports library functions that will be removed
 
-**Severity: Low. Proposed removal ([D48](DESIGN.md#d48)).** `youtube_whisperer.publication` re-exports pathlib-extensions `publication` functions, which the library will deprecate and remove. **Outcome:** the forwarder and its test are removed, and nothing in this project imports the library's `publication` module. **Acceptance:** no source or test imports `pathlib_extensions.publication` content; documentation no longer lists the forwarder. **Dependencies:** NB39.
+**Severity: Low. Proposed removal ([D48](DESIGN.md#d48)).** `youtube_whisperer.publication` re-exports pathlib-extensions `publication` functions, which the library will deprecate and remove. **Outcome:** the forwarder and its test are removed, and nothing in this project imports the library's `publication` module. **Acceptance:** no source or test imports `pathlib_extensions.publication` content; documentation no longer lists the forwarder. **Dependencies:** [NB39](completed_work/NB39.md) (implemented).
 
 ## Readiness and unresolved choices
 
@@ -99,6 +95,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB36](completed_work/NB36.md) — Implemented ([D46](DESIGN.md#d46)): pathlib-extensions `truncate_filename` keeps only extension-like suffixes, so long titles containing dots get video and SRT names within 220 bytes instead of failing.
 - [NB37](completed_work/NB37.md) — Implemented ([D46](DESIGN.md#d46)): pathlib-extensions owns the publication helpers and the `resolve_overwrite_mode` preflight; `youtube_whisperer.publication` forwards them and the seven repeated preflights are gone.
 - [NB38](completed_work/NB38.md) — Implemented ([D48](DESIGN.md#d48)): overwrite parameters take pathlib-extensions `OverwritePolicy` (pin `fff2bf6`), former `PROMPT` defaults are `NEVER`, and `RENAME` is rejected before any work.
+- [NB39](completed_work/NB39.md) — Implemented ([D48](DESIGN.md#d48)): video, SRT and WAV publish through pathlib-extensions `StagedFile` in private `.staging-<random>` directories; yt-dlp and ffmpeg still write under names that keep titles out of templates and the caller's suffix for container inference.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance

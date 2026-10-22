@@ -60,7 +60,7 @@ def test_dispatch_task_failed_conversion_retries_complete_wav_and_reuses_good_si
         assert overwrite == OverwritePolicy.NEVER
         assert settings is worker.settings
         assert audio_path.read_bytes() == complete_wav
-        assert not list(tmp_path.glob('.wav-*'))
+        assert not list(tmp_path.glob('.staging-*'))
         with wave.open(str(audio_path), 'rb') as reader:
             assert (reader.getnchannels(), reader.getsampwidth(), reader.getframerate(), reader.getnframes()) == (1, 2, 16000, 160)
         completed_calls.append(audio_path)
@@ -70,7 +70,7 @@ def test_dispatch_task_failed_conversion_retries_complete_wav_and_reuses_good_si
         worker.dispatch_task(task, source)
     service.assert_not_called()
     assert not sidecar.exists()
-    assert not list(tmp_path.glob('.wav-*'))
+    assert not list(tmp_path.glob('.staging-*'))
 
     worker.dispatch_task(task, source)
     assert completed_calls == [sidecar]

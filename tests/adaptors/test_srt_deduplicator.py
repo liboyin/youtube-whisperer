@@ -1,9 +1,9 @@
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from textwrap import dedent
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -231,18 +231,22 @@ def test_publish_srt_text_preserves_final_after_partial_write_and_retry(tmp_path
     assert list(tmp_path.iterdir()) == [output]
 
 
-def test_publish_srt_text_exclusive_creation_does_not_remove_an_unowned_collision(tmp_path):
-    """A colliding stage name fails safely without removing another writer's file."""
+@pytest.mark.parametrize("fails", [False, True])
+def test_publish_srt_text_never_removes_another_writers_stage(tmp_path, fails):
+    """Success and failure remove only this publication's own stage, never an unrelated one beside it."""
     output = tmp_path / "output.srt"
     output.write_text("original")
-    collision = tmp_path / ".srt-collision.tmp"
-    collision.write_text("other writer")
-    with patch.object(testee, 'uuid4', return_value=SimpleNamespace(hex='collision')), pytest.raises(FileExistsError):
+    unrelated = tmp_path / ".staging-unrelated"
+    unrelated.mkdir()
+    (unrelated / "output.srt").write_text("other writer")
+    if fails:
+        with patch.object(testee.Path, 'replace', side_effect=OSError("injected replace failure")), pytest.raises(OSError, match="injected replace failure"):
+            testee.publish_srt_text(output, "candidate")
+    else:
         testee.publish_srt_text(output, "candidate")
-    assert output.read_text() == "original"
-    assert collision.exists()
-    assert collision.read_text() == "other writer"
-    assert set(tmp_path.iterdir()) == {output, collision}
+    assert output.read_text() == ("original" if fails else "candidate")
+    assert set(tmp_path.iterdir()) == {output, unrelated}
+    assert (unrelated / "output.srt").read_text() == "other writer"
 
 
 @pytest.mark.parametrize("failure", [OSError, KeyboardInterrupt])
@@ -338,11 +342,12 @@ with patch.object(testee.Path, 'open', lambda path, mode='r', **kwargs: Interrup
     assert output.read_text() == "original" if existing else not output.exists()
     stages = set(tmp_path.iterdir()) - {output}
     assert len(stages) == 1
-    assert next(iter(stages)).read_text() == "com"
+    stage_dir = next(iter(stages))
+    assert stage_dir.name.startswith(".staging-")
+    assert (stage_dir / "output.srt").read_text() == "com"
     testee.publish_srt_text(output, "complete")
     assert output.read_text() == "complete"
-    for stage in stages:
-        stage.unlink()
+    shutil.rmtree(stage_dir)
     assert list(tmp_path.iterdir()) == [output]
 
 

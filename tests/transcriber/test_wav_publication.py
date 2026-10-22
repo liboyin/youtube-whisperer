@@ -1,6 +1,7 @@
 import errno
 import io
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -80,30 +81,33 @@ def conversion(mocker, tmp_path):
 
 
 def test_conversion_interrupt_reaps_and_closes_child_before_stage_removal(conversion, mocker, tmp_path):
-    """An interrupted writer is killed and drained before its partial stage is unlinked."""
+    """An interrupted writer is killed and drained before its stage directory is removed."""
     output = tmp_path / 'output.wav'
     output.write_bytes(b'previous good audio')
     conversion.options['interrupt'] = KeyboardInterrupt()
-    original_unlink = Path.unlink
+    original_rmtree = shutil.rmtree
+    observed = []
 
-    def unlink(path, *args, **kwargs):
-        """Require cancellation, quiescence and closed owned pipes at cleanup."""
-        if path in conversion.stages:
+    def rmtree(path, *args, **kwargs):
+        """Require cancellation, quiescence and closed owned pipes when the stage is removed."""
+        if any(Path(path) == stage.parent for stage in conversion.stages):
             process = conversion.processes[-1]
             assert process.events == ['communicate', 'kill', 'communicate']
             assert not process.alive
             assert process.stdout.closed and process.stderr.closed
-        return original_unlink(path, *args, **kwargs)
+            observed.append(path)
+        return original_rmtree(path, *args, **kwargs)
 
-    mocker.patch.object(testee.Path, 'unlink', unlink)
+    mocker.patch.object(shutil, 'rmtree', rmtree)
     with pytest.raises(KeyboardInterrupt):
         testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS)
 
+    assert observed == [conversion.stages[0].parent]
     assert output.read_bytes() == b'previous good audio'
-    assert not conversion.stages[0].exists()
+    assert not conversion.stages[0].parent.exists()
 
 
-def test_conversion_interrupt_reaps_real_owned_child_before_unlink(mocker, tmp_path):
+def test_conversion_interrupt_reaps_real_owned_child_before_stage_removal(mocker, tmp_path):
     """A pipe handshake interrupts a real owned child and cleanup observes its exit."""
     source = tmp_path / 'input.mp3'
     source.write_bytes(b'synthetic source')
@@ -133,23 +137,26 @@ def test_conversion_interrupt_reaps_real_owned_child_before_unlink(mocker, tmp_p
         return child
 
     stream.run_async.side_effect = start
-    original_unlink = Path.unlink
+    original_rmtree = shutil.rmtree
+    observed = []
 
-    def unlink(path, *args, **kwargs):
-        """Require the real child to be reaped with all owned pipes closed."""
-        if path in stages:
+    def rmtree(path, *args, **kwargs):
+        """Require the real child to be reaped with all owned pipes closed when the stage is removed."""
+        if any(Path(path) == stage.parent for stage in stages):
             child = children[0]
             assert child.returncode is not None
             assert child.poll() is not None
             assert all(pipe.closed for pipe in (child.stdin, child.stdout, child.stderr))
-        return original_unlink(path, *args, **kwargs)
+            observed.append(path)
+        return original_rmtree(path, *args, **kwargs)
 
-    mocker.patch.object(testee.Path, 'unlink', unlink)
+    mocker.patch.object(shutil, 'rmtree', rmtree)
     try:
         with pytest.raises(KeyboardInterrupt):
             testee.save_as_wav_file(source, output)
+        assert observed == [stages[0].parent]
         assert not output.exists()
-        assert not stages[0].exists()
+        assert not stages[0].parent.exists()
     finally:
         for child in children:
             if child.poll() is None:
@@ -198,7 +205,7 @@ def test_save_as_wav_file_startup_error_cleans_owned_stage(conversion, tmp_path)
     with pytest.raises(FileNotFoundError, match='ffmpeg missing'):
         testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS)
     assert output.read_bytes() == b'previous good audio'
-    assert not list(tmp_path.glob('.wav-*'))
+    assert not list(tmp_path.glob('.staging-*'))
 
 
 @pytest.mark.parametrize('overwrite', [{}, {'overwrite': OverwritePolicy.NEVER}])
@@ -209,7 +216,7 @@ def test_save_as_wav_file_declined_overwrite_avoids_conversion(conversion, tmp_p
     assert testee.save_as_wav_file(conversion.source, output, **overwrite) is None
     assert output.read_bytes() == b'previous good audio'
     conversion.input.assert_not_called()
-    assert not list(tmp_path.glob('.wav-*'))
+    assert not list(tmp_path.glob('.staging-*'))
 
 
 def test_save_as_wav_file_rejects_rename_before_conversion(conversion, tmp_path):
@@ -228,7 +235,8 @@ def test_save_as_wav_file_approved_overwrite_publishes_after_completion(conversi
     def during(stage, process):
         """Inspect the previous output while partial bytes remain unpublished."""
         assert stage != output
-        assert stage.parent == output.parent
+        assert stage.parent.parent == output.parent
+        assert stage.name == output.name
         assert stage.suffix == output.suffix
         assert output.read_bytes() == b'previous good audio'
         assert stage.read_bytes() == b'partial'
@@ -286,7 +294,7 @@ def test_save_as_wav_file_symlink_target_mode_and_hardlinked_alias_are_preserved
     assert target.read_bytes() == b'complete audio'
     assert stat.S_IMODE(target.stat().st_mode) == 0o640
     assert alias.read_bytes() == b'previous good audio'
-    assert conversion.stages[0].parent == target.parent
+    assert conversion.stages[0].parent.parent == target.parent
     assert conversion.stages[0].suffix == '.aiff'
 
 
@@ -355,21 +363,26 @@ def test_save_as_wav_file_publication_failure_cleans_stage_without_fallback(conv
     assert all(not stage.exists() for stage in conversion.stages)
 
 
-def test_save_as_wav_file_exclusive_creation_collision_never_cleans_unowned_file(conversion, mocker, tmp_path):
-    """An exclusive-create collision preserves the other writer's stage and skips ffmpeg."""
-    mocker.patch.object(testee, 'uuid4', return_value=SimpleNamespace(hex='collision'))
-    other_stage = tmp_path / '.wav-collision.wav'
-    other_stage.write_bytes(b'another writer')
-    with pytest.raises(FileExistsError):
-        testee.save_as_wav_file(conversion.source, tmp_path / 'output.wav')
-    assert other_stage.is_file()
-    assert other_stage.read_bytes() == b'another writer'
-    conversion.input.assert_not_called()
+@pytest.mark.parametrize('fails', [False, True])
+def test_save_as_wav_file_never_removes_another_writers_stage(conversion, tmp_path, fails):
+    """Success and failure remove only this conversion's own stage, never an unrelated one beside it."""
+    output = tmp_path / 'output.wav'
+    unrelated = tmp_path / '.staging-unrelated'
+    unrelated.mkdir()
+    (unrelated / 'output.wav').write_bytes(b'another writer')
+    if fails:
+        conversion.options['returncode'] = 1
+        with pytest.raises(testee.ffmpeg.Error):
+            testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS)
+    else:
+        assert testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS) == output
+    assert set(tmp_path.iterdir()) == ({conversion.source, unrelated} if fails else {conversion.source, unrelated, output})
+    assert (unrelated / 'output.wav').read_bytes() == b'another writer'
 
 
 def test_save_as_wav_file_stage_close_failure_cleans_only_owned_artifacts(conversion, mocker, tmp_path):
     """Owned creation followed by close failure removes only that stage before conversion."""
-    other_stage = tmp_path / '.wav-unrelated.wav'
+    other_stage = tmp_path / '.staging-unrelated.wav'
     other_stage.write_bytes(b'another writer')
     original_open = Path.open
 
@@ -391,7 +404,7 @@ def test_save_as_wav_file_stage_close_failure_cleans_only_owned_artifacts(conver
     mocker.patch.object(testee.Path, 'open', open_stage)
     with pytest.raises(OSError, match='close failed'):
         testee.save_as_wav_file(conversion.source, tmp_path / 'output.wav')
-    assert list(tmp_path.glob('.wav-*')) == [other_stage]
+    assert list(tmp_path.glob('.staging-*')) == [other_stage]
     assert other_stage.read_bytes() == b'another writer'
     conversion.input.assert_not_called()
 
@@ -409,4 +422,4 @@ def test_save_as_wav_file_real_ffmpeg_publishes_mono_pcm16_at_16khz(tmp_path):
     with wave.open(str(output), 'rb') as reader:
         assert (reader.getnchannels(), reader.getsampwidth(), reader.getframerate(), reader.getnframes()) == (1, 2, 16000, 1600)
         assert len(reader.readframes(1600)) == 3200
-    assert not list(tmp_path.glob('.wav-*'))
+    assert not list(tmp_path.glob('.staging-*'))

@@ -2,14 +2,12 @@ import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from uuid import uuid4
 
 from pathlib_extensions import (
     OverwritePolicy,
+    StagedFile,
     prepare_input_file,
     prepare_output_file,
-    publish_staged_file,
-    resolve_publication_target,
 )
 
 from youtube_whisperer.overwrite import require_supported_policy, resolve_output_path
@@ -190,7 +188,7 @@ def convert_srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
 
 
 def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = OverwritePolicy.ALWAYS) -> None:
-    """Publish complete SRT text after writing and closing an owned sibling stage.
+    """Publish complete SRT text after writing and closing it inside a `StagedFile`.
 
     Callers own the existing-output preflight. NEVER preserves even a completed
     file created while staging; ALWAYS replaces the target.
@@ -198,8 +196,9 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = Ov
     including a symlink to a file; other collisions propagate FileExistsError.
     Existing symlinks are followed and mode bits retained. Inode replacement can
     change ownership, ACLs, and extended attributes; hardlinked aliases keep old
-    contents. Abrupt process exit can leave a stage, but never partial final text.
-    This does not promise power-loss durability or scavenge abandoned stages.
+    contents. Abrupt process exit can leave a hidden stage directory, but never
+    partial final text. This does not promise power-loss durability or scavenge
+    abandoned stages.
 
     Args:
         file_path (Path): Final SRT path, with parents created as needed.
@@ -209,23 +208,13 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = Ov
     Raises:
         ValueError: If `overwrite` is RENAME.
         OSError: If staging, closing, mode preservation, or publication fails,
-            including unsupported hard-link publication. Owned stages are removed
-            on unwinding; exclusive-creation collisions are never removed.
+            including unsupported hard-link publication. The private stage
+            directory is removed on every exit.
     """
     require_supported_policy(overwrite)
-    target, mode = resolve_publication_target(prepare_output_file(file_path), overwrite)
-    stage = target.parent / f'.srt-{uuid4().hex}.tmp'
-    owned = False
-    try:
-        # Exclusive text creation uses 0666 filtered by umask without mutating it.
-        stream = stage.open('x')
-        owned = True
-        with stream as writer:
-            writer.write(text)
-        publish_staged_file(stage, target, mode, overwrite)
-    finally:
-        if owned:
-            stage.unlink(missing_ok=True)
+    # Exclusive text creation uses 0666 filtered by umask without mutating it.
+    with StagedFile(prepare_output_file(file_path), overwrite) as staged, staged.path.open('x') as writer:
+        writer.write(text)
 
 
 def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicate: bool = True, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> None:

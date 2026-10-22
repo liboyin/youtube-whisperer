@@ -95,7 +95,7 @@ def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(coo
         assert {key: value for key, value in created.instances[1].options.items() if key != 'outtmpl'} == expected
         assert created.instances[1].options['outtmpl'] == str(created.instances[1].staged_path)
         assert created.instances[0].staged_path != created.instances[1].staged_path
-        assert list(tmp_path.glob('.video-*')) == []
+        assert list(tmp_path.glob('.staging-*')) == []
         assert (tmp_path / 'video.mp4').read_bytes() == b'new video'
         assert discovery.call_count == 2
         assert detector.cache_info().misses == 1
@@ -142,7 +142,7 @@ def test_download_video_downloads_with_cookies_when_available(mocker, tmp_path, 
     assert created.instances[0].staged_path.parent.parent == target_path.parent
     assert created.instances[0].staged_path.name == "video.mp4"
     assert target_path.read_bytes() == b"new video"
-    assert list(tmp_path.glob(".video-*")) == []
+    assert list(tmp_path.glob(".staging-*")) == []
     assert created.instances[0].options["cookiesfrombrowser"] == ("firefox",)
     assert created.instances[0].download_calls == [["https://example.com/watch?v=2"]]
 
@@ -168,7 +168,7 @@ def test_download_video_propagates_error_and_exits_context(tmp_path, staged_yout
     with pytest.raises(RuntimeError) as caught:
         testee.download_video('url', target, OverwritePolicy.ALWAYS)
     assert target.read_bytes() == b'previous video'
-    assert list(tmp_path.glob('.video-*')) == []
+    assert list(tmp_path.glob('.staging-*')) == []
     assert caught.value is error
     instance = created.instances[0]
     assert instance.download_calls == [['url']]
@@ -201,7 +201,7 @@ def test_download_video_rejects_expanding_parent_before_staging(monkeypatch, moc
     parent = tmp_path / '$NB8_SET'
     parent.mkdir()
     created = staged_youtube_dl_factory(testee, cookies_available=False)
-    make_stage = mocker.spy(testee.tempfile, 'mkdtemp')
+    make_stage = mocker.spy(testee, 'StagedFile')
 
     with pytest.raises(ValueError, match='expand'):
         testee.download_video('url', parent / 'video.mp4', OverwritePolicy.ALWAYS)
@@ -303,7 +303,7 @@ def test_download_video_preserves_competing_file_and_propagates_other_collisions
         else:
             assert target.is_symlink()
             assert not other.exists()
-    assert list(tmp_path.glob('.video-*')) == []
+    assert list(tmp_path.glob('.staging-*')) == []
 
 
 @pytest.mark.parametrize('output', ['missing', 'directory'])
@@ -375,7 +375,7 @@ def test_download_video_publishes_only_after_downloader_context_exit(policy, exi
 def test_download_video_cleans_stage_after_publication_error(policy, mocker, tmp_path, staged_youtube_dl_factory):
     """Unsupported publication errors propagate while removing only the owned stage."""
     target = tmp_path / 'video.mp4'
-    unrelated = tmp_path / '.video-unrelated'
+    unrelated = tmp_path / '.staging-unrelated'
     unrelated.mkdir()
     (unrelated / 'keep').write_bytes(b'unrelated')
     staged_youtube_dl_factory(testee, cookies_available=False)

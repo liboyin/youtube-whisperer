@@ -1,15 +1,13 @@
 import logging
 from pathlib import Path
-from uuid import uuid4
 
 import ffmpeg
 import numpy as np
 from pathlib_extensions import (
     OverwritePolicy,
+    StagedFile,
     prepare_input_file,
     prepare_output_file,
-    publish_staged_file,
-    resolve_publication_target,
 )
 
 from youtube_whisperer.overwrite import resolve_output_path
@@ -91,13 +89,15 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
     """Convert audio to a completed sidecar before atomically publishing it.
 
     Early overwrite preflight avoids needless conversion. Staging
-    retains the destination suffix for ffmpeg container inference. Publication
+    converts under the caller's destination name, so ffmpeg infers the container
+    from its suffix even when a symlink's target differs. Publication
     follows symlink targets and preserves existing modes, but replaces the inode:
     hardlinked aliases retain old contents; ownership, ACLs and xattrs may change.
     NEVER preserves late competing files using same-filesystem hard links;
     other collisions and unsupported links raise without an unsafe fallback.
-    Only owned stages are cleaned; abrupt exit may leave one. This protects
-    process interruption, not power-loss durability, and does not repair old WAVs.
+    Conversion happens inside a `StagedFile`, whose private directory is removed
+    on every exit; abrupt exit may leave one. This protects process
+    interruption, not power-loss durability, and does not repair old WAVs.
 
     Args:
         input_file_path (Path): Audio or video input, validated by the input helper.
@@ -118,20 +118,17 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
     if resolve_output_path(output_file_path, overwrite) is None:
         return None
     output_file_path = prepare_output_file(output_file_path)
-    target, mode = resolve_publication_target(output_file_path, overwrite)
-    stage = target.parent / f'.wav-{uuid4().hex}{output_file_path.suffix}'
-    owned = False
     try:
-        # Exclusive creation uses ordinary 0666 permissions filtered by umask.
-        writer = stage.open('xb')
-        owned = True
-        writer.close()
-        _convert_audio_to_stage(input_file_path, stage)
-        publish_staged_file(stage, target, mode, overwrite)
+        with StagedFile(output_file_path, overwrite) as staged:
+            # ffmpeg infers the container from the suffix of the caller's destination, which a
+            # symlink's target may not share, so convert under the caller's name and rename.
+            # Exclusive creation uses ordinary 0666 permissions filtered by umask.
+            converted = staged.path.parent / output_file_path.name
+            converted.open('xb').close()
+            _convert_audio_to_stage(input_file_path, converted)
+            if converted != staged.path:
+                converted.rename(staged.path)
     except ffmpeg.Error as e:
         logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise
-    finally:
-        if owned:
-            stage.unlink(missing_ok=True)
     return output_file_path
