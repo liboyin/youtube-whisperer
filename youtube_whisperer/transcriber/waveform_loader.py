@@ -5,13 +5,14 @@ from uuid import uuid4
 import ffmpeg
 import numpy as np
 from pathlib_extensions import (
-    OverwriteMode,
+    OverwritePolicy,
     prepare_input_file,
     prepare_output_file,
     publish_staged_file,
-    resolve_overwrite_mode,
     resolve_publication_target,
 )
+
+from youtube_whisperer.overwrite import resolve_output_path
 
 logger = logging.getLogger(__name__)
 
@@ -86,14 +87,14 @@ def _convert_audio_to_stage(input_file_path: Path, stage: Path) -> None:
                 pipe.close()
 
 
-def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
+def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path | None:
     """Convert audio to a completed sidecar before atomically publishing it.
 
-    Early overwrite preflight avoids conversion and duplicate prompts. Staging
+    Early overwrite preflight avoids needless conversion. Staging
     retains the destination suffix for ffmpeg container inference. Publication
     follows symlink targets and preserves existing modes, but replaces the inode:
     hardlinked aliases retain old contents; ownership, ACLs and xattrs may change.
-    NEVER/RENAME preserve late competing files using same-filesystem hard links;
+    NEVER preserves late competing files using same-filesystem hard links;
     other collisions and unsupported links raise without an unsafe fallback.
     Only owned stages are cleaned; abrupt exit may leave one. This protects
     process interruption, not power-loss durability, and does not repair old WAVs.
@@ -101,23 +102,23 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
     Args:
         input_file_path (Path): Audio or video input, validated by the input helper.
         output_file_path (Path | None): Destination, defaulting to input with `.wav`.
-        overwrite (OverwriteMode): Existing-file policy, defaulting to PROMPT.
+        overwrite (OverwritePolicy): ALWAYS replaces an existing file; NEVER keeps it. Defaults to NEVER.
 
     Returns:
         Path | None: Original prepared destination path on completion (including
         a late competing file), or None when preflight declines replacement.
 
     Raises:
+        ValueError: If `overwrite` is RENAME.
         ffmpeg.Error: Failed conversion, logged with captured stderr diagnostics.
         OSError: Input/output validation, staging, startup or publication failure.
     """
     input_file_path = prepare_input_file(input_file_path)
     output_file_path = output_file_path or input_file_path.with_suffix('.wav')
-    policy = resolve_overwrite_mode(output_file_path, overwrite)
-    if policy is None:
+    if resolve_output_path(output_file_path, overwrite) is None:
         return None
     output_file_path = prepare_output_file(output_file_path)
-    target, mode = resolve_publication_target(output_file_path)
+    target, mode = resolve_publication_target(output_file_path, overwrite)
     stage = target.parent / f'.wav-{uuid4().hex}{output_file_path.suffix}'
     owned = False
     try:
@@ -126,7 +127,7 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
         owned = True
         writer.close()
         _convert_audio_to_stage(input_file_path, stage)
-        publish_staged_file(stage, target, mode, policy)
+        publish_staged_file(stage, target, mode, overwrite)
     except ffmpeg.Error as e:
         logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise

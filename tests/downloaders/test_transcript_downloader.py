@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 import youtube_whisperer.downloaders.transcript_downloader as testee
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
@@ -318,7 +318,7 @@ def test_download_as_srt_file_success(mocker, tmp_path, downloader):
         return original_open(path, mode, *args, **kwargs)
 
     with patch.object(testee.Path, 'open', checked_open):
-        assert downloader.download_as_srt_file(output, OverwriteMode.ALWAYS) is True
+        assert downloader.download_as_srt_file(output, OverwritePolicy.ALWAYS) is True
     assert output.read_text() == srt_text
     assert list(output.parent.iterdir()) == [output]
     download.assert_called_once_with()
@@ -332,15 +332,15 @@ def test_download_as_srt_file_preserves_final_on_publication_failure_and_retry(m
         output.write_text("original")
     mocker.patch.object(downloader, 'download_as_srt_text', return_value="complete\n\n")
     with patch.object(testee.Path, 'replace', side_effect=OSError("injected publication failure")), pytest.raises(OSError, match="injected publication failure"):
-        downloader.download_as_srt_file(output, OverwriteMode.ALWAYS)
+        downloader.download_as_srt_file(output, OverwritePolicy.ALWAYS)
     assert output.read_text() == "original" if existing else not output.exists()
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
-    assert downloader.download_as_srt_file(output, OverwriteMode.NEVER if not existing else OverwriteMode.ALWAYS) is True
+    assert downloader.download_as_srt_file(output, OverwritePolicy.NEVER if not existing else OverwritePolicy.ALWAYS) is True
     assert output.read_text() == "complete\n\n"
 
 
 @pytest.mark.parametrize("existing", [False, True])
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_download_as_srt_file_never_preserves_competitor_and_avoids_denied_download(mocker, tmp_path, downloader, existing, overwrite):
     """Denied captions avoid network work and a competitor appearing during download wins."""
     output = tmp_path / "output.srt"
@@ -363,7 +363,7 @@ def test_download_as_srt_file_no_transcript(mocker, tmp_path, downloader):
     """Test when no transcript is available."""
     output_path = tmp_path / "output.srt"
     mocker.patch.object(downloader, 'download_as_srt_text', return_value=None)
-    result = downloader.download_as_srt_file(output_path, OverwriteMode.ALWAYS)
+    result = downloader.download_as_srt_file(output_path, OverwritePolicy.ALWAYS)
     assert result is False
     downloader.download_as_srt_text.assert_called_once_with()
 
@@ -372,9 +372,18 @@ def test_download_as_srt_file_returns_true_when_file_exists_and_no_overwrite(tmp
     """Test that an existing SRT is preserved and reported as success when overwrite is denied."""
     output_path = tmp_path / "output.srt"
     output_path.write_text("existing content")
-    result = downloader.download_as_srt_file(output_path, OverwriteMode.NEVER)
+    result = downloader.download_as_srt_file(output_path, OverwritePolicy.NEVER)
     assert result is True
     assert output_path.read_text() == "existing content"
+
+
+def test_download_as_srt_file_rejects_rename_before_caption_request(mocker, tmp_path, downloader):
+    """RENAME is refused before captions are requested or any SRT is written."""
+    request = mocker.patch.object(downloader, "download_as_srt_text", side_effect=AssertionError("caption request"))
+    with pytest.raises(ValueError, match="RENAME is not supported"):
+        downloader.download_as_srt_file(tmp_path / "output.srt", OverwritePolicy.RENAME)
+    request.assert_not_called()
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_download_as_srt_file_with_default_title_success(mocker, tmp_path, downloader):
@@ -382,17 +391,27 @@ def test_download_as_srt_file_with_default_title_success(mocker, tmp_path, downl
     output_path = tmp_path / "Test Video [n9xhJrPXop4].srt"
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=("Test Video", "n9xhJrPXop4"))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
-    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
+    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwritePolicy.NEVER)
     assert result == output_path
     testee.get_video_title_and_id.assert_called_once_with(downloader.url)
-    downloader.download_as_srt_file.assert_called_once_with(output_path, overwrite=OverwriteMode.NEVER)
+    downloader.download_as_srt_file.assert_called_once_with(output_path, overwrite=OverwritePolicy.NEVER)
+
+
+def test_download_as_srt_file_with_default_title_rejects_rename_before_metadata_or_settings(mocker, downloader):
+    """RENAME fails before the asset directory is resolved or video metadata is requested."""
+    metadata = mocker.patch.object(testee, 'get_video_title_and_id', side_effect=AssertionError('metadata requested'))
+    settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
+    with pytest.raises(ValueError, match='RENAME is not supported'):
+        downloader.download_as_srt_file_with_default_title(overwrite=OverwritePolicy.RENAME)
+    metadata.assert_not_called()
+    settings.assert_not_called()
 
 
 def test_download_as_srt_file_with_default_title_failure(mocker, downloader):
     """Test failure case."""
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=("Test Video", "n9xhJrPXop4"))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=False)
-    result = downloader.download_as_srt_file_with_default_title(overwrite=OverwriteMode.NEVER)
+    result = downloader.download_as_srt_file_with_default_title(overwrite=OverwritePolicy.NEVER)
     assert result is None
     downloader.download_as_srt_file.assert_called()
 
@@ -403,8 +422,8 @@ def test_download_as_srt_file_with_default_title_reuses_existing_title_only_srt(
     legacy.write_text("legacy captions")
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=("Test Video", "n9xhJrPXop4"))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
-    assert downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER) == legacy
-    downloader.download_as_srt_file.assert_called_once_with(legacy, overwrite=OverwriteMode.NEVER)
+    assert downloader.download_as_srt_file_with_default_title(tmp_path, OverwritePolicy.NEVER) == legacy
+    downloader.download_as_srt_file.assert_called_once_with(legacy, overwrite=OverwritePolicy.NEVER)
 
 
 def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, tmp_path, downloader):
@@ -412,7 +431,7 @@ def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, 
     long_title = "a/b\\c?d*e:f|g<h>i\"j" * 20
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=(long_title, "n9xhJrPXop4"))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
-    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
+    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwritePolicy.NEVER)
     assert result is not None
     assert len(result.name.encode('utf-8')) <= 220
     assert result.name.endswith(' [n9xhJrPXop4].srt')
@@ -433,9 +452,9 @@ def test_download_as_srt_file_with_default_title_truncates_long_dotted_title_kee
     title = 'Mr. Smith Goes to Washington ' + 'x' * 300
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=(title, 'n9xhJrPXop4'))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
-    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
+    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwritePolicy.NEVER)
     assert result == tmp_path / (title[:220 - len(' [n9xhJrPXop4].srt')] + ' [n9xhJrPXop4].srt')
-    downloader.download_as_srt_file.assert_called_once_with(result, overwrite=OverwriteMode.NEVER)
+    downloader.download_as_srt_file.assert_called_once_with(result, overwrite=OverwritePolicy.NEVER)
 
 
 def test_download_as_srt_file_with_default_title_never_reuses_another_videos_tagged_srt(mocker, tmp_path, downloader):
@@ -444,7 +463,7 @@ def test_download_as_srt_file_with_default_title_never_reuses_another_videos_tag
     other.write_text('captions of video a')
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=('Title [aaaaaaaaaaa]', 'bbbbbbbbbbb'))
     mocker.patch.object(downloader, 'download_as_srt_file', return_value=True)
-    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwriteMode.NEVER)
+    result = downloader.download_as_srt_file_with_default_title(tmp_path, OverwritePolicy.NEVER)
     assert result == tmp_path / 'Title [aaaaaaaaaaa] [bbbbbbbbbbb].srt'
-    downloader.download_as_srt_file.assert_called_once_with(result, overwrite=OverwriteMode.NEVER)
+    downloader.download_as_srt_file.assert_called_once_with(result, overwrite=OverwritePolicy.NEVER)
     assert other.read_text() == 'captions of video a'

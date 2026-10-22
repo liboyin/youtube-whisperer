@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 import youtube_whisperer.transcriber.azure_transcriber as testee
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
@@ -339,20 +339,32 @@ def test_transcribe_audio_file_returns_existing_output_when_overwrite_denied(moc
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     output_path.write_text("existing")
-    mock_overwrite = mocker.patch.object(testee, "resolve_overwrite_mode", wraps=testee.resolve_overwrite_mode)
+    mock_overwrite = mocker.patch.object(testee, "resolve_output_path", wraps=testee.resolve_output_path)
     mock_speech = mocker.patch.object(testee.speechsdk, "SpeechConfig")
 
     with owned_path_probes():
         result = testee.transcribe_audio_file(
             input_path,
             LANGUAGE,
-            overwrite=OverwriteMode.NEVER,
+            overwrite=OverwritePolicy.NEVER,
         )
 
     assert result == output_path
-    mock_overwrite.assert_called_once_with(output_path, OverwriteMode.NEVER)
+    mock_overwrite.assert_called_once_with(output_path, OverwritePolicy.NEVER)
     mock_speech.assert_not_called()
     synthetic_azure_settings.assert_not_called()
+
+
+def test_transcribe_audio_file_rejects_rename_before_contacting_azure(mocker, tmp_path, owned_path_probes, synthetic_azure_settings):
+    """RENAME is refused before audio inspection, settings or any Azure object."""
+    duration = mocker.patch.object(testee, "get_audio_duration_seconds", side_effect=AssertionError("audio inspected"))
+    speech = mocker.patch.object(testee.speechsdk, "SpeechConfig")
+    with owned_path_probes(), pytest.raises(ValueError, match="RENAME is not supported"):
+        testee.transcribe_audio_file(tmp_path / "audio.wav", LANGUAGE, overwrite=OverwritePolicy.RENAME)
+    duration.assert_not_called()
+    speech.assert_not_called()
+    synthetic_azure_settings.assert_not_called()
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.parametrize('subscription, region', [
@@ -392,18 +404,16 @@ def test_transcribe_audio_file_successfully_saves_srt(mocker, tmp_path, owned_pa
     save_mock.assert_called_once()
     blocks_iter, saved_output_path = save_mock.call_args.args
     assert saved_output_path == output_path
-    assert save_mock.call_args.kwargs == {"deduplicate": True, "overwrite": OverwriteMode.PROMPT}
+    assert save_mock.call_args.kwargs == {"deduplicate": True, "overwrite": OverwritePolicy.NEVER}
     saved = list(blocks_iter)
     assert len(saved) == 1 and saved[0].text == "hello"
     assert fake_speechsdk.created_recognizer.stop_calls == 1
 
 
 @pytest.mark.parametrize('overwrite, existing_before_start', [
-    (OverwriteMode.ALWAYS, True),
-    (OverwriteMode.NEVER, True),
-    (OverwriteMode.NEVER, False),
-    (OverwriteMode.RENAME, True),
-    (OverwriteMode.RENAME, False),
+    (OverwritePolicy.ALWAYS, True),
+    (OverwritePolicy.NEVER, True),
+    (OverwritePolicy.NEVER, False),
 ])
 def test_transcribe_audio_file_honors_noninteractive_overwrite_policy(mocker, tmp_path, owned_path_probes, synthetic_azure_settings, overwrite, existing_before_start):
     """Keep or replace actual output according to policy without reading stdin."""
@@ -430,11 +440,11 @@ def test_transcribe_audio_file_honors_noninteractive_overwrite_policy(mocker, tm
 
     assert result == output_path
     stdin.assert_not_called()
-    if overwrite == OverwriteMode.ALWAYS:
+    if overwrite == OverwritePolicy.ALWAYS:
         assert output_path.read_text() == '1\n00:00:00,000 --> 00:00:01,000\nhello\n'
     else:
         assert output_path.read_text() == prior_text
-    if overwrite in (OverwriteMode.NEVER, OverwriteMode.RENAME) and existing_before_start:
+    if overwrite is OverwritePolicy.NEVER and existing_before_start:
         assert fake_speechsdk.created_recognizer is None
         synthetic_azure_settings.assert_not_called()
         duration.assert_not_called()
@@ -442,9 +452,8 @@ def test_transcribe_audio_file_honors_noninteractive_overwrite_policy(mocker, tm
         assert fake_speechsdk.created_recognizer.stop_calls == 1
 
 
-@pytest.mark.parametrize('answer', ['y', 'n'])
-def test_transcribe_audio_file_default_prompt_honors_competing_output_consent(mocker, tmp_path, owned_path_probes, answer):
-    """Default PROMPT saves a competing output only after explicit consent."""
+def test_transcribe_audio_file_default_never_keeps_competing_output(mocker, tmp_path, owned_path_probes):
+    """The default policy keeps a competing output that appears during recognition, without reading stdin."""
     output_path = tmp_path / 'audio.srt'
     prior_text = 'competing complete output'
 
@@ -457,44 +466,30 @@ def test_transcribe_audio_file_default_prompt_honors_competing_output_consent(mo
     fake_speechsdk = FakeSpeechSDK(on_start)
     mocker.patch.object(testee, 'speechsdk', fake_speechsdk)
     mocker.patch.object(testee, 'get_audio_duration_seconds', return_value=0)
-    stdin = mocker.patch.object(builtins, 'input', return_value=answer)
+    stdin = mocker.patch.object(builtins, 'input', side_effect=AssertionError('Unexpected stdin read'))
 
     with owned_path_probes():
         result = testee.transcribe_audio_file(tmp_path / 'audio.wav', LanguageCode(source='en-us'))
 
     assert result == output_path
-    stdin.assert_called_once_with(f"Path '{output_path}' already exists. Overwrite? (y/N): ")
-    expected = '1\n00:00:00,000 --> 00:00:01,000\nhello\n' if answer == 'y' else prior_text
-    assert output_path.read_text() == expected
+    stdin.assert_not_called()
+    assert output_path.read_text() == prior_text
     assert fake_speechsdk.created_recognizer.stop_calls == 1
 
 
-@pytest.mark.parametrize('answer', ['y', 'n'])
-def test_transcribe_audio_file_existing_prompt_is_decided_once(mocker, tmp_path, owned_path_probes, answer):
-    """Existing-output consent occurs once before recognition and is reused for atomic saving."""
+def test_transcribe_audio_file_default_never_skips_recognition_for_existing_output(mocker, tmp_path, owned_path_probes):
+    """The default policy keeps existing output and starts no recognition, without reading stdin."""
     output = tmp_path / 'audio.srt'
     output.write_text('original')
-
-    def on_start(recognizer: FakeSpeechRecognizerSync) -> None:
-        """Complete a synchronous test-owned recognition without background callbacks."""
-        recognizer.recognized.emit(SimpleNamespace(result=MockSpeechRecognitionResult(0, 10_000_000, 'hello')))
-        recognizer.session_stopped.emit(SimpleNamespace())
-
-    fake_speechsdk = FakeSpeechSDK(on_start)
+    fake_speechsdk = FakeSpeechSDK(lambda recognizer: None)
     mocker.patch.object(testee, 'speechsdk', fake_speechsdk)
     duration = mocker.patch.object(testee, 'get_audio_duration_seconds', return_value=0)
-    stdin = mocker.patch.object(builtins, 'input', return_value=answer)
+    mocker.patch.object(builtins, 'input', side_effect=AssertionError('Unexpected stdin read'))
     with owned_path_probes():
         assert testee.transcribe_audio_file(tmp_path / 'audio.wav', LanguageCode(source='en-us')) == output
-    stdin.assert_called_once_with(f"Path '{output}' already exists. Overwrite? (y/N): ")
-    expected = '1\n00:00:00,000 --> 00:00:01,000\nhello\n' if answer == 'y' else 'original'
-    assert output.read_text() == expected
-    if answer == 'y':
-        assert fake_speechsdk.created_recognizer.stop_calls == 1
-        duration.assert_called_once()
-    else:
-        assert fake_speechsdk.created_recognizer is None
-        duration.assert_not_called()
+    assert output.read_text() == 'original'
+    assert fake_speechsdk.created_recognizer is None
+    duration.assert_not_called()
 
 
 def test_transcribe_audio_file_waits_for_delayed_callback(mocker, tmp_path, owned_path_probes, callback_owner):

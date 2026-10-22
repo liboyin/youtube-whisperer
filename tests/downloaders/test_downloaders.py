@@ -3,7 +3,7 @@ from xml.etree.ElementTree import ParseError
 
 import pytest
 import requests
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 from youtube_transcript_api import RequestBlocked, VideoUnavailable
 
 import youtube_whisperer.downloaders as testee
@@ -32,21 +32,33 @@ def test_download_video_and_transcript_with_default_title_delegates(mocker, tmp_
         "https://example.com/watch?v=1",
         LANGUAGE,
         target_dir=tmp_path,
-        overwrite=OverwriteMode.ALWAYS,
+        overwrite=OverwritePolicy.ALWAYS,
     )
 
     assert result == (video_path, True)
     mock_download_video.assert_called_once_with(
         "https://example.com/watch?v=1",
         tmp_path,
-        OverwriteMode.ALWAYS,
+        OverwritePolicy.ALWAYS,
     )
     mock_downloader.assert_called_once_with("https://example.com/watch?v=1", LANGUAGE)
     downloader_instance.download_as_srt_file.assert_called_once_with(
         tmp_path / "video.srt",
-        OverwriteMode.ALWAYS,
+        OverwritePolicy.ALWAYS,
     )
 
+
+
+def test_download_video_and_transcript_with_default_title_rejects_rename_before_any_work(mocker):
+    """RENAME fails before settings, media download or caption work."""
+    video = mocker.patch.object(testee, 'download_video_with_default_title', side_effect=AssertionError('video downloaded'))
+    captions = mocker.patch.object(testee, 'TranscriptDownloader', side_effect=AssertionError('captions requested'))
+    settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
+    with pytest.raises(ValueError, match='RENAME is not supported'):
+        testee.download_video_and_transcript_with_default_title('https://youtu.be/n9xhJrPXop4', LANGUAGE, overwrite=OverwritePolicy.RENAME)
+    video.assert_not_called()
+    captions.assert_not_called()
+    settings.assert_not_called()
 
 
 def test_combined_download_keeps_videos_apart_when_title_ends_in_another_id(mocker, tmp_path):
@@ -59,8 +71,8 @@ def test_combined_download_keeps_videos_apart_when_title_ends_in_another_id(mock
     captions = mocker.patch.object(testee, 'TranscriptDownloader').return_value
     captions.download_as_srt_file.side_effect = lambda path, overwrite: path.write_text('captions') or True
 
-    first, _ = testee.download_video_and_transcript_with_default_title('url-a', LANGUAGE, tmp_path, OverwriteMode.NEVER)
-    second, _ = testee.download_video_and_transcript_with_default_title('url-b', LANGUAGE, tmp_path, OverwriteMode.NEVER)
+    first, _ = testee.download_video_and_transcript_with_default_title('url-a', LANGUAGE, tmp_path, OverwritePolicy.NEVER)
+    second, _ = testee.download_video_and_transcript_with_default_title('url-b', LANGUAGE, tmp_path, OverwritePolicy.NEVER)
 
     assert first == tmp_path / 'Title [aaaaaaaaaaa].mp4'
     assert second == tmp_path / 'Title [aaaaaaaaaaa] [bbbbbbbbbbb].mp4'
@@ -84,7 +96,7 @@ def test_caption_service_failure_preserves_media_returns_missing_and_warns(mocke
 
     mocker.patch.object(testee, 'download_video_with_default_title', side_effect=download_media)
     with caplog.at_level(logging.WARNING, logger=testee.__name__):
-        assert testee.download_video_and_transcript_with_default_title(url, LANGUAGE, tmp_path, OverwriteMode.NEVER) == (media, False)
+        assert testee.download_video_and_transcript_with_default_title(url, LANGUAGE, tmp_path, OverwritePolicy.NEVER) == (media, False)
     assert media.read_bytes() == b'owned media'
     assert not media.with_suffix('.srt').exists()
     assert caption_http.calls[-1][0] == phase
@@ -135,7 +147,7 @@ def test_srt_publication_failure_propagates_and_preserves_existing_output(mocker
     mocker.patch.object(testee, 'download_video_with_default_title', return_value=media)
     mocker.patch.object(caption_testee.Path, 'replace', side_effect=OSError('owned publication failure'))
     with pytest.raises(OSError, match='owned publication failure'):
-        testee.download_video_and_transcript_with_default_title('https://youtu.be/n9xhJrPXop4', LANGUAGE, tmp_path, OverwriteMode.ALWAYS)
+        testee.download_video_and_transcript_with_default_title('https://youtu.be/n9xhJrPXop4', LANGUAGE, tmp_path, OverwritePolicy.ALWAYS)
     assert media.read_bytes() == b'owned media'
     assert srt.read_text() == 'original subtitles'
     assert sorted(tmp_path.iterdir()) == sorted([media, srt])

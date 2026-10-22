@@ -56,13 +56,9 @@ None open.
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** [D10](DESIGN.md#d10) intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
 
-#### NB38 — Overwrite policies still use OverwriteMode and PROMPT
-
-**Severity: Low. Proposed migration ([D48](DESIGN.md#d48)); validated against pathlib-extensions `fff2bf6` on 2026-10-22.** Ten public functions default to `OverwriteMode.PROMPT`, which a web app cannot honor, and the library's rebuilt publication functions accept only `OverwritePolicy`: passing an `OverwriteMode` value there silently takes the numbered `RENAME` path, so the pin update and this migration must land together. **Outcome:** every overwrite parameter takes `OverwritePolicy`, defaults that were `PROMPT` become `NEVER`, `RENAME` raises `ValueError`, and one helper owns that rejection and the existing-output preflight through `OverwritePolicy.resolve`. **Acceptance:** workers keep `NEVER` semantics; a kept file is never rewritten at any call site; `RENAME` is rejected before any work; gates pass against `fff2bf6`. **Dependencies:** none.
-
 #### NB39 — Callers still hand-roll their publication stages
 
-**Severity: Low. Proposed simplification ([D48](DESIGN.md#d48)).** Video, SRT and WAV each create, track and remove their own stage before calling the library's publication functions. **Outcome:** all three publish through `StagedFile`; yt-dlp keeps writing a fixed `video.mp4` inside the stage directory so titles never enter its output template. **Acceptance:** the completion contract and [D22](DESIGN.md#d22) hold for all three callers, with mutation evidence per caller; DESIGN describes the new stage directories. **Dependencies:** NB38.
+**Severity: Low. Proposed simplification ([D48](DESIGN.md#d48)).** Video, SRT and WAV each create, track and remove their own stage before calling the library's publication functions. **Outcome:** all three publish through `StagedFile`; yt-dlp keeps writing a fixed `video.mp4` inside the stage directory so titles never enter its output template. **Acceptance:** the completion contract and [D22](DESIGN.md#d22) hold for all three callers, with mutation evidence per caller; DESIGN describes the new stage directories. **Dependencies:** [NB38](completed_work/NB38.md) (implemented).
 
 #### NB40 — The publication forwarder imports library functions that will be removed
 
@@ -102,6 +98,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB35](completed_work/NB35.md) — Implemented ([D43](DESIGN.md#d43)): a missing consumer group is created from stream ID `0`, so a task appended to a stream recreated without its group (for example by a submission racing `DELETE /tasks`) is delivered instead of stranded as pending.
 - [NB36](completed_work/NB36.md) — Implemented ([D46](DESIGN.md#d46)): pathlib-extensions `truncate_filename` keeps only extension-like suffixes, so long titles containing dots get video and SRT names within 220 bytes instead of failing.
 - [NB37](completed_work/NB37.md) — Implemented ([D46](DESIGN.md#d46)): pathlib-extensions owns the publication helpers and the `resolve_overwrite_mode` preflight; `youtube_whisperer.publication` forwards them and the seven repeated preflights are gone.
+- [NB38](completed_work/NB38.md) — Implemented ([D48](DESIGN.md#d48)): overwrite parameters take pathlib-extensions `OverwritePolicy` (pin `fff2bf6`), former `PROMPT` defaults are `NEVER`, and `RENAME` is rejected before any work.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance

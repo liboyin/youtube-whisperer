@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
-from pathlib_extensions import OverwriteMode, resolve_overwrite_mode
+from pathlib_extensions import OverwritePolicy
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import (
@@ -15,6 +15,7 @@ from youtube_whisperer.adaptors.srt_deduplicator import (
     timestamps_to_srt_block,
 )
 from youtube_whisperer.config import Settings
+from youtube_whisperer.overwrite import resolve_output_path
 from youtube_whisperer.transcriber.model_parameters import (
     get_default_whisper_model_parameters,
 )
@@ -104,19 +105,19 @@ def transcribe_waveform_with_default_model(waveform: np.ndarray, language: Langu
     return transcribe_waveform(model, waveform, language)
 
 
-def transcribe_file_with_default_model(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, *, settings: Settings | None = None) -> Path | None:
+def transcribe_file_with_default_model(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER, *, settings: Settings | None = None) -> Path | None:
     """
     Transcribe a waveform file using default model parameters and save the output to an SRT file.
 
-    Existing-output consent is obtained before model work and reused for saving;
-    complete lazy recognition and rejection finish before SRT publication.
+    The existing-output preflight runs before model work and its policy is reused
+    for saving; complete lazy recognition and rejection finish before SRT publication.
 
     Args:
         input_file_path (Path): Input waveform file path.
         language (LanguageCode): The source language of the waveform.
         output_file_path (Path | None, optional): Output SRT file path. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
         settings: Supplied model snapshot; None uses the process default model.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
+        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing SRT; NEVER keeps it. Defaults to NEVER.
 
     Returns:
         Path | None: Output SRT file path, including an existing output when overwrite is denied.
@@ -128,13 +129,12 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
             so callers (e.g. the worker loop) can dead-letter the task instead of silently dropping it.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
-    policy = resolve_overwrite_mode(output_file_path, overwrite)
-    if policy is None:
+    if resolve_output_path(output_file_path, overwrite) is None:
         return output_file_path
     waveform = load_whisper_waveform_from_file(input_file_path)
     if len(waveform) == 0:
         raise ValueError(f"No audio samples decoded from {input_file_path}; check that the file contains a decodable audio track.")
     segments = transcribe_waveform_with_default_model(waveform, language) if settings is None else transcribe_waveform_with_default_model(waveform, language, settings=settings)
     segments_generator = reject_bad_segments(segments)
-    save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=policy)
+    save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
     return output_file_path

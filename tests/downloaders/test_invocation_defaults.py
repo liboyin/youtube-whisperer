@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 import pytest
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 
@@ -18,11 +18,11 @@ def test_combined_download_resolves_one_current_asset_directory(mocker, monkeypa
         monkeypatch.setenv('WHISPER_ASSETS_DIR', str(target))
         if explicit:
             with patch.object(testee, 'Settings', side_effect=AssertionError('settings construction')):
-                result = testee.download_video_and_transcript_with_default_title('owned-url', LanguageCode('en'), target, OverwriteMode.NEVER)
+                result = testee.download_video_and_transcript_with_default_title('owned-url', LanguageCode('en'), target, OverwritePolicy.NEVER)
         else:
-            result = testee.download_video_and_transcript_with_default_title('owned-url', LanguageCode('en'), overwrite=OverwriteMode.NEVER)
-        download.assert_called_with('owned-url', target, OverwriteMode.NEVER)
-        transcript.download_as_srt_file.assert_called_with(tmp_path / 'video.srt', OverwriteMode.NEVER)
+            result = testee.download_video_and_transcript_with_default_title('owned-url', LanguageCode('en'), overwrite=OverwritePolicy.NEVER)
+        download.assert_called_with('owned-url', target, OverwritePolicy.NEVER)
+        transcript.download_as_srt_file.assert_called_with(tmp_path / 'video.srt', OverwritePolicy.NEVER)
         assert result[0] == tmp_path / 'video.mp4'
 
 
@@ -38,11 +38,11 @@ def test_video_title_download_observes_current_asset_directory(mocker, monkeypat
         monkeypatch.setenv('WHISPER_ASSETS_DIR', str(target))
         if explicit:
             with patch.object(testee, 'Settings', side_effect=AssertionError('settings construction')):
-                result = testee.download_video_with_default_title('owned-url', target, OverwriteMode.NEVER)
+                result = testee.download_video_with_default_title('owned-url', target, OverwritePolicy.NEVER)
         else:
-            result = testee.download_video_with_default_title('owned-url', overwrite=OverwriteMode.NEVER)
+            result = testee.download_video_with_default_title('owned-url', overwrite=OverwritePolicy.NEVER)
         assert result == target / 'owned-title [owned-id].mp4'
-        download.assert_called_with('owned-url', result, overwrite=OverwriteMode.NEVER)
+        download.assert_called_with('owned-url', result, overwrite=OverwritePolicy.NEVER)
 
 
 @pytest.mark.parametrize('explicit', [False, True])
@@ -58,11 +58,11 @@ def test_transcript_title_download_observes_current_asset_directory(mocker, monk
         monkeypatch.setenv('WHISPER_ASSETS_DIR', str(target))
         if explicit:
             with patch.object(testee, 'Settings', side_effect=AssertionError('settings construction')):
-                result = downloader.download_as_srt_file_with_default_title(target, OverwriteMode.NEVER)
+                result = downloader.download_as_srt_file_with_default_title(target, OverwritePolicy.NEVER)
         else:
-            result = downloader.download_as_srt_file_with_default_title(overwrite=OverwriteMode.NEVER)
+            result = downloader.download_as_srt_file_with_default_title(overwrite=OverwritePolicy.NEVER)
         assert result == target / 'owned-title [owned-id].srt'
-        download.assert_called_with(result, overwrite=OverwriteMode.NEVER)
+        download.assert_called_with(result, overwrite=OverwritePolicy.NEVER)
 
 
 @pytest.mark.parametrize('explicit', [False, True])
@@ -84,10 +84,10 @@ def test_playlist_title_download_resolves_one_directory_for_entire_invocation(mo
         mocker.patch.object(testee, 'yield_video_urls_from_playlist', side_effect=expand)
         if explicit:
             with patch.object(testee, 'Settings', side_effect=AssertionError('settings construction')):
-                result = testee.download_playlist_with_default_titles('owned-url', target, OverwriteMode.NEVER)
+                result = testee.download_playlist_with_default_titles('owned-url', target, OverwritePolicy.NEVER)
         else:
-            result = testee.download_playlist_with_default_titles('owned-url', overwrite=OverwriteMode.NEVER)
+            result = testee.download_playlist_with_default_titles('owned-url', overwrite=OverwritePolicy.NEVER)
         assert result == [tmp_path / 'video.mp4'] * 2
         assert download.call_args_list[-2:] == [
-            mocker.call('one', target, OverwriteMode.NEVER), mocker.call('two', target, OverwriteMode.NEVER),
+            mocker.call('one', target, OverwritePolicy.NEVER), mocker.call('two', target, OverwritePolicy.NEVER),
         ]

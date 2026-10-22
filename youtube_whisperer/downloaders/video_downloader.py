@@ -5,10 +5,9 @@ from pathlib import Path
 
 import yt_dlp
 from pathlib_extensions import (
-    OverwriteMode,
+    OverwritePolicy,
     prepare_output_file,
     publish_staged_file,
-    resolve_overwrite_mode,
     resolve_publication_target,
 )
 
@@ -19,30 +18,30 @@ from youtube_whisperer.downloaders.utils import (
     is_firefox_cookies_available,
     resolve_default_media_path,
 )
+from youtube_whisperer.overwrite import require_supported_policy, resolve_output_path
 
 
-def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> None:
+def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> None:
     """
     Download to an owned stage and atomically publish the literal target path.
 
-    Failed downloads preserve previous output. NEVER and RENAME also preserve
-    competing files; approved replacements follow symlinks and retain mode bits.
+    Failed downloads preserve previous output. NEVER also preserves competing
+    files; ALWAYS replacements follow symlinks and retain mode bits.
     The stage directory is removed on normal return and exception unwinding.
 
     Args:
         url (str): The URL of the video.
         target_path (Path): The path where the downloaded video will be saved.
-        overwrite (OverwriteMode): Whether to overwrite existing video files.
+        overwrite (OverwritePolicy): ALWAYS replaces an existing video; NEVER keeps it.
 
     Raises:
-        ValueError: If yt-dlp would expand environment variables in the stage path.
+        ValueError: If `overwrite` is RENAME, or yt-dlp would expand environment variables in the stage path.
         FileNotFoundError: If the download leaves no regular staged video.
         OSError: If preparation, mode restoration, or atomic publication fails.
     """
-    policy = resolve_overwrite_mode(target_path, overwrite)
-    if policy is None:
+    if resolve_output_path(target_path, overwrite) is None:
         return
-    target, mode = resolve_publication_target(prepare_output_file(target_path))
+    target, mode = resolve_publication_target(prepare_output_file(target_path), overwrite)
     # The generated stage name is safe, but its parent can contain expansions
     # that yt-dlp cannot escape. Check before acquiring the stage directory.
     template_parent = str(target.parent / 'video.mp4')
@@ -60,12 +59,12 @@ def download_video(url: str, target_path: Path, overwrite: OverwriteMode) -> Non
             ydl.download([url])
         if not stage.is_file():
             raise FileNotFoundError(f'Download did not produce a regular staged video: {stage}')
-        publish_staged_file(stage, target, mode, policy)
+        publish_staged_file(stage, target, mode, overwrite)
     finally:
         shutil.rmtree(stage_dir)
 
 
-def download_video_with_default_title(url: str, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
+def download_video_with_default_title(url: str, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path:
     """
     Download a video into the target directory under its default name, 'Title [videoID].mp4'.
 
@@ -75,11 +74,15 @@ def download_video_with_default_title(url: str, target_dir: Path | None = None, 
     Args:
         url (str): The URL of the video to download.
         target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to settings resolved at invocation.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing video files. Defaults to `prompt`.
+        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing video; NEVER keeps it. Defaults to NEVER.
 
     Returns:
         Path: The path to the downloaded video file.
+
+    Raises:
+        ValueError: If `overwrite` is RENAME, before any other work.
     """
+    require_supported_policy(overwrite)
     target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir
     title, video_id = get_video_title_and_id(url)
     target_path = resolve_default_media_path(target_dir, title, video_id, '.mp4')

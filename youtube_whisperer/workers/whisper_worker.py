@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 from redis import StrictRedis
 
 from youtube_whisperer.config import Settings
@@ -93,4 +93,4 @@ class WhisperWorker(TranscriptionWorker):
                 loop so the task is dead-lettered.
         """
         validate_gpu_health_or_exit(self.settings)
-        transcribe_file_with_default_model(source, task.language, overwrite=OverwriteMode.NEVER, settings=self.settings)
+        transcribe_file_with_default_model(source, task.language, overwrite=OverwritePolicy.NEVER, settings=self.settings)

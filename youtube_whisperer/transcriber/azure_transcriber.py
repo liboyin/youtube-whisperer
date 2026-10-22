@@ -6,7 +6,7 @@ from typing import Any
 import azure.cognitiveservices.speech as speechsdk
 import soundfile as sf
 from azure.cognitiveservices.speech import SpeechRecognitionResult
-from pathlib_extensions import OverwriteMode, resolve_overwrite_mode
+from pathlib_extensions import OverwritePolicy
 
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
 from youtube_whisperer.adaptors.srt_deduplicator import (
@@ -15,6 +15,7 @@ from youtube_whisperer.adaptors.srt_deduplicator import (
     timestamps_to_srt_block,
 )
 from youtube_whisperer.config import Settings
+from youtube_whisperer.overwrite import resolve_output_path
 
 logger = logging.getLogger(__name__)
 
@@ -114,21 +115,21 @@ def _recognize_continuously(speech_recognizer: "speechsdk.SpeechRecognizer", tim
     return recognition_results
 
 
-def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT, *, settings: Settings | None = None) -> Path | None:
+def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER, *, settings: Settings | None = None) -> Path | None:
     """
     Transcribes an audio file using Azure AI Speech service.
 
     This function blocks until Azure recognition completes, fails, or times
     out. The synchronous behavior keeps queue state aligned with actual task
-    completion in the Azure worker. Existing-output consent is obtained before
-    recognition and reused for final saving without another prompt.
+    completion in the Azure worker. The existing-output preflight runs before
+    recognition and its policy is reused for final saving.
 
     Args:
         input_file_path (Path): The path to the audio file to transcribe.
         language (LanguageCode): The language of the audio file.
         output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
         settings: Supplied credential snapshot, or invocation-time environment defaults.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files at preflight and final saving. Defaults to `prompt`.
+        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing SRT at preflight and final saving; NEVER keeps it. Defaults to NEVER.
 
     Returns:
         Path | None: The output SRT file path. When the output already exists and
@@ -150,8 +151,7 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     unchanged. No SRT file is written when recognition fails.
     """
     output_file_path = output_file_path or input_file_path.with_suffix('.srt')
-    policy = resolve_overwrite_mode(output_file_path, overwrite)
-    if policy is None:
+    if resolve_output_path(output_file_path, overwrite) is None:
         return output_file_path
     settings = settings if settings is not None else Settings()
     # Time out after 1.5x audio duration, but never below the floor so short clips still allow startup.
@@ -163,5 +163,5 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     recognition_results = _recognize_continuously(speech_recognizer, timeout_seconds)
 
-    save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True, overwrite=policy)
+    save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True, overwrite=overwrite)
     return output_file_path

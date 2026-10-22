@@ -5,13 +5,14 @@ from pathlib import Path
 from uuid import uuid4
 
 from pathlib_extensions import (
-    OverwriteMode,
+    OverwritePolicy,
     prepare_input_file,
     prepare_output_file,
     publish_staged_file,
-    resolve_overwrite_mode,
     resolve_publication_target,
 )
+
+from youtube_whisperer.overwrite import require_supported_policy, resolve_output_path
 
 logger = logging.getLogger(__name__)
 
@@ -188,11 +189,11 @@ def convert_srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
     return '\n'.join(yield_lines_from_srt_blocks(blocks))
 
 
-def publish_srt_text(file_path: Path, text: str, overwrite: OverwriteMode = OverwriteMode.ALWAYS) -> None:
+def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = OverwritePolicy.ALWAYS) -> None:
     """Publish complete SRT text after writing and closing an owned sibling stage.
 
-    Callers own overwrite preflight and prompts. NEVER and RENAME preserve even
-    a completed file created while staging; other modes replace an approved target.
+    Callers own the existing-output preflight. NEVER preserves even a completed
+    file created while staging; ALWAYS replaces the target.
     A publication collision is skipped only if the destination is a file,
     including a symlink to a file; other collisions propagate FileExistsError.
     Existing symlinks are followed and mode bits retained. Inode replacement can
@@ -203,14 +204,16 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwriteMode = Over
     Args:
         file_path (Path): Final SRT path, with parents created as needed.
         text (str): Fully materialized text, preserved with ordinary text I/O.
-        overwrite (OverwriteMode): Preflight policy; defaults to authorized replacement.
+        overwrite (OverwritePolicy): ALWAYS or NEVER; defaults to replacement.
 
     Raises:
+        ValueError: If `overwrite` is RENAME.
         OSError: If staging, closing, mode preservation, or publication fails,
             including unsupported hard-link publication. Owned stages are removed
             on unwinding; exclusive-creation collisions are never removed.
     """
-    target, mode = resolve_publication_target(prepare_output_file(file_path))
+    require_supported_policy(overwrite)
+    target, mode = resolve_publication_target(prepare_output_file(file_path), overwrite)
     stage = target.parent / f'.srt-{uuid4().hex}.tmp'
     owned = False
     try:
@@ -225,7 +228,7 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwriteMode = Over
             stage.unlink(missing_ok=True)
 
 
-def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicate: bool = True, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> None:
+def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicate: bool = True, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> None:
     """
     Serialize all SrtBlocks before publishing complete SRT text atomically.
 
@@ -236,18 +239,20 @@ def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicat
         blocks (Iterable[SrtBlock]): SrtBlock objects to write, typically produced by mapping a transcriber-specific converter over recognition results.
         file_path (Path): The path to the output SRT file.
         deduplicate (bool, optional): Whether to merge consecutive blocks with identical content. Defaults to True.
-        overwrite (OverwriteMode, optional): Whether to overwrite an existing file. Defaults to `prompt`.
+        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing file; NEVER keeps it. Defaults to NEVER.
+
+    Raises:
+        ValueError: If `overwrite` is RENAME.
     """
-    policy = resolve_overwrite_mode(file_path, overwrite)
-    if policy is None:
+    if resolve_output_path(file_path, overwrite) is None:
         return
     file_path = prepare_output_file(file_path)
     if deduplicate:
         blocks = yield_deduplicated_srt_blocks(blocks)
-    publish_srt_text(file_path, convert_srt_blocks_to_str(blocks), overwrite=policy)
+    publish_srt_text(file_path, convert_srt_blocks_to_str(blocks), overwrite=overwrite)
 
 
-def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path:
+def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path:
     """
     Read and deduplicate an SRT file before atomically publishing complete text.
 
@@ -257,20 +262,23 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
     Args:
         input_file_path (Path): The path to the input SRT file.
         output_file_path (Path | None, optional): The path to the output file. If `None`, the input file will be overwritten. Defaults to `None`.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
+        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing output file; NEVER keeps it,
+            so in-place deduplication needs ALWAYS. Defaults to NEVER.
 
     Returns:
         Path: The path to the output file.
+
+    Raises:
+        ValueError: If `overwrite` is RENAME.
     """
     logger.info("Deduplicating SRT file: %s", input_file_path)
     output_file_path = output_file_path or input_file_path
-    policy = resolve_overwrite_mode(output_file_path, overwrite)
-    if policy is None:
+    if resolve_output_path(output_file_path, overwrite) is None:
         return output_file_path
     output_file_path = prepare_output_file(output_file_path)
     assert isinstance(output_file_path, Path)  # narrow down type from `Path | None` to `Path`
     with prepare_input_file(input_file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))
-    publish_srt_text(output_file_path, convert_srt_blocks_to_str(blocks), overwrite=policy)
+    publish_srt_text(output_file_path, convert_srt_blocks_to_str(blocks), overwrite=overwrite)
     return output_file_path

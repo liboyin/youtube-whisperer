@@ -1,7 +1,7 @@
 import inspect
 
 import pytest
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 import youtube_whisperer.downloaders.playlist_downloader as testee
 
@@ -168,11 +168,24 @@ def test_download_playlist_with_default_titles_downloads_each_url(mocker, tmp_pa
     result = testee.download_playlist_with_default_titles(
         "https://example.com/playlist",
         target_dir=tmp_path,
-        overwrite=OverwriteMode.NEVER,
+        overwrite=OverwritePolicy.NEVER,
     )
 
     assert result == [tmp_path / "one.mp4", tmp_path / "two.mp4"]
     assert mock_download.call_args_list == [
-        mocker.call("url-1", tmp_path, OverwriteMode.NEVER),
-        mocker.call("url-2", tmp_path, OverwriteMode.NEVER),
+        mocker.call("url-1", tmp_path, OverwritePolicy.NEVER),
+        mocker.call("url-2", tmp_path, OverwritePolicy.NEVER),
     ]
+
+
+@pytest.mark.parametrize('urls', [[], ['url-1']])
+def test_download_playlist_with_default_titles_rejects_rename_before_expansion(mocker, urls):
+    """RENAME fails before the playlist is expanded, including for an empty playlist."""
+    expand = mocker.patch.object(testee, 'yield_video_urls_from_playlist', return_value=iter(urls))
+    download = mocker.patch.object(testee, 'download_video_with_default_title', side_effect=AssertionError('video downloaded'))
+    settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
+    with pytest.raises(ValueError, match='RENAME is not supported'):
+        testee.download_playlist_with_default_titles('https://example.com/playlist', overwrite=OverwritePolicy.RENAME)
+    expand.assert_not_called()
+    download.assert_not_called()
+    settings.assert_not_called()

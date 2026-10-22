@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from pathlib_extensions import NotAFileError, OverwriteMode
+from pathlib_extensions import NotAFileError, OverwritePolicy
 
 import youtube_whisperer.transcriber.waveform_loader as testee
 
@@ -97,7 +97,7 @@ def test_conversion_interrupt_reaps_and_closes_child_before_stage_removal(conver
 
     mocker.patch.object(testee.Path, 'unlink', unlink)
     with pytest.raises(KeyboardInterrupt):
-        testee.save_as_wav_file(conversion.source, output, OverwriteMode.ALWAYS)
+        testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS)
 
     assert output.read_bytes() == b'previous good audio'
     assert not conversion.stages[0].exists()
@@ -171,7 +171,7 @@ def test_save_as_wav_file_partial_failure_preserves_final_and_retry_completes(co
         output.write_bytes(b'previous good audio')
     conversion.options['returncode'] = 1
     with pytest.raises(testee.ffmpeg.Error) as caught:
-        testee.save_as_wav_file(conversion.source, output, OverwriteMode.ALWAYS)
+        testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS)
     assert caught.value.stdout == b'captured stdout'
     assert caught.value.stderr == b'conversion failed'
     assert 'ffmpeg failed: conversion failed' in caplog.text
@@ -184,7 +184,7 @@ def test_save_as_wav_file_partial_failure_preserves_final_and_retry_completes(co
     assert conversion.processes[0].stdout.closed and conversion.processes[0].stderr.closed
 
     conversion.options.clear()
-    assert testee.save_as_wav_file(conversion.source, output, OverwriteMode.ALWAYS) == output
+    assert testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS) == output
     assert output.read_bytes() == b'complete audio'
     assert len(conversion.processes) == 2
     assert all(not stage.exists() for stage in conversion.stages)
@@ -196,32 +196,34 @@ def test_save_as_wav_file_startup_error_cleans_owned_stage(conversion, tmp_path)
     output.write_bytes(b'previous good audio')
     conversion.stream.run_async.side_effect = FileNotFoundError('ffmpeg missing')
     with pytest.raises(FileNotFoundError, match='ffmpeg missing'):
-        testee.save_as_wav_file(conversion.source, output, OverwriteMode.ALWAYS)
+        testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS)
     assert output.read_bytes() == b'previous good audio'
     assert not list(tmp_path.glob('.wav-*'))
 
 
-@pytest.mark.parametrize('policy, consent', [(OverwriteMode.NEVER, None), (OverwriteMode.RENAME, None), (OverwriteMode.PROMPT, False)])
-def test_save_as_wav_file_declined_overwrite_avoids_conversion_and_prompt_duplication(conversion, mocker, tmp_path, policy, consent):
-    """Declined overwrite skips all conversion and preserves the existing file."""
+@pytest.mark.parametrize('overwrite', [{}, {'overwrite': OverwritePolicy.NEVER}])
+def test_save_as_wav_file_declined_overwrite_avoids_conversion(conversion, tmp_path, overwrite):
+    """The default and explicit NEVER skip all conversion and preserve the existing file."""
     output = tmp_path / 'output.wav'
     output.write_bytes(b'previous good audio')
-    import pathlib_extensions.overwrite as helpers
-    prompt = mocker.patch.object(helpers, 'user_confirms_overwrite', return_value=consent)
-    assert testee.save_as_wav_file(conversion.source, output, policy) is None
+    assert testee.save_as_wav_file(conversion.source, output, **overwrite) is None
     assert output.read_bytes() == b'previous good audio'
     conversion.input.assert_not_called()
-    assert prompt.call_count == (1 if policy == OverwriteMode.PROMPT else 0)
     assert not list(tmp_path.glob('.wav-*'))
 
 
-@pytest.mark.parametrize('policy', [OverwriteMode.ALWAYS, OverwriteMode.PROMPT])
-def test_save_as_wav_file_approved_overwrite_publishes_after_completion_with_one_prompt(conversion, mocker, tmp_path, policy):
-    """Approved conversion preserves prior output until completion and prompts once."""
+def test_save_as_wav_file_rejects_rename_before_conversion(conversion, tmp_path):
+    """RENAME is refused before ffmpeg is configured or any stage is created."""
+    with pytest.raises(ValueError, match="RENAME is not supported"):
+        testee.save_as_wav_file(conversion.source, tmp_path / 'output.wav', OverwritePolicy.RENAME)
+    conversion.input.assert_not_called()
+    assert list(tmp_path.iterdir()) == [conversion.source]
+
+
+def test_save_as_wav_file_approved_overwrite_publishes_after_completion(conversion, tmp_path):
+    """ALWAYS conversion preserves prior output until completion, then replaces it."""
     output = tmp_path / 'output.aiff'
     output.write_bytes(b'previous good audio')
-    import pathlib_extensions.overwrite as helpers
-    prompt = mocker.patch.object(helpers, 'user_confirms_overwrite', return_value=True)
 
     def during(stage, process):
         """Inspect the previous output while partial bytes remain unpublished."""
@@ -236,7 +238,7 @@ def test_save_as_wav_file_approved_overwrite_publishes_after_completion_with_one
     result = None
     error = None
     try:
-        result = testee.save_as_wav_file(conversion.source, output, policy)
+        result = testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS)
     except (testee.ffmpeg.Error, OSError) as caught:
         error = caught
     assert error is None, f'Approved conversion failed: {error!r}'
@@ -245,7 +247,6 @@ def test_save_as_wav_file_approved_overwrite_publishes_after_completion_with_one
     conversion.input.assert_called_once_with(str(conversion.source))
     assert conversion.stream.output.call_args.kwargs == {'acodec': 'pcm_s16le', 'ac': 1, 'ar': 16000}
     assert conversion.stream.run_async.call_args.kwargs == {'overwrite_output': True, 'pipe_stdout': True, 'pipe_stderr': True}
-    assert prompt.call_count == (1 if policy == OverwriteMode.PROMPT else 0)
     assert all(not stage.exists() for stage in conversion.stages)
 
 
@@ -254,7 +255,7 @@ def test_save_as_wav_file_default_and_explicit_suffix_preserve_container_inferen
     """Default output is WAV while explicit suffixes reach ffmpeg without forced format."""
     output = None if suffix == '.wav' else tmp_path / f'output{suffix}'
     final = output or conversion.source.with_suffix('.wav')
-    assert testee.save_as_wav_file(conversion.source, output, OverwriteMode.NEVER) == final
+    assert testee.save_as_wav_file(conversion.source, output, OverwritePolicy.NEVER) == final
     assert conversion.stages[0].suffix == suffix
     assert final.read_bytes() == b'complete audio'
     assert 'format' not in conversion.stream.output.call_args.kwargs
@@ -280,7 +281,7 @@ def test_save_as_wav_file_symlink_target_mode_and_hardlinked_alias_are_preserved
     os.link(target, alias)
     output = tmp_path / 'output.aiff'
     output.symlink_to(target)
-    assert testee.save_as_wav_file(conversion.source, output, OverwriteMode.ALWAYS) == output
+    assert testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS) == output
     assert output.is_symlink()
     assert target.read_bytes() == b'complete audio'
     assert stat.S_IMODE(target.stat().st_mode) == 0o640
@@ -299,7 +300,7 @@ def test_save_as_wav_file_new_file_uses_inherited_ordinary_creation_mode(convers
     assert stat.S_IMODE(output.stat().st_mode) == stat.S_IMODE(control.stat().st_mode)
 
 
-@pytest.mark.parametrize('policy', [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize('policy', [OverwritePolicy.NEVER])
 @pytest.mark.parametrize('competitor', ['file', 'symlink', 'directory', 'dangling'])
 def test_save_as_wav_file_no_clobber_accepts_only_completed_competing_files(conversion, tmp_path, policy, competitor):
     """Late completed competitors survive while directory and dangling collisions raise."""
@@ -336,18 +337,18 @@ def test_save_as_wav_file_no_clobber_accepts_only_completed_competing_files(conv
     assert all(not stage.exists() for stage in conversion.stages)
 
 
-@pytest.mark.parametrize('policy', [OverwriteMode.ALWAYS, OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize('policy', [OverwritePolicy.ALWAYS, OverwritePolicy.NEVER])
 def test_save_as_wav_file_publication_failure_cleans_stage_without_fallback(conversion, mocker, tmp_path, policy):
     """Replacement and unsupported hard-link errors propagate without clobbering output."""
     output = tmp_path / 'output.wav'
-    if policy == OverwriteMode.ALWAYS:
+    if policy == OverwritePolicy.ALWAYS:
         output.write_bytes(b'previous good audio')
         mocker.patch.object(testee.Path, 'replace', side_effect=PermissionError('publication failed'))
     else:
         mocker.patch.object(os, 'link', side_effect=OSError(errno.EOPNOTSUPP, 'publication failed'))
     with pytest.raises(OSError, match='publication failed'):
         testee.save_as_wav_file(conversion.source, output, policy)
-    if policy == OverwriteMode.ALWAYS:
+    if policy == OverwritePolicy.ALWAYS:
         assert output.read_bytes() == b'previous good audio'
     else:
         assert not output.exists()

@@ -5,10 +5,7 @@ from functools import partialmethod
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from pathlib_extensions import (
-    OverwriteMode,
-    resolve_overwrite_mode,
-)
+from pathlib_extensions import OverwritePolicy
 from requests import Session
 from youtube_transcript_api import (
     FetchedTranscript,
@@ -26,6 +23,7 @@ from youtube_whisperer.downloaders.utils import (
     get_video_title_and_id,
     resolve_default_media_path,
 )
+from youtube_whisperer.overwrite import require_supported_policy, resolve_output_path
 
 logger = logging.getLogger(__name__)
 
@@ -191,31 +189,33 @@ class TranscriptDownloader:
             return None
         return SRTFormatter().format_transcript(transcript)
     
-    def download_as_srt_file(self, output_file_path: Path, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> bool:
+    def download_as_srt_file(self, output_file_path: Path, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> bool:
         """
         Download captions and publish complete SRT text after closing a sibling stage.
 
         Declined overwrites avoid the caption request. Publication preserves prior
-        valid output on failure and keeps any competing output under NEVER/RENAME.
+        valid output on failure and keeps any competing output under NEVER.
 
         Args:
             output_file_path (Path): The path where the SRT file will be saved.
-            overwrite (OverwriteMode): Whether to overwrite existing SRT files. Defaults to `prompt`.
+            overwrite (OverwritePolicy): ALWAYS replaces an existing SRT; NEVER keeps it. Defaults to NEVER.
 
         Returns:
             bool: Whether the download is successful.
+
+        Raises:
+            ValueError: If `overwrite` is RENAME.
         """
-        policy = resolve_overwrite_mode(output_file_path, overwrite)
-        if policy is None:
+        if resolve_output_path(output_file_path, overwrite) is None:
             return True
         srt_text = self.download_as_srt_text()
         if srt_text is None:
             return False
         logger.info("About to write to SRT file: %s", output_file_path)
-        publish_srt_text(output_file_path, srt_text, overwrite=policy)
+        publish_srt_text(output_file_path, srt_text, overwrite=overwrite)
         return True
     
-    def download_as_srt_file_with_default_title(self, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> Path | None:
+    def download_as_srt_file_with_default_title(self, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path | None:
         """
         Download the transcript as an SRT file under its default name, 'Title [videoID].srt'.
 
@@ -224,11 +224,15 @@ class TranscriptDownloader:
 
         Args:
             target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to settings resolved at invocation.
-            overwrite (OverwriteMode, optional): Whether to overwrite existing SRT files. Defaults to `prompt`.
+            overwrite (OverwritePolicy, optional): ALWAYS replaces an existing SRT; NEVER keeps it. Defaults to NEVER.
 
         Returns:
             Path | None: The path to the downloaded SRT file if successful, otherwise 'None'.
+
+        Raises:
+            ValueError: If `overwrite` is RENAME, before any other work.
         """
+        require_supported_policy(overwrite)
         target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir
         title, video_id = get_video_title_and_id(self.url)
         output_file_path = resolve_default_media_path(target_dir, title, video_id, '.srt')

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 import youtube_whisperer.adaptors.srt_deduplicator as testee
 
@@ -394,7 +394,7 @@ def test_publish_srt_text_new_file_mode_matches_ordinary_creation(tmp_path):
     assert output.stat().st_mode & 0o777 == reference.stat().st_mode & 0o777
 
 
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_publish_srt_text_never_preserves_competing_output_at_publication(tmp_path, overwrite):
     """NEVER cannot replace a completed competing output that appears while staging."""
     output = tmp_path / "output.srt"
@@ -416,7 +416,7 @@ def test_publish_srt_text_never_preserves_competing_output_at_publication(tmp_pa
     assert list(tmp_path.iterdir()) == [output]
 
 
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_publish_srt_text_no_clobber_accepts_late_symlink_to_completed_file(tmp_path, overwrite):
     """A late symlink to a completed file is preserved and accepted as competing output."""
     completed = tmp_path / "completed.srt"
@@ -442,7 +442,7 @@ def test_publish_srt_text_no_clobber_accepts_late_symlink_to_completed_file(tmp_
     assert set(tmp_path.iterdir()) == {completed, output}
 
 
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_publish_srt_text_no_clobber_rejects_late_directory_and_allows_retry(tmp_path, overwrite):
     """A late directory propagates the collision and cleans the stage without claiming completion."""
     output = tmp_path / "output.srt"
@@ -464,7 +464,7 @@ def test_publish_srt_text_no_clobber_rejects_late_directory_and_allows_retry(tmp
     assert list(tmp_path.iterdir()) == [output]
 
 
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_publish_srt_text_no_clobber_rejects_late_dangling_symlink_and_allows_retry(tmp_path, overwrite):
     """A late dangling symlink propagates the collision and remains untouched after stage cleanup."""
     output = tmp_path / "output.srt"
@@ -489,7 +489,7 @@ def test_publish_srt_text_no_clobber_rejects_late_dangling_symlink_and_allows_re
     assert list(tmp_path.iterdir()) == [output]
 
 
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_publish_srt_text_no_clobber_publishes_complete_new_output(tmp_path, overwrite):
     """No-clobber policies permit a complete new final file when the destination stays absent."""
     output = tmp_path / "output.srt"
@@ -499,7 +499,7 @@ def test_publish_srt_text_no_clobber_publishes_complete_new_output(tmp_path, ove
     assert list(tmp_path.iterdir()) == [output]
 
 
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_publish_srt_text_no_clobber_preserves_existing_output_and_symlink(tmp_path, overwrite):
     """No-clobber publication preserves an existing target reached through a symlink."""
     target = tmp_path / "target.srt"
@@ -512,7 +512,7 @@ def test_publish_srt_text_no_clobber_preserves_existing_output_and_symlink(tmp_p
     assert set(tmp_path.iterdir()) == {target, output}
 
 
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_publish_srt_text_no_clobber_preserves_competitor_created_after_stage_close(tmp_path, overwrite):
     """A real competitor created after closing the stage wins without check-then-replace races."""
     output = tmp_path / "output.srt"
@@ -548,11 +548,21 @@ def test_publish_srt_text_link_failure_cleans_stage_and_allows_retry(tmp_path):
     """Unsupported no-clobber publication propagates without creating a completion marker."""
     output = tmp_path / "output.srt"
     with patch.object(os, 'link', side_effect=OSError("unsupported link")), pytest.raises(OSError, match="unsupported link"):
-        testee.publish_srt_text(output, "candidate", overwrite=OverwriteMode.NEVER)
+        testee.publish_srt_text(output, "candidate", overwrite=OverwritePolicy.NEVER)
     assert list(tmp_path.iterdir()) == []
-    testee.publish_srt_text(output, "complete", overwrite=OverwriteMode.NEVER)
+    testee.publish_srt_text(output, "complete", overwrite=OverwritePolicy.NEVER)
     assert output.read_text() == "complete"
     assert list(tmp_path.iterdir()) == [output]
+
+
+def test_publish_srt_text_rejects_rename_without_staging(tmp_path):
+    """RENAME is refused before any stage or numbered copy is written."""
+    output = tmp_path / "output.srt"
+    output.write_text("existing")
+    with pytest.raises(ValueError, match="RENAME is not supported"):
+        testee.publish_srt_text(output, "candidate", overwrite=OverwritePolicy.RENAME)
+    assert list(tmp_path.iterdir()) == [output]
+    assert output.read_text() == "existing"
 
 
 def test_save_segments_as_srt_writes_blocks(tmp_path):
@@ -563,7 +573,7 @@ def test_save_segments_as_srt_writes_blocks(tmp_path):
         testee.SrtBlock("00:00:04,240", "00:00:06,240", ["SRT"]),
     ]
     output_file_path = tmp_path / "output.srt"
-    testee.save_segments_as_srt(iter(blocks), output_file_path, deduplicate=False, overwrite=OverwriteMode.ALWAYS)
+    testee.save_segments_as_srt(iter(blocks), output_file_path, deduplicate=False, overwrite=OverwritePolicy.ALWAYS)
     expected = "1\n00:00:00,000 --> 00:00:01,240\nSegment\n\n2\n00:00:01,240 --> 00:00:04,240\nto\n\n3\n00:00:04,240 --> 00:00:06,240\nSRT\n"
     assert output_file_path.is_file()
     assert output_file_path.read_text() == expected
@@ -576,7 +586,7 @@ def test_save_segments_as_srt_deduplicates_consecutive(tmp_path):
         testee.SrtBlock("00:00:01,000", "00:00:02,000", ["Same"]),
     ]
     output_file_path = tmp_path / "output.srt"
-    testee.save_segments_as_srt(iter(blocks), output_file_path, deduplicate=True, overwrite=OverwriteMode.ALWAYS)
+    testee.save_segments_as_srt(iter(blocks), output_file_path, deduplicate=True, overwrite=OverwritePolicy.ALWAYS)
     assert output_file_path.read_text().count("Same") == 1
 
 
@@ -585,12 +595,12 @@ def test_save_segments_as_srt_skips_existing_when_overwrite_never(tmp_path):
     output_file_path = tmp_path / "output.srt"
     output_file_path.write_text("original content")
     blocks = [testee.SrtBlock("00:00:00,000", "00:00:01,000", ["new"])]
-    testee.save_segments_as_srt(iter(blocks), output_file_path, overwrite=OverwriteMode.NEVER)
+    testee.save_segments_as_srt(iter(blocks), output_file_path, overwrite=OverwritePolicy.NEVER)
     assert output_file_path.read_text() == "original content"
 
 
 @pytest.mark.parametrize("existing", [False, True])
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_save_segments_as_srt_never_preserves_competitor_after_lazy_materialization(tmp_path, existing, overwrite):
     """Lazy serialization respects NEVER and is skipped entirely for an existing output."""
     output = tmp_path / "output.srt"
@@ -626,16 +636,16 @@ def test_save_segments_as_srt_consumes_all_lazy_blocks_before_opening_stage(tmp_
         raise ValueError("late generator failure")
 
     with patch.object(testee.Path, 'open', side_effect=AssertionError("premature write")) as opened, pytest.raises(ValueError, match="late generator failure"):
-        testee.save_segments_as_srt(blocks(), output, overwrite=OverwriteMode.ALWAYS)
+        testee.save_segments_as_srt(blocks(), output, overwrite=OverwritePolicy.ALWAYS)
     opened.assert_not_called()
     assert consumed == ["first", "second"]
     assert output.read_text() == "original" if existing else not output.exists()
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
 
 
-@pytest.mark.parametrize("approved", [False, True])
-def test_save_segments_as_srt_prompt_is_decided_once_before_lazy_work(tmp_path, approved):
-    """One existing-output prompt authorizes publication or skips lazy serialization entirely."""
+@pytest.mark.parametrize(("overwrite", "approved"), [({}, False), ({"overwrite": OverwritePolicy.NEVER}, False), ({"overwrite": OverwritePolicy.ALWAYS}, True)])
+def test_save_segments_as_srt_existing_output_policy_is_decided_before_lazy_work(tmp_path, overwrite, approved):
+    """The default NEVER skips lazy serialization entirely; ALWAYS consumes it and publishes."""
     output = tmp_path / "output.srt"
     output.write_text("original")
     consumed = []
@@ -645,17 +655,29 @@ def test_save_segments_as_srt_prompt_is_decided_once_before_lazy_work(tmp_path, 
         consumed.append(True)
         yield testee.SrtBlock("00:00:00,000", "00:00:01,000", ["candidate"])
 
-    import pathlib_extensions.overwrite as helpers
-    with patch.object(helpers, 'user_confirms_overwrite', return_value=approved) as preflight:
-        testee.save_segments_as_srt(blocks(), output, overwrite=OverwriteMode.PROMPT)
-    preflight.assert_called_once_with(output)
+    testee.save_segments_as_srt(blocks(), output, **overwrite)
     assert consumed == ([True] if approved else [])
     assert output.read_text() == ("1\n00:00:00,000 --> 00:00:01,000\ncandidate\n" if approved else "original")
 
 
+def test_save_segments_as_srt_rejects_rename_before_lazy_work(tmp_path):
+    """RENAME is refused before any lazy block is consumed or any file is written."""
+    consumed = []
+
+    def blocks():
+        """Record lazy work that a refused policy must never start."""
+        consumed.append(True)
+        yield testee.SrtBlock("00:00:00,000", "00:00:01,000", ["candidate"])
+
+    with pytest.raises(ValueError, match="RENAME is not supported"):
+        testee.save_segments_as_srt(blocks(), tmp_path / "output.srt", overwrite=OverwritePolicy.RENAME)
+    assert consumed == []
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_deduplicate_srt_file(temp_srt_file: Path):
     """Test that duplicate blocks in a file are merged and written back in place."""
-    assert testee.deduplicate_srt_file(temp_srt_file, overwrite=OverwriteMode.ALWAYS) is temp_srt_file
+    assert testee.deduplicate_srt_file(temp_srt_file, overwrite=OverwritePolicy.ALWAYS) is temp_srt_file
     expected = dedent("""\
         1
         00:00:01,000 --> 00:00:02,000
@@ -673,9 +695,26 @@ def test_deduplicate_srt_file_returns_early_when_overwrite_never(tmp_path):
     srt_file = tmp_path / "test.srt"
     srt_file.write_text("1\n00:00:01,000 --> 00:00:02,000\nOriginal\n\n")
     original_content = srt_file.read_text()
-    result = testee.deduplicate_srt_file(srt_file, overwrite=OverwriteMode.NEVER)
+    result = testee.deduplicate_srt_file(srt_file, overwrite=OverwritePolicy.NEVER)
     assert result is srt_file
     assert srt_file.read_text() == original_content
+
+
+@pytest.mark.parametrize("overwrite", [{}, {"overwrite": OverwritePolicy.NEVER}])
+def test_deduplicate_srt_file_keeps_existing_output_without_reading_input(tmp_path, overwrite):
+    """The default and explicit NEVER return before the input is opened, so a missing input is never reached."""
+    output = tmp_path / "output.srt"
+    output.write_text("existing")
+    assert testee.deduplicate_srt_file(tmp_path / "missing.srt", output, **overwrite) is output
+    assert output.read_text() == "existing"
+    assert list(tmp_path.iterdir()) == [output]
+
+
+def test_deduplicate_srt_file_rejects_rename_before_reading_input(tmp_path):
+    """RENAME is refused before the input is opened, so even a missing input reports the policy."""
+    with pytest.raises(ValueError, match="RENAME is not supported"):
+        testee.deduplicate_srt_file(tmp_path / "missing.srt", tmp_path / "output.srt", overwrite=OverwritePolicy.RENAME)
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.parametrize("failure", [OSError, KeyboardInterrupt])
@@ -685,15 +724,15 @@ def test_deduplicate_srt_file_in_place_preserves_input_on_publication_failure_an
     original = "1\n00:00:00,000 --> 00:00:01,000\nSame\n\n2\n00:00:03,000 --> 00:00:04,000\nSame\n"
     output.write_text(original)
     with patch.object(testee.Path, 'replace', side_effect=failure("injected publication failure")), pytest.raises(failure, match="injected publication failure"):
-        testee.deduplicate_srt_file(output, overwrite=OverwriteMode.ALWAYS)
+        testee.deduplicate_srt_file(output, overwrite=OverwritePolicy.ALWAYS)
     assert output.read_text() == original
     assert list(tmp_path.iterdir()) == [output]
-    assert testee.deduplicate_srt_file(output, overwrite=OverwriteMode.ALWAYS) == output
+    assert testee.deduplicate_srt_file(output, overwrite=OverwritePolicy.ALWAYS) == output
     assert output.read_text() == "1\n00:00:00,000 --> 00:00:04,000\nSame\n"
     assert list(tmp_path.iterdir()) == [output]
 
 
-@pytest.mark.parametrize("overwrite", [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
 def test_deduplicate_srt_file_no_clobber_preserves_competitor_created_after_input_read(tmp_path, overwrite):
     """Dedup forwards no-clobber policy when completed competing output appears after input closes."""
     input_path = tmp_path / "input.srt"

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 from redis import StrictRedis
 
 from youtube_whisperer.config import Settings
@@ -47,9 +47,9 @@ class AzureWorker(TranscriptionWorker):
         if source.suffix.lower() != '.wav':
             wav_source = source.with_suffix('.wav')
             if not wav_source.is_file():
-                converted_source = save_as_wav_file(source, output_file_path=wav_source, overwrite=OverwriteMode.NEVER)
+                converted_source = save_as_wav_file(source, output_file_path=wav_source, overwrite=OverwritePolicy.NEVER)
                 if converted_source is None:
                     raise RuntimeError(f"Failed to create WAV file for {source}")
                 wav_source = converted_source
             source = wav_source
-        transcribe_audio_file(source, task.language, overwrite=OverwriteMode.NEVER, settings=self.settings)
+        transcribe_audio_file(source, task.language, overwrite=OverwritePolicy.NEVER, settings=self.settings)

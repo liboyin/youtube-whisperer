@@ -8,7 +8,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 from faster_whisper.transcribe import Segment
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 import youtube_whisperer.transcriber.whisper_transcriber as testee
 from youtube_whisperer.adaptors.lang_code_adaptor import LanguageCode
@@ -204,19 +204,28 @@ def test_transcribe_file_with_default_model_returns_existing_output_when_overwri
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
     output_path.write_text("existing")
-    mock_overwrite = mocker.patch.object(testee, "resolve_overwrite_mode", wraps=testee.resolve_overwrite_mode)
+    mock_overwrite = mocker.patch.object(testee, "resolve_output_path", wraps=testee.resolve_output_path)
     mock_load = mocker.patch.object(testee, "load_whisper_waveform_from_file")
 
     result = testee.transcribe_file_with_default_model(
         input_path,
         LANGUAGE,
         output_file_path=output_path,
-        overwrite=OverwriteMode.NEVER,
+        overwrite=OverwritePolicy.NEVER,
     )
 
     assert result == output_path
-    mock_overwrite.assert_called_once_with(output_path, OverwriteMode.NEVER)
+    mock_overwrite.assert_called_once_with(output_path, OverwritePolicy.NEVER)
     mock_load.assert_not_called()
+
+
+def test_transcribe_file_with_default_model_rejects_rename_before_audio_work(mocker, tmp_path):
+    """RENAME is refused before audio is decoded or the model runs."""
+    load = mocker.patch.object(testee, "load_whisper_waveform_from_file", side_effect=AssertionError("audio decoded"))
+    with pytest.raises(ValueError, match="RENAME is not supported"):
+        testee.transcribe_file_with_default_model(tmp_path / "audio.wav", LANGUAGE, overwrite=OverwritePolicy.RENAME)
+    load.assert_not_called()
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.parametrize("existing", [False, True])
@@ -232,7 +241,7 @@ def test_transcribe_file_with_default_model_rejects_empty_waveform_before_model_
     save = mocker.patch.object(testee, "save_segments_as_srt")
 
     with pytest.raises(ValueError, match="No audio samples decoded") as error:
-        testee.transcribe_file_with_default_model(input_path, LANGUAGE, overwrite=OverwriteMode.ALWAYS)
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE, overwrite=OverwritePolicy.ALWAYS)
 
     assert str(input_path) in str(error.value)
     assert 'decodable audio track' in str(error.value)
@@ -274,7 +283,7 @@ def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
         input_path,
         LANGUAGE,
         output_file_path=output_path,
-        overwrite=OverwriteMode.ALWAYS,
+        overwrite=OverwritePolicy.ALWAYS,
     )
 
     assert result == output_path
@@ -282,7 +291,7 @@ def test_transcribe_file_with_default_model_saves_segments(mocker, tmp_path):
     assert mock_transcribe.call_args.args[1:] == (LANGUAGE,)
     save_mock.assert_called_once()
     assert save_mock.call_args.args[1] == output_path
-    assert save_mock.call_args.kwargs == {"overwrite": OverwriteMode.ALWAYS}
+    assert save_mock.call_args.kwargs == {"overwrite": OverwritePolicy.ALWAYS}
 
 
 @pytest.mark.parametrize("existing", [False, True])
@@ -304,13 +313,13 @@ def test_transcribe_file_with_default_model_late_rejection_preserves_final_and_r
 
     transcribe = mocker.patch.object(testee, 'transcribe_waveform_with_default_model', return_value=segments())
     with patch.object(testee.Path, "open", side_effect=AssertionError("premature write")) as opened, pytest.raises(RejectedTranscriptionError):
-        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwriteMode.ALWAYS)
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS)
     opened.assert_not_called()
     assert consumed == ["good", "bad"]
     assert output.read_text() == "original" if existing else not output.exists()
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
     transcribe.return_value = iter([SimpleNamespace(start=0.0, end=1.0, text="Good"), SimpleNamespace(start=2.0, end=3.0, text="Done")])
-    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwriteMode.ALWAYS) == output
+    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS) == output
     assert output.read_text() == "1\n00:00:00,000 --> 00:00:01,000\nGood\n\n2\n00:00:02,000 --> 00:00:03,000\nDone\n"
     assert list(tmp_path.iterdir()) == [output]
 
@@ -325,28 +334,27 @@ def test_transcribe_file_with_default_model_publication_failure_preserves_final_
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
     mocker.patch.object(testee, "transcribe_waveform_with_default_model", side_effect=lambda *args: iter([SimpleNamespace(start=0.0, end=1.0, text="Good")]))
     with patch.object(testee.Path, "replace", side_effect=OSError("failed publication")), pytest.raises(OSError, match="failed publication"):
-        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwriteMode.ALWAYS)
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS)
     assert output.read_text() == "original" if existing else not output.exists()
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
-    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwriteMode.ALWAYS) == output
+    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS) == output
     assert output.read_text() == "1\n00:00:00,000 --> 00:00:01,000\nGood\n"
     assert list(tmp_path.iterdir()) == [output]
 
 
-@pytest.mark.parametrize("approved", [False, True])
-def test_transcribe_file_with_default_model_existing_prompt_is_decided_once(mocker, tmp_path, approved):
-    """Existing-output consent occurs once before audio/model work and is reused for saving."""
+@pytest.mark.parametrize(("overwrite", "replaced"), [({}, False), ({"overwrite": OverwritePolicy.NEVER}, False), ({"overwrite": OverwritePolicy.ALWAYS}, True)])
+def test_transcribe_file_with_default_model_existing_output_policy_is_decided_before_model_work(mocker, tmp_path, overwrite, replaced):
+    """The default NEVER and explicit policies decide existing output before audio/model work, without reading stdin."""
     input_path = tmp_path / "audio.wav"
     output = tmp_path / "audio.srt"
     output.write_text("original")
-    stdin = mocker.patch.object(builtins, "input", return_value="y" if approved else "n")
+    mocker.patch.object(builtins, "input", side_effect=AssertionError("unexpected stdin read"))
     load = mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
     transcribe = mocker.patch.object(testee, "transcribe_waveform_with_default_model", return_value=iter([SimpleNamespace(start=0.0, end=1.0, text="Good")]))
-    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output) == output
-    stdin.assert_called_once_with(f"Path '{output}' already exists. Overwrite? (y/N): ")
-    assert load.call_count == int(approved)
-    assert transcribe.call_count == int(approved)
-    assert output.read_text() == ("1\n00:00:00,000 --> 00:00:01,000\nGood\n" if approved else "original")
+    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, **overwrite) == output
+    assert load.call_count == int(replaced)
+    assert transcribe.call_count == int(replaced)
+    assert output.read_text() == ("1\n00:00:00,000 --> 00:00:01,000\nGood\n" if replaced else "original")
 
 
 def test_transcribe_file_with_default_model_propagates_error(mocker, tmp_path):

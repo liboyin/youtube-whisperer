@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 import youtube_whisperer.downloaders.video_downloader as testee
 
@@ -80,7 +80,7 @@ def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(coo
     try:
         assert detector.cache_info().misses == 0
         discovery.assert_not_called()
-        testee.download_video('url', tmp_path / 'video.mp4', OverwriteMode.ALWAYS)
+        testee.download_video('url', tmp_path / 'video.mp4', OverwritePolicy.ALWAYS)
         expected = {'verbose': True, 'js_runtimes': {'deno': {}}, 'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]'}
         if cookies_available:
             expected['cookiesfrombrowser'] = ('firefox',)
@@ -91,7 +91,7 @@ def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(coo
         else:
             cookies.parent.mkdir(parents=True)
             cookies.write_text('owned')
-        testee.download_video('url', tmp_path / 'video.mp4', OverwriteMode.ALWAYS)
+        testee.download_video('url', tmp_path / 'video.mp4', OverwritePolicy.ALWAYS)
         assert {key: value for key, value in created.instances[1].options.items() if key != 'outtmpl'} == expected
         assert created.instances[1].options['outtmpl'] == str(created.instances[1].staged_path)
         assert created.instances[0].staged_path != created.instances[1].staged_path
@@ -111,15 +111,24 @@ def test_download_video_returns_early_when_existing_file_should_not_be_overwritt
     """Test that an existing file is not re-downloaded when overwrite is denied."""
     target_path = tmp_path / "video.mp4"
     target_path.write_text("existing")
-    mock_overwrite = mocker.patch.object(testee, "resolve_overwrite_mode", wraps=testee.resolve_overwrite_mode)
+    mock_overwrite = mocker.patch.object(testee, "resolve_output_path", wraps=testee.resolve_output_path)
     mock_prepare = mocker.patch.object(testee, "prepare_output_file")
     mock_ydl = mocker.patch.object(testee.yt_dlp, "YoutubeDL")
 
-    testee.download_video("https://example.com/watch?v=1", target_path, OverwriteMode.NEVER)
+    testee.download_video("https://example.com/watch?v=1", target_path, OverwritePolicy.NEVER)
 
-    mock_overwrite.assert_called_once_with(target_path, OverwriteMode.NEVER)
+    mock_overwrite.assert_called_once_with(target_path, OverwritePolicy.NEVER)
     mock_prepare.assert_not_called()
     mock_ydl.assert_not_called()
+
+
+def test_download_video_rejects_rename_before_any_download_work(mocker, tmp_path):
+    """RENAME fails before preparing the destination or constructing the downloader."""
+    downloader = mocker.patch.object(testee.yt_dlp, "YoutubeDL")
+    with pytest.raises(ValueError, match="RENAME is not supported"):
+        testee.download_video("https://example.com/watch?v=1", tmp_path / "out" / "video.mp4", OverwritePolicy.RENAME)
+    downloader.assert_not_called()
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_download_video_downloads_with_cookies_when_available(mocker, tmp_path, staged_youtube_dl_factory):
@@ -127,7 +136,7 @@ def test_download_video_downloads_with_cookies_when_available(mocker, tmp_path, 
     target_path = tmp_path / "video.mp4"
     created = staged_youtube_dl_factory(testee, cookies_available=True)
 
-    testee.download_video("https://example.com/watch?v=2", target_path, OverwriteMode.ALWAYS)
+    testee.download_video("https://example.com/watch?v=2", target_path, OverwritePolicy.ALWAYS)
 
     assert created.instances[0].options["outtmpl"] == str(created.instances[0].staged_path)
     assert created.instances[0].staged_path.parent.parent == target_path.parent
@@ -143,7 +152,7 @@ def test_download_video_omits_cookies_when_unavailable(mocker, tmp_path, staged_
     target_path = tmp_path / "video.mp4"
     created = staged_youtube_dl_factory(testee, cookies_available=False)
 
-    testee.download_video("https://example.com/watch?v=4", target_path, OverwriteMode.ALWAYS)
+    testee.download_video("https://example.com/watch?v=4", target_path, OverwritePolicy.ALWAYS)
 
     # Asking yt-dlp for browser cookies that do not exist makes it fail instead of downloading anonymously.
     assert "cookiesfrombrowser" not in created.instances[0].options
@@ -157,7 +166,7 @@ def test_download_video_propagates_error_and_exits_context(tmp_path, staged_yout
     error = RuntimeError('download failed')
     created = staged_youtube_dl_factory(testee, cookies_available=False, error=error)
     with pytest.raises(RuntimeError) as caught:
-        testee.download_video('url', target, OverwriteMode.ALWAYS)
+        testee.download_video('url', target, OverwritePolicy.ALWAYS)
     assert target.read_bytes() == b'previous video'
     assert list(tmp_path.glob('.video-*')) == []
     assert caught.value is error
@@ -176,7 +185,7 @@ def test_download_video_publishes_literal_names_after_real_template_evaluation(n
     target = tmp_path / directory / f'{name}.mp4'
     created = staged_youtube_dl_factory(testee, cookies_available=False)
 
-    testee.download_video('url', target, OverwriteMode.ALWAYS)
+    testee.download_video('url', target, OverwritePolicy.ALWAYS)
 
     instance = created.instances[0]
     assert instance.staged_path.parent.parent == target.parent
@@ -195,7 +204,7 @@ def test_download_video_rejects_expanding_parent_before_staging(monkeypatch, moc
     make_stage = mocker.spy(testee.tempfile, 'mkdtemp')
 
     with pytest.raises(ValueError, match='expand'):
-        testee.download_video('url', parent / 'video.mp4', OverwriteMode.ALWAYS)
+        testee.download_video('url', parent / 'video.mp4', OverwritePolicy.ALWAYS)
 
     make_stage.assert_not_called()
     assert created.instances == []
@@ -209,39 +218,36 @@ def test_download_video_keeps_set_variable_in_title_literal(monkeypatch, tmp_pat
     target = tmp_path / 'Price $NB8_SET.mp4'
     staged_youtube_dl_factory(testee, cookies_available=False)
 
-    testee.download_video('url', target, OverwriteMode.ALWAYS)
+    testee.download_video('url', target, OverwritePolicy.ALWAYS)
 
     assert target.read_bytes() == b'new video'
     assert list(tmp_path.iterdir()) == [target]
 
 
-@pytest.mark.parametrize('policy', [OverwriteMode.ALWAYS, OverwriteMode.PROMPT])
-def test_download_video_replaces_authorized_existing_file_and_preserves_mode(policy, mocker, tmp_path, staged_youtube_dl_factory):
-    """Approved replacement publishes new bytes with the previous permission bits."""
+def test_download_video_replaces_authorized_existing_file_and_preserves_mode(mocker, tmp_path, staged_youtube_dl_factory):
+    """ALWAYS replacement publishes new bytes with the previous permission bits."""
     target = tmp_path / 'video.mp4'
     target.write_bytes(b'previous video')
     target.chmod(0o640)
     created = staged_youtube_dl_factory(testee, cookies_available=False)
-    import pathlib_extensions.overwrite as helpers
-    mocker.patch.object(helpers, 'user_confirms_overwrite', return_value=True)
-    consent = mocker.patch.object(testee, 'resolve_overwrite_mode', wraps=testee.resolve_overwrite_mode)
+    consent = mocker.patch.object(testee, 'resolve_output_path', wraps=testee.resolve_output_path)
 
     def observe_previous_output():
         """Check that the old video survives until download completion."""
         assert target.read_bytes() == b'previous video'
 
     created.during_download = observe_previous_output
-    testee.download_video('url', target, policy)
+    testee.download_video('url', target, OverwritePolicy.ALWAYS)
 
-    consent.assert_called_once_with(target, policy)
+    consent.assert_called_once_with(target, OverwritePolicy.ALWAYS)
     assert target.read_bytes() == b'new video'
     assert stat.S_IMODE(target.stat().st_mode) == 0o640
     assert list(tmp_path.iterdir()) == [target]
 
 
-@pytest.mark.parametrize('policy', [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize('policy', [OverwritePolicy.NEVER])
 def test_download_video_preserves_existing_file_without_constructing_downloader(policy, tmp_path, staged_youtube_dl_factory):
-    """Existing files satisfy NEVER and RENAME without staging or downloader work."""
+    """Existing files satisfy NEVER without staging or downloader work."""
     target = tmp_path / 'video.mp4'
     target.write_bytes(b'previous video')
     created = staged_youtube_dl_factory(testee, cookies_available=False)
@@ -253,7 +259,7 @@ def test_download_video_preserves_existing_file_without_constructing_downloader(
     assert list(tmp_path.iterdir()) == [target]
 
 
-@pytest.mark.parametrize('policy', [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize('policy', [OverwritePolicy.NEVER])
 def test_download_video_publishes_absent_output_under_preserving_policies(policy, tmp_path, staged_youtube_dl_factory):
     """Create-if-absent publishes a completed new video and removes its stage."""
     target = tmp_path / 'video.mp4'
@@ -265,7 +271,7 @@ def test_download_video_publishes_absent_output_under_preserving_policies(policy
     assert list(tmp_path.iterdir()) == [target]
 
 
-@pytest.mark.parametrize('policy', [OverwriteMode.NEVER, OverwriteMode.RENAME])
+@pytest.mark.parametrize('policy', [OverwritePolicy.NEVER])
 @pytest.mark.parametrize('collision', ['file', 'directory', 'dangling-symlink', 'file-symlink'])
 def test_download_video_preserves_competing_file_and_propagates_other_collisions(policy, collision, tmp_path, staged_youtube_dl_factory):
     """Create-if-absent keeps competing files and reports non-file collisions."""
@@ -309,7 +315,7 @@ def test_download_video_requires_regular_staged_output(output, tmp_path, staged_
     created.output = output
 
     with pytest.raises(FileNotFoundError, match='regular staged video'):
-        testee.download_video('url', target, OverwriteMode.ALWAYS)
+        testee.download_video('url', target, OverwritePolicy.ALWAYS)
 
     assert target.read_bytes() == b'previous video'
     assert list(tmp_path.iterdir()) == [target]
@@ -322,7 +328,7 @@ def test_download_video_missing_staged_output_does_not_create_destination(tmp_pa
     created.output = 'missing'
 
     with pytest.raises(FileNotFoundError):
-        testee.download_video('url', target, OverwriteMode.ALWAYS)
+        testee.download_video('url', target, OverwritePolicy.ALWAYS)
 
     assert list(tmp_path.iterdir()) == []
 
@@ -335,7 +341,7 @@ def test_download_video_cleans_stage_on_interruption(tmp_path, staged_youtube_dl
     created = staged_youtube_dl_factory(testee, cookies_available=False, error=interruption)
 
     with pytest.raises(KeyboardInterrupt) as caught:
-        testee.download_video('url', target, OverwriteMode.ALWAYS)
+        testee.download_video('url', target, OverwritePolicy.ALWAYS)
 
     assert caught.value is interruption
     assert created.instances[0].exit_calls[0][:2] == (KeyboardInterrupt, interruption)
@@ -343,7 +349,7 @@ def test_download_video_cleans_stage_on_interruption(tmp_path, staged_youtube_dl
     assert list(tmp_path.iterdir()) == [target]
 
 
-@pytest.mark.parametrize(('policy', 'existing'), [(OverwriteMode.ALWAYS, True), (OverwriteMode.NEVER, False)])
+@pytest.mark.parametrize(('policy', 'existing'), [(OverwritePolicy.ALWAYS, True), (OverwritePolicy.NEVER, False)])
 def test_download_video_publishes_only_after_downloader_context_exit(policy, existing, tmp_path, staged_youtube_dl_factory):
     """A failing downloader exit after a complete download publishes nothing and removes the stage."""
     target = tmp_path / 'video.mp4'
@@ -365,7 +371,7 @@ def test_download_video_publishes_only_after_downloader_context_exit(policy, exi
         assert list(tmp_path.iterdir()) == []
 
 
-@pytest.mark.parametrize('policy', [OverwriteMode.NEVER, OverwriteMode.ALWAYS])
+@pytest.mark.parametrize('policy', [OverwritePolicy.NEVER, OverwritePolicy.ALWAYS])
 def test_download_video_cleans_stage_after_publication_error(policy, mocker, tmp_path, staged_youtube_dl_factory):
     """Unsupported publication errors propagate while removing only the owned stage."""
     target = tmp_path / 'video.mp4'
@@ -374,7 +380,7 @@ def test_download_video_cleans_stage_after_publication_error(policy, mocker, tmp
     (unrelated / 'keep').write_bytes(b'unrelated')
     staged_youtube_dl_factory(testee, cookies_available=False)
     error = OSError('publication failed')
-    operation = 'link' if policy == OverwriteMode.NEVER else 'replace'
+    operation = 'link' if policy == OverwritePolicy.NEVER else 'replace'
     mocker.patch.object(testee.os, operation, side_effect=error)
 
     with pytest.raises(OSError) as caught:
@@ -398,7 +404,7 @@ def test_download_video_resolves_symlink_and_leaves_hardlinked_alias_unchanged(t
     alias.hardlink_to(real)
     created = staged_youtube_dl_factory(testee, cookies_available=False)
 
-    testee.download_video('url', link, OverwriteMode.ALWAYS)
+    testee.download_video('url', link, OverwritePolicy.ALWAYS)
 
     assert link.is_symlink()
     assert real.read_bytes() == link.read_bytes() == b'new video'
@@ -413,10 +419,20 @@ def test_download_video_with_default_title_names_file_after_title_and_id(mocker,
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=('bad:/title', 'n9xhJrPXop4'))
     mock_download = mocker.patch.object(testee, 'download_video')
 
-    result = testee.download_video_with_default_title('https://example.com/watch?v=3', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
+    result = testee.download_video_with_default_title('https://example.com/watch?v=3', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
 
     assert result == tmp_path / 'bad__title [n9xhJrPXop4].mp4'
-    mock_download.assert_called_once_with('https://example.com/watch?v=3', result, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_called_once_with('https://example.com/watch?v=3', result, overwrite=OverwritePolicy.NEVER)
+
+
+def test_download_video_with_default_title_rejects_rename_before_metadata_or_settings(mocker):
+    """RENAME fails before the asset directory is resolved or video metadata is requested."""
+    metadata = mocker.patch.object(testee, 'get_video_title_and_id', side_effect=AssertionError('metadata requested'))
+    settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
+    with pytest.raises(ValueError, match='RENAME is not supported'):
+        testee.download_video_with_default_title('https://example.com/watch?v=3', overwrite=OverwritePolicy.RENAME)
+    metadata.assert_not_called()
+    settings.assert_not_called()
 
 
 def test_download_video_with_default_title_reuses_existing_title_only_video(mocker, tmp_path):
@@ -426,10 +442,10 @@ def test_download_video_with_default_title_reuses_existing_title_only_video(mock
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=('Title', 'n9xhJrPXop4'))
     mock_download = mocker.patch.object(testee, 'download_video')
 
-    result = testee.download_video_with_default_title('https://example.com/watch?v=5', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
+    result = testee.download_video_with_default_title('https://example.com/watch?v=5', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
 
     assert result == legacy
-    mock_download.assert_called_once_with('https://example.com/watch?v=5', legacy, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_called_once_with('https://example.com/watch?v=5', legacy, overwrite=OverwritePolicy.NEVER)
 
 
 def test_download_video_with_default_title_truncates_long_dotted_title_keeping_mp4_suffix(mocker, tmp_path):
@@ -438,10 +454,10 @@ def test_download_video_with_default_title_truncates_long_dotted_title_keeping_m
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=(title, 'n9xhJrPXop4'))
     mock_download = mocker.patch.object(testee, 'download_video')
 
-    result = testee.download_video_with_default_title('https://example.com/watch?v=4', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
+    result = testee.download_video_with_default_title('https://example.com/watch?v=4', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
 
     assert result == tmp_path / (title[:220 - len(' [n9xhJrPXop4].mp4')] + ' [n9xhJrPXop4].mp4')
-    mock_download.assert_called_once_with('https://example.com/watch?v=4', result, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_called_once_with('https://example.com/watch?v=4', result, overwrite=OverwritePolicy.NEVER)
 
 
 def test_download_video_with_default_title_keeps_videos_apart_when_title_ends_in_another_id(mocker, tmp_path):
@@ -450,8 +466,8 @@ def test_download_video_with_default_title_keeps_videos_apart_when_title_ends_in
     mocker.patch.object(testee, 'get_video_title_and_id', side_effect=metadata.__getitem__)
     downloads = mocker.patch.object(testee, 'download_video', side_effect=lambda url, path, overwrite: path.write_text(url))
 
-    first = testee.download_video_with_default_title('url-a', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
-    second = testee.download_video_with_default_title('url-b', target_dir=tmp_path, overwrite=OverwriteMode.NEVER)
+    first = testee.download_video_with_default_title('url-a', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
+    second = testee.download_video_with_default_title('url-b', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
 
     assert first == tmp_path / 'Title [aaaaaaaaaaa].mp4'
     assert second == tmp_path / 'Title [aaaaaaaaaaa] [bbbbbbbbbbb].mp4'

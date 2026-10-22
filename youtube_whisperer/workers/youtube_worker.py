@@ -1,7 +1,7 @@
 
 import logging
 
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 from redis import StrictRedis
 
 from youtube_whisperer.config import Settings
@@ -60,7 +60,7 @@ class YouTubeWorker(BaseWorker):
             task.source,
             task.language,
             target_dir=self.runtime.assets_dir,
-            overwrite=OverwriteMode.NEVER,
+            overwrite=OverwritePolicy.NEVER,
         )
         if task.transcriber != TranscriberType.NONE and not transcript_found:
             queue_transcription_tasks(self.client, [task.model_copy(update={

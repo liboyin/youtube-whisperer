@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 import requests
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 from youtube_transcript_api import RequestBlocked, VideoUnavailable
 
 import youtube_whisperer.downloaders as downloaders_testee
@@ -78,7 +78,7 @@ def test_process_video_queues_follow_up_when_transcript_is_missing(mocker, clien
 
     testee.YouTubeWorker('youtube-0', client=client).process_video(task)
 
-    mock_download.assert_called_once_with(VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_called_once_with(VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
     mock_queue.assert_called_once_with(client, [concrete_task(playlist_task, '/owned/video-1.mp4')])
 
 
@@ -108,7 +108,7 @@ def test_process_video_with_none_transcriber_downloads_without_queueing_follow_u
 
     testee.YouTubeWorker('youtube-0', client=client).process_video(task)
 
-    mock_download.assert_called_once_with(VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_called_once_with(VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
     mock_queue.assert_not_called()
 
 
@@ -121,7 +121,7 @@ def test_process_video_uses_supplied_snapshot_asset_path_after_environment_mutat
     for worker, snapshot in zip(workers, snapshots, strict=True):
         worker.process_video(playlist_task)
         download.assert_called_with(playlist_task.source, playlist_task.language,
-                                    target_dir=snapshot.whisper_assets_dir, overwrite=OverwriteMode.NEVER)
+                                    target_dir=snapshot.whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
 
 
 @pytest.mark.parametrize("transcriber", [TranscriberType.WHISPER, TranscriberType.AZURE, TranscriberType.NONE])
@@ -209,8 +209,8 @@ def test_process_task_queues_follow_ups_only_for_videos_missing_a_transcript(moc
     testee.YouTubeWorker('youtube-0', client=client).process_task(playlist_task)
 
     assert mock_download.call_count == 2
-    mock_download.assert_any_call(VIDEO_1, playlist_task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwriteMode.NEVER)
-    mock_download.assert_any_call(VIDEO_2, playlist_task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwriteMode.NEVER)
+    mock_download.assert_any_call(VIDEO_1, playlist_task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
+    mock_download.assert_any_call(VIDEO_2, playlist_task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
     mock_queue.assert_called_once_with(client, [concrete_task(playlist_task, '/owned/video-2.mp4')])
     mock_dead_letter.assert_not_called()
 

@@ -3,7 +3,7 @@ import wave
 from pathlib import Path
 
 import pytest
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 import youtube_whisperer.workers.azure_worker as testee
 from youtube_whisperer.models import Task
@@ -57,7 +57,7 @@ def test_dispatch_task_failed_conversion_retries_complete_wav_and_reuses_good_si
         """Verify complete WAV bytes synchronously at the mocked Azure boundary."""
         assert audio_path == sidecar
         assert language == task.language
-        assert overwrite == OverwriteMode.NEVER
+        assert overwrite == OverwritePolicy.NEVER
         assert settings is worker.settings
         assert audio_path.read_bytes() == complete_wav
         assert not list(tmp_path.glob('.wav-*'))

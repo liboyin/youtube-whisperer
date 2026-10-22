@@ -2,7 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 import youtube_whisperer.transcriber.waveform_loader as waveform_testee
 import youtube_whisperer.transcriber.whisper_transcriber as transcriber_testee
@@ -84,7 +84,7 @@ def test_dispatch_task_for_whisper_transcriber(mocker, worker):
     worker.dispatch_task(task, source_path)
 
     mock_validate_gpu.assert_called_once()
-    mock_transcribe.assert_called_once_with(source_path, task.language, overwrite=OverwriteMode.NEVER, settings=worker.settings)
+    mock_transcribe.assert_called_once_with(source_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings)
 
 
 def test_dispatch_task_propagates_transcription_failure(mocker, worker):
@@ -115,7 +115,7 @@ def test_dispatch_task_rechecks_gpu_for_each_task_using_supplied_snapshot(mocker
     assert probe.call_count == 2
     assert use_cuda.call_count == 2
     use_cuda.assert_called_with(snapshot)
-    transcribe.assert_called_once_with(source, task.language, overwrite=OverwriteMode.NEVER, settings=snapshot)
+    transcribe.assert_called_once_with(source, task.language, overwrite=OverwritePolicy.NEVER, settings=snapshot)
 
 
 @pytest.mark.parametrize('dead_letter_fails', [False, True])

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import yt_dlp
-from pathlib_extensions import OverwriteMode
+from pathlib_extensions import OverwritePolicy
 
 from youtube_whisperer.config import Settings
 from youtube_whisperer.downloaders.utils import (
@@ -13,6 +13,7 @@ from youtube_whisperer.downloaders.utils import (
 from youtube_whisperer.downloaders.video_downloader import (
     download_video_with_default_title,
 )
+from youtube_whisperer.overwrite import require_supported_policy
 
 
 def extract_flat_info(url: str) -> dict[str, Any] | None:
@@ -97,17 +98,21 @@ def yield_flattened_video_urls(urls: Iterable[str]) -> Generator[str, None, None
         yield from yield_video_urls_from_playlist(url)
 
 
-def download_playlist_with_default_titles(url: str, target_dir: Path | None = None, overwrite: OverwriteMode = OverwriteMode.PROMPT) -> list[Path]:
+def download_playlist_with_default_titles(url: str, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> list[Path]:
     """
     Downloads all videos in a YouTube playlist and saves them with default titles in the target directory.
     
     Args:
         url (str): The URL of the YouTube playlist.
         target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to settings resolved at invocation.
-        overwrite (OverwriteMode, optional): Whether to overwrite existing video files. Defaults to `prompt`.
+        overwrite (OverwritePolicy, optional): ALWAYS replaces existing videos; NEVER keeps them. Defaults to NEVER.
     
     Returns:
         list[Path]: A list of paths to downloaded video files.
+
+    Raises:
+        ValueError: If `overwrite` is RENAME, before any other work.
     """
+    require_supported_policy(overwrite)
     target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir
     return [download_video_with_default_title(v, target_dir, overwrite) for v in yield_video_urls_from_playlist(url)]
