@@ -56,10 +56,6 @@ None open.
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** [D10](DESIGN.md#d10) intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
 
-#### NB40 — The publication forwarder imports library functions that will be removed
-
-**Severity: Low. Proposed removal ([D48](DESIGN.md#d48)).** `youtube_whisperer.publication` re-exports pathlib-extensions `publication` functions, which the library will deprecate and remove. **Outcome:** the forwarder and its test are removed, and nothing in this project imports the library's `publication` module. **Acceptance:** no source or test imports `pathlib_extensions.publication` content; documentation no longer lists the forwarder. **Dependencies:** [NB39](completed_work/NB39.md) (implemented).
-
 ## Readiness and unresolved choices
 
 NB2 needs its investigation gate cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
@@ -96,6 +92,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB37](completed_work/NB37.md) — Implemented ([D46](DESIGN.md#d46)): pathlib-extensions owns the publication helpers and the `resolve_overwrite_mode` preflight; `youtube_whisperer.publication` forwards them and the seven repeated preflights are gone.
 - [NB38](completed_work/NB38.md) — Implemented ([D48](DESIGN.md#d48)): overwrite parameters take pathlib-extensions `OverwritePolicy` (pin `fff2bf6`), former `PROMPT` defaults are `NEVER`, and `RENAME` is rejected before any work.
 - [NB39](completed_work/NB39.md) — Implemented ([D48](DESIGN.md#d48)): video, SRT and WAV publish through pathlib-extensions `StagedFile` in private `.staging-<random>` directories; yt-dlp and ffmpeg still write under names that keep titles out of templates and the caller's suffix for container inference.
+- [NB40](completed_work/NB40.md) — Implemented ([D48](DESIGN.md#d48)): the `youtube_whisperer.publication` forwarder is removed, so nothing in this project imports the library's `publication` module, which the library will deprecate and remove.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance
