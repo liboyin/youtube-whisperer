@@ -29,10 +29,10 @@ class AzureWorker(TranscriptionWorker):
     def dispatch_task(self, task: Task, source: Path) -> None:
         """Run Azure Speech transcription for a resolved filesystem source.
 
-        Azure transcription expects WAV input, so the worker reuses an existing
-        sidecar WAV file when present or converts the source before submitting the
-        resulting audio file to the Azure transcriber using the task's requested
-        language.
+        Azure transcription expects WAV input, so a non-WAV source is converted to a
+        sidecar WAV under NEVER, which keeps and reuses an existing sidecar without
+        converting (D49). The source must exist either way. The sidecar is then
+        submitted to the Azure transcriber using the task's requested language.
 
         Args:
             task: The transcription task that provides language settings for the
@@ -46,10 +46,6 @@ class AzureWorker(TranscriptionWorker):
         """
         if source.suffix.lower() != '.wav':
             wav_source = source.with_suffix('.wav')
-            if not wav_source.is_file():
-                converted_source = save_as_wav_file(source, output_file_path=wav_source, overwrite=OverwritePolicy.NEVER)
-                if converted_source is None:
-                    raise RuntimeError(f"Failed to create WAV file for {source}")
-                wav_source = converted_source
+            save_as_wav_file(source, output_file_path=wav_source, overwrite=OverwritePolicy.NEVER)
             source = wav_source
         transcribe_audio_file(source, task.language, overwrite=OverwritePolicy.NEVER, settings=self.settings)
