@@ -23,10 +23,10 @@ def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> N
 
     Failed downloads preserve previous output. NEVER also preserves competing
     files; ALWAYS replacements follow symlinks and retain mode bits. yt-dlp
-    writes a fixed `video.mp4` inside the private stage directory, because a
-    title in its output template would be expanded; the result is renamed to
-    the staged name before publication. The stage directory, with any partial
-    or auxiliary downloader files, is removed on every exit.
+    writes a fixed `video.mp4`, the `StagedFile` stage name, inside the private
+    stage directory, because a title in its output template would be expanded.
+    The stage directory, with any partial or auxiliary downloader files, is
+    removed on every exit.
 
     Args:
         url (str): The URL of the video.
@@ -45,19 +45,16 @@ def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> N
     template_parent = str(target_path.resolve().parent / 'video.mp4')
     if os.path.expandvars(os.path.expanduser(template_parent)) != template_parent:
         raise ValueError('yt-dlp would expand the video stage directory path')
-    with StagedFile(target_path, overwrite) as staged:
-        download = staged.path.parent / 'video.mp4'
+    with StagedFile(target_path, overwrite, name='video.mp4') as staged:
         ydl_opts = build_youtube_dl_options(is_firefox_cookies_available())
         ydl_opts.update({
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
-            'outtmpl': str(download).replace('%', '%%'),
+            'outtmpl': str(staged.path).replace('%', '%%'),
         })
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-        if not download.is_file():
-            raise FileNotFoundError(f'Download did not produce a regular staged video: {download}')
-        if download != staged.path:
-            download.rename(staged.path)
+        if not staged.path.is_file():
+            raise FileNotFoundError(f'Download did not produce a regular staged video: {staged.path}')
 
 
 def download_video_with_default_title(url: str, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path:

@@ -118,15 +118,12 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
     if resolve_output_path(output_file_path, overwrite) is None:
         return None
     try:
-        with StagedFile(output_file_path, overwrite) as staged:
-            # ffmpeg infers the container from the suffix of the caller's destination, which a
-            # symlink's target may not share, so convert under the caller's name and rename.
+        # ffmpeg infers the container from the suffix of the caller's destination, which a
+        # symlink's target may not share, so the stage file takes the caller's name.
+        with StagedFile(output_file_path, overwrite, name=output_file_path.name) as staged:
             # Exclusive creation uses ordinary 0666 permissions filtered by umask.
-            converted = staged.path.parent / output_file_path.name
-            converted.open('xb').close()
-            _convert_audio_to_stage(input_file_path, converted)
-            if converted != staged.path:
-                converted.rename(staged.path)
+            staged.path.open('xb').close()
+            _convert_audio_to_stage(input_file_path, staged.path)
     except ffmpeg.Error as e:
         logger.error("ffmpeg failed: %s", e.stderr.decode())
         raise

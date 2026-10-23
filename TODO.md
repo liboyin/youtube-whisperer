@@ -56,13 +56,9 @@ None open.
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** [D10](DESIGN.md#d10) intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
 
-#### NB45 — Video and WAV rename their staged files
-
-**Severity: Low. Proposed simplification (D48 gap review, 2026-10-23).** `download_video` and `save_as_wav_file` write under another name inside the stage directory and rename it to `staged.path`. **Dependency:** the library's `StagedFile` stage-file name option ([D49](DESIGN.md#d49)), pushed by the user, and a pin update. **Direction:** pass `name='video.mp4'` and the caller's destination name; remove the renames. **Validation:** NB39's V2, W1 and W2 properties keep mutation evidence. **Done:** full gates, review, record; committed only after the library commit is pushed.
-
 ## Readiness and unresolved choices
 
-NB2 needs its investigation gate cleared first. NB5 needs a user decision on the mechanism before it has a boundary. NB45 waits for the user to push the library's `StagedFile` name option.
+NB2 needs its investigation gate cleared first. NB5 needs a user decision on the mechanism before it has a boundary.
 
 All entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming is settled by [D47](DESIGN.md#d47); playlist continuation is settled by [D17](DESIGN.md#d17). [D14](DESIGN.md#d14)/[D16](DESIGN.md#d16) settle the configuration and caption-error outcomes; N7/N8 are resolved; NB24 implemented D16.
 
@@ -101,6 +97,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB42](completed_work/NB42.md) — Implemented ([D49](DESIGN.md#d49)): only the `OverwritePolicy.ALWAYS` and `NEVER` members are accepted, by identity, so stale `OverwriteMode` members and strings raise `ValueError` before any work instead of publishing numbered copies; WAV conversion checks the policy before its input.
 - [NB43](completed_work/NB43.md) — Implemented ([D49](DESIGN.md#d49)): `save_segments_as_srt` and `deduplicate_srt_file` default to `ALWAYS` like `publish_srt_text`, so in-place deduplication works without an explicit policy.
 - [NB44](completed_work/NB44.md) — Implemented ([D49](DESIGN.md#d49)): the Azure worker reuses a sidecar WAV through `save_as_wav_file(..., NEVER)` instead of its own existence check; the source must now exist even when its WAV does.
+- [NB45](completed_work/NB45.md) — Implemented ([D49](DESIGN.md#d49)): video and WAV publication name their stage files through pathlib-extensions `StagedFile(..., name=...)` (pin `c679a0e`) instead of renaming inside the stage directory.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance
