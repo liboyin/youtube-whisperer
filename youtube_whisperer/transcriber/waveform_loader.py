@@ -7,7 +7,6 @@ from pathlib_extensions import (
     OverwritePolicy,
     StagedFile,
     prepare_input_file,
-    prepare_output_file,
 )
 
 from youtube_whisperer.overwrite import resolve_output_path
@@ -117,7 +116,6 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
     output_file_path = output_file_path or input_file_path.with_suffix('.wav')
     if resolve_output_path(output_file_path, overwrite) is None:
         return None
-    output_file_path = prepare_output_file(output_file_path)
     try:
         with StagedFile(output_file_path, overwrite) as staged:
             # ffmpeg infers the container from the suffix of the caller's destination, which a

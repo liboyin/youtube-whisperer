@@ -213,7 +213,7 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = Ov
     """
     require_supported_policy(overwrite)
     # Exclusive text creation uses 0666 filtered by umask without mutating it.
-    with StagedFile(prepare_output_file(file_path), overwrite) as staged, staged.path.open('x') as writer:
+    with StagedFile(file_path, overwrite) as staged, staged.path.open('x') as writer:
         writer.write(text)
 
 
@@ -264,8 +264,6 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
     output_file_path = output_file_path or input_file_path
     if resolve_output_path(output_file_path, overwrite) is None:
         return output_file_path
-    output_file_path = prepare_output_file(output_file_path)
-    assert isinstance(output_file_path, Path)  # narrow down type from `Path | None` to `Path`
     with prepare_input_file(input_file_path).open() as file_handler:
         # force a file read before closing file_handler because both generators are lazy
         blocks = list(yield_deduplicated_srt_blocks(yield_srt_blocks_from_lines(file_handler)))

@@ -5,7 +5,6 @@ import yt_dlp
 from pathlib_extensions import (
     OverwritePolicy,
     StagedFile,
-    prepare_output_file,
 )
 
 from youtube_whisperer.config import Settings
@@ -41,13 +40,12 @@ def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> N
     """
     if resolve_output_path(target_path, overwrite) is None:
         return
-    destination = prepare_output_file(target_path)
     # The generated stage directory name is safe, but its parent can contain expansions
     # that yt-dlp cannot escape. Check before the stage directory is created.
-    template_parent = str(destination.resolve().parent / 'video.mp4')
+    template_parent = str(target_path.resolve().parent / 'video.mp4')
     if os.path.expandvars(os.path.expanduser(template_parent)) != template_parent:
         raise ValueError('yt-dlp would expand the video stage directory path')
-    with StagedFile(destination, overwrite) as staged:
+    with StagedFile(target_path, overwrite) as staged:
         download = staged.path.parent / 'video.mp4'
         ydl_opts = build_youtube_dl_options(is_firefox_cookies_available())
         ydl_opts.update({

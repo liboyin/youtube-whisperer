@@ -112,13 +112,13 @@ def test_download_video_returns_early_when_existing_file_should_not_be_overwritt
     target_path = tmp_path / "video.mp4"
     target_path.write_text("existing")
     mock_overwrite = mocker.patch.object(testee, "resolve_output_path", wraps=testee.resolve_output_path)
-    mock_prepare = mocker.patch.object(testee, "prepare_output_file")
+    mock_staged = mocker.patch.object(testee, "StagedFile")
     mock_ydl = mocker.patch.object(testee.yt_dlp, "YoutubeDL")
 
     testee.download_video("https://example.com/watch?v=1", target_path, OverwritePolicy.NEVER)
 
     mock_overwrite.assert_called_once_with(target_path, OverwritePolicy.NEVER)
-    mock_prepare.assert_not_called()
+    mock_staged.assert_not_called()
     mock_ydl.assert_not_called()
 
 

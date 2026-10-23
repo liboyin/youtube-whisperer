@@ -625,6 +625,22 @@ def test_save_segments_as_srt_never_preserves_competitor_after_lazy_materializat
     assert list(tmp_path.iterdir()) == [output]
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses the write-permission check this race depends on")
+def test_save_segments_as_srt_never_keeps_unwritable_competitor_created_during_work(tmp_path):
+    """NEVER keeps a read-only SRT that appears during the work instead of failing on its permissions."""
+    output = tmp_path / "output.srt"
+
+    def blocks():
+        """Create a competing output this process cannot write while blocks are consumed."""
+        output.write_text("competing")
+        output.chmod(0o444)
+        yield testee.SrtBlock("00:00:00,000", "00:00:01,000", ["candidate"])
+
+    testee.save_segments_as_srt(blocks(), output, overwrite=OverwritePolicy.NEVER)
+    assert output.read_text() == "competing"
+    assert list(tmp_path.iterdir()) == [output]
+
+
 @pytest.mark.parametrize("existing", [False, True])
 def test_save_segments_as_srt_consumes_all_lazy_blocks_before_opening_stage(tmp_path, existing):
     """A late generator failure finishes before any staged write and preserves final output."""
