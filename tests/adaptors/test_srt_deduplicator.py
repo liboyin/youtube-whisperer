@@ -675,9 +675,9 @@ def test_save_segments_as_srt_consumes_all_lazy_blocks_before_opening_stage(tmp_
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
 
 
-@pytest.mark.parametrize(("overwrite", "approved"), [({}, False), ({"overwrite": OverwritePolicy.NEVER}, False), ({"overwrite": OverwritePolicy.ALWAYS}, True)])
+@pytest.mark.parametrize(("overwrite", "approved"), [({}, True), ({"overwrite": OverwritePolicy.NEVER}, False), ({"overwrite": OverwritePolicy.ALWAYS}, True)])
 def test_save_segments_as_srt_existing_output_policy_is_decided_before_lazy_work(tmp_path, overwrite, approved):
-    """The default NEVER skips lazy serialization entirely; ALWAYS consumes it and publishes."""
+    """NEVER skips lazy serialization entirely; ALWAYS, the default, consumes it and publishes."""
     output = tmp_path / "output.srt"
     output.write_text("original")
     consumed = []
@@ -722,6 +722,15 @@ def test_deduplicate_srt_file(temp_srt_file: Path):
     assert temp_srt_file.read_text().strip() == expected.strip()
 
 
+def test_deduplicate_srt_file_deduplicates_in_place_by_default(tmp_path):
+    """Without an explicit policy, in-place deduplication replaces the input with merged blocks."""
+    srt_file = tmp_path / "test.srt"
+    srt_file.write_text("1\n00:00:01,000 --> 00:00:02,000\nSame\n\n2\n00:00:02,000 --> 00:00:03,000\nSame\n")
+    assert testee.deduplicate_srt_file(srt_file) is srt_file
+    assert srt_file.read_text() == "1\n00:00:01,000 --> 00:00:03,000\nSame\n"
+    assert list(tmp_path.iterdir()) == [srt_file]
+
+
 def test_deduplicate_srt_file_returns_early_when_overwrite_never(tmp_path):
     """Test that an existing file is left untouched when overwrite mode is NEVER."""
     srt_file = tmp_path / "test.srt"
@@ -732,12 +741,11 @@ def test_deduplicate_srt_file_returns_early_when_overwrite_never(tmp_path):
     assert srt_file.read_text() == original_content
 
 
-@pytest.mark.parametrize("overwrite", [{}, {"overwrite": OverwritePolicy.NEVER}])
-def test_deduplicate_srt_file_keeps_existing_output_without_reading_input(tmp_path, overwrite):
-    """The default and explicit NEVER return before the input is opened, so a missing input is never reached."""
+def test_deduplicate_srt_file_keeps_existing_output_without_reading_input(tmp_path):
+    """NEVER returns before the input is opened, so a missing input is never reached."""
     output = tmp_path / "output.srt"
     output.write_text("existing")
-    assert testee.deduplicate_srt_file(tmp_path / "missing.srt", output, **overwrite) is output
+    assert testee.deduplicate_srt_file(tmp_path / "missing.srt", output, overwrite=OverwritePolicy.NEVER) is output
     assert output.read_text() == "existing"
     assert list(tmp_path.iterdir()) == [output]
 

@@ -203,7 +203,8 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = Ov
     Args:
         file_path (Path): Final SRT path, with parents created as needed.
         text (str): Fully materialized text, preserved with ordinary text I/O.
-        overwrite (OverwritePolicy): ALWAYS or NEVER; defaults to replacement.
+        overwrite (OverwritePolicy): ALWAYS or NEVER. Defaults to ALWAYS, like every SRT helper
+            in this module (D49).
 
     Raises:
         ValueError: If `overwrite` is not ALWAYS or NEVER.
@@ -217,7 +218,7 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = Ov
         writer.write(text)
 
 
-def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicate: bool = True, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> None:
+def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicate: bool = True, overwrite: OverwritePolicy = OverwritePolicy.ALWAYS) -> None:
     """
     Serialize all SrtBlocks before publishing complete SRT text atomically.
 
@@ -228,7 +229,8 @@ def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicat
         blocks (Iterable[SrtBlock]): SrtBlock objects to write, typically produced by mapping a transcriber-specific converter over recognition results.
         file_path (Path): The path to the output SRT file.
         deduplicate (bool, optional): Whether to merge consecutive blocks with identical content. Defaults to True.
-        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing file; NEVER keeps it. Defaults to NEVER.
+        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing file; NEVER keeps it. Defaults to ALWAYS,
+            like every SRT helper in this module (D49).
 
     Raises:
         ValueError: If `overwrite` is not ALWAYS or NEVER.
@@ -241,7 +243,7 @@ def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicat
     publish_srt_text(file_path, convert_srt_blocks_to_str(blocks), overwrite=overwrite)
 
 
-def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path:
+def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.ALWAYS) -> Path:
     """
     Read and deduplicate an SRT file before atomically publishing complete text.
 
@@ -252,7 +254,8 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
         input_file_path (Path): The path to the input SRT file.
         output_file_path (Path | None, optional): The path to the output file. If `None`, the input file will be overwritten. Defaults to `None`.
         overwrite (OverwritePolicy, optional): ALWAYS replaces an existing output file; NEVER keeps it,
-            so in-place deduplication needs ALWAYS. Defaults to NEVER.
+            so in-place deduplication under NEVER changes nothing. Defaults to ALWAYS, like every SRT
+            helper in this module (D49).
 
     Returns:
         Path: The path to the output file.
