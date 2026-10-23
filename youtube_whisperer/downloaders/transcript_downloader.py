@@ -191,7 +191,7 @@ class TranscriptDownloader:
     
     def download_as_srt_file(self, output_file_path: Path, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> bool:
         """
-        Download captions and publish complete SRT text after closing a sibling stage.
+        Download captions and publish complete SRT text after closing it inside a `StagedFile`.
 
         Declined overwrites avoid the caption request. Publication preserves prior
         valid output on failure and keeps any competing output under NEVER.

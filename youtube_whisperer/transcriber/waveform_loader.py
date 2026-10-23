@@ -57,7 +57,7 @@ def _convert_audio_to_stage(input_file_path: Path, stage: Path) -> None:
 
     Args:
         input_file_path (Path): Validated input audio or video file.
-        stage (Path): Exclusively owned sibling with the destination suffix.
+        stage (Path): Exclusively created file inside the `StagedFile` directory, with the destination suffix.
 
     Raises:
         ffmpeg.Error: If conversion fails, retaining captured output diagnostics.
