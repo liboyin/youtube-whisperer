@@ -125,7 +125,7 @@ def test_download_video_returns_early_when_existing_file_should_not_be_overwritt
 def test_download_video_rejects_rename_before_any_download_work(mocker, tmp_path):
     """RENAME fails before preparing the destination or constructing the downloader."""
     downloader = mocker.patch.object(testee.yt_dlp, "YoutubeDL")
-    with pytest.raises(ValueError, match="RENAME is not supported"):
+    with pytest.raises(ValueError, match="RENAME.*is not supported"):
         testee.download_video("https://example.com/watch?v=1", tmp_path / "out" / "video.mp4", OverwritePolicy.RENAME)
     downloader.assert_not_called()
     assert list(tmp_path.iterdir()) == []
@@ -429,7 +429,7 @@ def test_download_video_with_default_title_rejects_rename_before_metadata_or_set
     """RENAME fails before the asset directory is resolved or video metadata is requested."""
     metadata = mocker.patch.object(testee, 'get_video_title_and_id', side_effect=AssertionError('metadata requested'))
     settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
-    with pytest.raises(ValueError, match='RENAME is not supported'):
+    with pytest.raises(ValueError, match='RENAME.*is not supported'):
         testee.download_video_with_default_title('https://example.com/watch?v=3', overwrite=OverwritePolicy.RENAME)
     metadata.assert_not_called()
     settings.assert_not_called()

@@ -359,7 +359,7 @@ def test_transcribe_audio_file_rejects_rename_before_contacting_azure(mocker, tm
     """RENAME is refused before audio inspection, settings or any Azure object."""
     duration = mocker.patch.object(testee, "get_audio_duration_seconds", side_effect=AssertionError("audio inspected"))
     speech = mocker.patch.object(testee.speechsdk, "SpeechConfig")
-    with owned_path_probes(), pytest.raises(ValueError, match="RENAME is not supported"):
+    with owned_path_probes(), pytest.raises(ValueError, match="RENAME.*is not supported"):
         testee.transcribe_audio_file(tmp_path / "audio.wav", LANGUAGE, overwrite=OverwritePolicy.RENAME)
     duration.assert_not_called()
     speech.assert_not_called()

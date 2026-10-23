@@ -222,7 +222,7 @@ def test_transcribe_file_with_default_model_returns_existing_output_when_overwri
 def test_transcribe_file_with_default_model_rejects_rename_before_audio_work(mocker, tmp_path):
     """RENAME is refused before audio is decoded or the model runs."""
     load = mocker.patch.object(testee, "load_whisper_waveform_from_file", side_effect=AssertionError("audio decoded"))
-    with pytest.raises(ValueError, match="RENAME is not supported"):
+    with pytest.raises(ValueError, match="RENAME.*is not supported"):
         testee.transcribe_file_with_default_model(tmp_path / "audio.wav", LANGUAGE, overwrite=OverwritePolicy.RENAME)
     load.assert_not_called()
     assert list(tmp_path.iterdir()) == []

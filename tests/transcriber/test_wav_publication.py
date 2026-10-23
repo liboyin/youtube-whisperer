@@ -221,10 +221,17 @@ def test_save_as_wav_file_declined_overwrite_avoids_conversion(conversion, tmp_p
 
 def test_save_as_wav_file_rejects_rename_before_conversion(conversion, tmp_path):
     """RENAME is refused before ffmpeg is configured or any stage is created."""
-    with pytest.raises(ValueError, match="RENAME is not supported"):
+    with pytest.raises(ValueError, match="RENAME.*is not supported"):
         testee.save_as_wav_file(conversion.source, tmp_path / 'output.wav', OverwritePolicy.RENAME)
     conversion.input.assert_not_called()
     assert list(tmp_path.iterdir()) == [conversion.source]
+
+
+def test_save_as_wav_file_rejects_rename_before_validating_input(tmp_path):
+    """An unsupported policy is reported before the input is checked, even when it is missing."""
+    with pytest.raises(ValueError, match="RENAME.*is not supported"):
+        testee.save_as_wav_file(tmp_path / 'missing.mp4', tmp_path / 'output.wav', OverwritePolicy.RENAME)
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_save_as_wav_file_approved_overwrite_publishes_after_completion(conversion, tmp_path):

@@ -9,7 +9,7 @@ from pathlib_extensions import (
     prepare_input_file,
 )
 
-from youtube_whisperer.overwrite import resolve_output_path
+from youtube_whisperer.overwrite import require_supported_policy, resolve_output_path
 
 logger = logging.getLogger(__name__)
 
@@ -108,10 +108,11 @@ def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None
         a late competing file), or None when preflight declines replacement.
 
     Raises:
-        ValueError: If `overwrite` is RENAME.
+        ValueError: If `overwrite` is not ALWAYS or NEVER.
         ffmpeg.Error: Failed conversion, logged with captured stderr diagnostics.
         OSError: Input/output validation, staging, startup or publication failure.
     """
+    require_supported_policy(overwrite)
     input_file_path = prepare_input_file(input_file_path)
     output_file_path = output_file_path or input_file_path.with_suffix('.wav')
     if resolve_output_path(output_file_path, overwrite) is None:

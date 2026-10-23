@@ -206,7 +206,7 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = Ov
         overwrite (OverwritePolicy): ALWAYS or NEVER; defaults to replacement.
 
     Raises:
-        ValueError: If `overwrite` is RENAME.
+        ValueError: If `overwrite` is not ALWAYS or NEVER.
         OSError: If staging, closing, mode preservation, or publication fails,
             including unsupported hard-link publication. The private stage
             directory is removed on every exit.
@@ -231,7 +231,7 @@ def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicat
         overwrite (OverwritePolicy, optional): ALWAYS replaces an existing file; NEVER keeps it. Defaults to NEVER.
 
     Raises:
-        ValueError: If `overwrite` is RENAME.
+        ValueError: If `overwrite` is not ALWAYS or NEVER.
     """
     if resolve_output_path(file_path, overwrite) is None:
         return
@@ -258,7 +258,7 @@ def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = 
         Path: The path to the output file.
 
     Raises:
-        ValueError: If `overwrite` is RENAME.
+        ValueError: If `overwrite` is not ALWAYS or NEVER.
     """
     logger.info("Deduplicating SRT file: %s", input_file_path)
     output_file_path = output_file_path or input_file_path

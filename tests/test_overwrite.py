@@ -1,5 +1,5 @@
 import pytest
-from pathlib_extensions import NotAFileError, OverwritePolicy
+from pathlib_extensions import NotAFileError, OverwriteMode, OverwritePolicy
 
 import youtube_whisperer.overwrite as testee
 
@@ -12,8 +12,15 @@ def test_require_supported_policy_returns_always_and_never_unchanged(policy):
 
 def test_require_supported_policy_rejects_rename():
     """RENAME would publish numbered copies that break MP4/SRT pairing, so it is refused."""
-    with pytest.raises(ValueError, match='RENAME is not supported'):
+    with pytest.raises(ValueError, match='RENAME.*is not supported'):
         testee.require_supported_policy(OverwritePolicy.RENAME)
+
+
+@pytest.mark.parametrize('value', [OverwriteMode.ALWAYS, OverwriteMode.NEVER, 'always', 'never', None])
+def test_require_supported_policy_rejects_values_that_only_resemble_always_or_never(value):
+    """Stale OverwriteMode members and strings, which the library would publish like RENAME, are refused."""
+    with pytest.raises(ValueError, match='is not supported'):
+        testee.require_supported_policy(value)
 
 
 def test_resolve_output_path_keeps_existing_file_under_never(tmp_path):
@@ -41,7 +48,7 @@ def test_resolve_output_path_rejects_rename_before_checking_the_filesystem(tmp_p
     """RENAME is refused even where the library would choose a numbered free name."""
     path = tmp_path / 'out.srt'
     path.write_text('existing')
-    with pytest.raises(ValueError, match='RENAME is not supported'):
+    with pytest.raises(ValueError, match='RENAME.*is not supported'):
         testee.resolve_output_path(path, OverwritePolicy.RENAME)
     assert list(tmp_path.iterdir()) == [path]
 

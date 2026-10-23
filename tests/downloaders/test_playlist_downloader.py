@@ -184,7 +184,7 @@ def test_download_playlist_with_default_titles_rejects_rename_before_expansion(m
     expand = mocker.patch.object(testee, 'yield_video_urls_from_playlist', return_value=iter(urls))
     download = mocker.patch.object(testee, 'download_video_with_default_title', side_effect=AssertionError('video downloaded'))
     settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
-    with pytest.raises(ValueError, match='RENAME is not supported'):
+    with pytest.raises(ValueError, match='RENAME.*is not supported'):
         testee.download_playlist_with_default_titles('https://example.com/playlist', overwrite=OverwritePolicy.RENAME)
     expand.assert_not_called()
     download.assert_not_called()

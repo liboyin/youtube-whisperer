@@ -111,7 +111,7 @@ def download_playlist_with_default_titles(url: str, target_dir: Path | None = No
         list[Path]: A list of paths to downloaded video files.
 
     Raises:
-        ValueError: If `overwrite` is RENAME, before any other work.
+        ValueError: If `overwrite` is not ALWAYS or NEVER, before any other work.
     """
     require_supported_policy(overwrite)
     target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir

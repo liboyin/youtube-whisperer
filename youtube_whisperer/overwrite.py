@@ -10,9 +10,12 @@ def require_supported_policy(policy: OverwritePolicy) -> OverwritePolicy:
     """
     Return `policy` if this application can publish under it.
 
-    Only ALWAYS and NEVER are supported. The library's RENAME writes a numbered copy, such as
-    'Title [id].1.mp4', and a numbered SRT beside its video would break the MP4/SRT pairing
-    that asset cleanup relies on. Public functions call this before any other work.
+    Only the ALWAYS and NEVER members are supported (D49). The library's RENAME writes a
+    numbered copy, such as 'Title [id].1.mp4', and a numbered SRT beside its video would break
+    the MP4/SRT pairing that asset cleanup relies on. The library also publishes every other
+    value, such as a stale `OverwriteMode` member or a plain string, the way it publishes
+    RENAME. Members are compared by identity because those values compare equal to the
+    policies they resemble. Public functions call this before any other work.
 
     Args:
         policy (OverwritePolicy): The requested policy.
@@ -21,11 +24,11 @@ def require_supported_policy(policy: OverwritePolicy) -> OverwritePolicy:
         OverwritePolicy: `policy`, unchanged.
 
     Raises:
-        ValueError: If `policy` is RENAME.
+        ValueError: If `policy` is anything other than ALWAYS or NEVER.
     """
-    if policy is OverwritePolicy.RENAME:
-        raise ValueError('OverwritePolicy.RENAME is not supported: use ALWAYS or NEVER')
-    return policy
+    if policy is OverwritePolicy.ALWAYS or policy is OverwritePolicy.NEVER:
+        return policy
+    raise ValueError(f'Overwrite policy {policy!r} is not supported: use OverwritePolicy.ALWAYS or NEVER')
 
 
 def resolve_output_path(path: Path, policy: OverwritePolicy) -> Path | None:
@@ -44,7 +47,7 @@ def resolve_output_path(path: Path, policy: OverwritePolicy) -> Path | None:
         that must be kept.
 
     Raises:
-        ValueError: If `policy` is RENAME.
+        ValueError: If `policy` is anything other than ALWAYS or NEVER.
         NotAFileError: If something other than a file exists at `path`, following symlinks.
     """
     return require_supported_policy(policy).resolve(path)

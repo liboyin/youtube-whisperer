@@ -204,7 +204,7 @@ class TranscriptDownloader:
             bool: Whether the download is successful.
 
         Raises:
-            ValueError: If `overwrite` is RENAME.
+            ValueError: If `overwrite` is not ALWAYS or NEVER.
         """
         if resolve_output_path(output_file_path, overwrite) is None:
             return True
@@ -230,7 +230,7 @@ class TranscriptDownloader:
             Path | None: The path to the downloaded SRT file if successful, otherwise 'None'.
 
         Raises:
-            ValueError: If `overwrite` is RENAME, before any other work.
+            ValueError: If `overwrite` is not ALWAYS or NEVER, before any other work.
         """
         require_supported_policy(overwrite)
         target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir

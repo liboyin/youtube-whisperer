@@ -34,7 +34,7 @@ def download_video_and_transcript_with_default_title(url: str, language: Languag
         tuple[Path, bool]: A tuple containing the path to the downloaded video file and a boolean indicating whether the transcript was successfully downloaded.
 
     Raises:
-        ValueError: If `overwrite` is RENAME, before any other work.
+        ValueError: If `overwrite` is not ALWAYS or NEVER, before any other work.
     """
     require_supported_policy(overwrite)
     target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir

@@ -34,7 +34,7 @@ def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> N
         overwrite (OverwritePolicy): ALWAYS replaces an existing video; NEVER keeps it.
 
     Raises:
-        ValueError: If `overwrite` is RENAME, or yt-dlp would expand environment variables in the stage path.
+        ValueError: If `overwrite` is not ALWAYS or NEVER, or yt-dlp would expand environment variables in the stage path.
         FileNotFoundError: If the download leaves no regular staged video.
         OSError: If preparation, mode restoration, or atomic publication fails.
     """
@@ -76,7 +76,7 @@ def download_video_with_default_title(url: str, target_dir: Path | None = None, 
         Path: The path to the downloaded video file.
 
     Raises:
-        ValueError: If `overwrite` is RENAME, before any other work.
+        ValueError: If `overwrite` is not ALWAYS or NEVER, before any other work.
     """
     require_supported_policy(overwrite)
     target_dir = target_dir if target_dir is not None else Settings().whisper_assets_dir

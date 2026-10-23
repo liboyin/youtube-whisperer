@@ -7,7 +7,7 @@ from textwrap import dedent
 from unittest.mock import patch
 
 import pytest
-from pathlib_extensions import OverwritePolicy
+from pathlib_extensions import OverwriteMode, OverwritePolicy
 
 import youtube_whisperer.adaptors.srt_deduplicator as testee
 
@@ -564,8 +564,19 @@ def test_publish_srt_text_rejects_rename_without_staging(tmp_path):
     """RENAME is refused before any stage or numbered copy is written."""
     output = tmp_path / "output.srt"
     output.write_text("existing")
-    with pytest.raises(ValueError, match="RENAME is not supported"):
+    with pytest.raises(ValueError, match="RENAME.*is not supported"):
         testee.publish_srt_text(output, "candidate", overwrite=OverwritePolicy.RENAME)
+    assert list(tmp_path.iterdir()) == [output]
+    assert output.read_text() == "existing"
+
+
+@pytest.mark.parametrize("value", [OverwriteMode.ALWAYS, OverwriteMode.NEVER, "always"])
+def test_publish_srt_text_rejects_stale_policy_values_without_numbered_copy(tmp_path, value):
+    """Values the library would publish under a numbered name are refused before staging."""
+    output = tmp_path / "output.srt"
+    output.write_text("existing")
+    with pytest.raises(ValueError, match="is not supported"):
+        testee.publish_srt_text(output, "candidate", overwrite=value)
     assert list(tmp_path.iterdir()) == [output]
     assert output.read_text() == "existing"
 
@@ -690,7 +701,7 @@ def test_save_segments_as_srt_rejects_rename_before_lazy_work(tmp_path):
         consumed.append(True)
         yield testee.SrtBlock("00:00:00,000", "00:00:01,000", ["candidate"])
 
-    with pytest.raises(ValueError, match="RENAME is not supported"):
+    with pytest.raises(ValueError, match="RENAME.*is not supported"):
         testee.save_segments_as_srt(blocks(), tmp_path / "output.srt", overwrite=OverwritePolicy.RENAME)
     assert consumed == []
     assert list(tmp_path.iterdir()) == []
@@ -733,7 +744,7 @@ def test_deduplicate_srt_file_keeps_existing_output_without_reading_input(tmp_pa
 
 def test_deduplicate_srt_file_rejects_rename_before_reading_input(tmp_path):
     """RENAME is refused before the input is opened, so even a missing input reports the policy."""
-    with pytest.raises(ValueError, match="RENAME is not supported"):
+    with pytest.raises(ValueError, match="RENAME.*is not supported"):
         testee.deduplicate_srt_file(tmp_path / "missing.srt", tmp_path / "output.srt", overwrite=OverwritePolicy.RENAME)
     assert list(tmp_path.iterdir()) == []
 

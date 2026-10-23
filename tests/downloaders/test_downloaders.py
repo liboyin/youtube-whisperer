@@ -54,7 +54,7 @@ def test_download_video_and_transcript_with_default_title_rejects_rename_before_
     video = mocker.patch.object(testee, 'download_video_with_default_title', side_effect=AssertionError('video downloaded'))
     captions = mocker.patch.object(testee, 'TranscriptDownloader', side_effect=AssertionError('captions requested'))
     settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
-    with pytest.raises(ValueError, match='RENAME is not supported'):
+    with pytest.raises(ValueError, match='RENAME.*is not supported'):
         testee.download_video_and_transcript_with_default_title('https://youtu.be/n9xhJrPXop4', LANGUAGE, overwrite=OverwritePolicy.RENAME)
     video.assert_not_called()
     captions.assert_not_called()

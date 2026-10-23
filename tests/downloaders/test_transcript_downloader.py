@@ -380,7 +380,7 @@ def test_download_as_srt_file_returns_true_when_file_exists_and_no_overwrite(tmp
 def test_download_as_srt_file_rejects_rename_before_caption_request(mocker, tmp_path, downloader):
     """RENAME is refused before captions are requested or any SRT is written."""
     request = mocker.patch.object(downloader, "download_as_srt_text", side_effect=AssertionError("caption request"))
-    with pytest.raises(ValueError, match="RENAME is not supported"):
+    with pytest.raises(ValueError, match="RENAME.*is not supported"):
         downloader.download_as_srt_file(tmp_path / "output.srt", OverwritePolicy.RENAME)
     request.assert_not_called()
     assert list(tmp_path.iterdir()) == []
@@ -401,7 +401,7 @@ def test_download_as_srt_file_with_default_title_rejects_rename_before_metadata_
     """RENAME fails before the asset directory is resolved or video metadata is requested."""
     metadata = mocker.patch.object(testee, 'get_video_title_and_id', side_effect=AssertionError('metadata requested'))
     settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
-    with pytest.raises(ValueError, match='RENAME is not supported'):
+    with pytest.raises(ValueError, match='RENAME.*is not supported'):
         downloader.download_as_srt_file_with_default_title(overwrite=OverwritePolicy.RENAME)
     metadata.assert_not_called()
     settings.assert_not_called()
