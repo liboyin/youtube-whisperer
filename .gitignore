@@ -19,4 +19,5 @@ Thumbs.db
 assets/
 
 # Misc.
+.claude/settings.*.json
 .vscode/
