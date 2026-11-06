@@ -1,5 +1,8 @@
 x-build: &build
   context: .
+  # Services run the lean image; the dev container overrides `app` to the `dev` target
+  # (.devcontainer/docker-compose.devcontainer.yaml).
+  target: runtime
   additional_contexts:
     # Shared apt/uv install scripts, pinned to a version tag. Set BUILD_COMMON_CONTEXT
     # in .env to a local clone to build offline, or to test a change to the helpers before

@@ -96,6 +96,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB44](completed_work/NB44.md) — Implemented ([D49](DESIGN.md#d49)): the Azure worker reuses a sidecar WAV through `save_as_wav_file(..., NEVER)` instead of its own existence check; the source must now exist even when its WAV does.
 - [NB45](completed_work/NB45.md) — Implemented ([D49](DESIGN.md#d49)): video and WAV publication name their stage files through pathlib-extensions `StagedFile(..., name=...)` (pin `c679a0e`) instead of renaming inside the stage directory.
 - [NB46](completed_work/NB46.md) — Implemented ([D50](DESIGN.md#d50)): `uv.lock` replaces the `pip freeze` snapshot; the image installs it into `/opt/venv` through docker-build-common `uv_install.sh` (tag `v1.2.0`); the devcontainer adds the locked `dev` group, and `update-dependencies.sh` refreshes the lock; host Docker validation is pending.
+- [NB47](completed_work/NB47.md) — Implemented ([D52](DESIGN.md#d52)): the devcontainer's `app` service builds a `dev` target that installs the locked dev tools through `PYPI_PROXY`; production services build `runtime`, and the creation hook only checks the lock offline.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance

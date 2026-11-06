@@ -24,7 +24,7 @@ This preserves an existing file's contents. An empty file is sufficient for non-
 
 ### Dev Container (recommended)
 
-Open the repository in VS Code and reopen in the Dev Container (`.devcontainer/`). The image installs the locked runtime dependencies from `uv.lock` and the editable project into the venv at `/opt/venv`, which is first on `PATH`. The creation hook then adds the locked `dev` group with `uv sync --locked`, which fails if `uv.lock` no longer matches `pyproject.toml` and never rewrites the lock, and installs Claude Code and standalone Codex with their native installers. Codex installation is noninteractive; its installer owns command installation and shell PATH setup, and the hook verifies `codex --version`. Review tooling needs no Claude Code plugin or VS Code extension binary links. Sign in with `codex login` before using direct CLI review; [the review skill](.agents/skills/adversarial-review/SKILL.md#reviewer-session) owns dispatch and authentication checks.
+Open the repository in VS Code and reopen in the Dev Container (`.devcontainer/`). The dev container's `app` service builds the Dockerfile's `dev` target (`.devcontainer/docker-compose.devcontainer.yaml`), which installs the locked runtime and `dev` dependencies and the editable project into the venv at `/opt/venv`, first on `PATH`, with every PyPI package fetched through `PYPI_PROXY` when it is set. The workers it also starts keep the `runtime` image. The creation hook installs no Python packages: it checks offline that `uv.lock` still matches `pyproject.toml`, and fails if it doesn't, without ever rewriting the lock. It then installs Claude Code and standalone Codex with their native installers. Codex installation is noninteractive; its installer owns command installation and shell PATH setup, and the hook verifies `codex --version`. Review tooling needs no Claude Code plugin or VS Code extension binary links. Sign in with `codex login` before using direct CLI review; [the review skill](.agents/skills/adversarial-review/SKILL.md#reviewer-session) owns dispatch and authentication checks.
 
 ### Full stack with Docker Compose
 
@@ -38,7 +38,7 @@ This starts Redis, the API on port `8001`, and the YouTube, Whisper and Azure wo
 The build fetches shared helpers from GitHub at `docker-build-common` tag `v1.2.0`; set `BUILD_COMMON_CONTEXT` to a local clone to avoid fetching that helper context. Other image-build steps still need their dependencies. Compose supplies the named context automatically. A standalone build must supply it explicitly:
 
 ```sh
-docker buildx build --build-context build_common=https://github.com/liboyin/docker-build-common.git#v1.2.0 .
+docker buildx build --target runtime --build-context build_common=https://github.com/liboyin/docker-build-common.git#v1.2.0 .
 ```
 
 See [build-helper design](DESIGN.md#build-helpers-come-from-a-shared-repository) for its ownership and rationale.
@@ -110,7 +110,7 @@ Compose also reads a few **interpolation** variables (host-side paths and build 
 | `WHISPER_MODELS_VOLUME` | `whisper_models` (named volume) | Host directory or volume for the Whisper model cache. |
 | `FIREFOX_PROFILE_DIR` | `firefox_profile` (named volume) | Host Firefox profile for yt-dlp cookies; set it to download private/age-gated videos. |
 | `APT_PROXY` | empty (none) | Optional apt caching proxy used during image build. |
-| `PYPI_PROXY` | empty (none) | Optional PyPI proxy used for the image's dependency install; the dev container's `uv sync` goes to PyPI directly. |
+| `PYPI_PROXY` | empty (none) | Optional PyPI proxy for every PyPI package the image installs, including the dev container's dev tools. `update-dependencies.sh` still resolves against PyPI. |
 | `BUILD_COMMON_CONTEXT` | pinned Git URL (`docker-build-common.git#v1.2.0`) | Shared build-helper source; a local clone avoids fetching that context. |
 
 ## Updating dependencies
@@ -125,7 +125,7 @@ Compose also reads a few **interpolation** variables (host-side paths and build 
 
 uv prints each version change. To add a dependency, use `uv add <package>` for runtime or `uv add --group dev <package>` for a dev tool; it updates `pyproject.toml`, `uv.lock` and the venv together.
 
-Then review the `uv.lock` diff, run the gates under [Testing](#testing), and commit `pyproject.toml` and `uv.lock` together. The deployed image picks up the new lock on its next build. The image installs only what the lock records, and its build does not check the lock against `pyproject.toml`; the dev container's `uv sync --locked` does. [Dependency design](DESIGN.md#dependencies-are-locked-and-installed-with-uv) records the reasoning.
+Then review the `uv.lock` diff, run the gates under [Testing](#testing), and commit `pyproject.toml` and `uv.lock` together. The deployed image picks up the new lock on its next build. The image installs only what the lock records, and its build does not check the lock against `pyproject.toml`; the dev container's creation hook does. The script talks to PyPI directly, because a lock resolved through the mirror would record the mirror's URLs; rebuilding the dev container instead installs the new lock through the mirror. [Dependency design](DESIGN.md#dependencies-are-locked-and-installed-with-uv) records the reasoning.
 
 ## Testing
 

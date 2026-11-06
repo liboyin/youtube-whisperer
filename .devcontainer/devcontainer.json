@@ -1,5 +1,9 @@
 {
-    "dockerComposeFile": "../docker-compose.yaml",
+    "dockerComposeFile": [
+        "../docker-compose.yaml",
+        // builds the app service from the Dockerfile's dev target, which adds the dev tools
+        "docker-compose.devcontainer.yaml"
+    ],
     "service": "app",
     "features": {
         // base image doesn't have sudo

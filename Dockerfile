@@ -1,4 +1,8 @@
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
+# Two targets: `runtime` is what every Compose service runs, and `dev` adds the locked dev
+# group for the dev container (selected in .devcontainer/docker-compose.devcontainer.yaml).
+# Every PyPI package, dev tools included, is installed here through PYPI_PROXY when it is
+# set, so creating the dev container needs no PyPI access.
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS runtime
 
 ARG APT_PROXY
 ARG PYPI_PROXY
@@ -6,7 +10,8 @@ ARG PYPI_PROXY
 # The application runs from a uv-managed venv built from the distro's python3; uv never
 # downloads an interpreter. The venv lives outside the project directory because the dev
 # container bind-mounts the workspace over it, which would hide an in-project .venv.
-# UV_PROJECT_ENVIRONMENT points `uv sync` in the dev container at the same venv.
+# UV_PROJECT_ENVIRONMENT points the dev container's `uv sync` (update-dependencies.sh) at the
+# same venv.
 ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_DRIVER_CAPABILITIES=all \
     PYTHONFAULTHANDLER=1 \
@@ -24,7 +29,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # copied: they are build-time only, so nothing is left behind in the image. A build that
 # bypasses compose must supply the context itself, otherwise BuildKit looks for an image
 # by that name on Docker Hub:
-#   docker buildx build --build-context build_common=<git-url-or-local-clone> .
+#   docker buildx build --target runtime --build-context build_common=<git-url-or-local-clone> .
 #
 # git fetches the pathlib-extensions git dependency.
 RUN --mount=type=bind,from=build_common,target=/build-common \
@@ -38,8 +43,8 @@ RUN export DENO_INSTALL=/usr/local && curl -fsSL https://deno.land/install.sh | 
 COPY --from=ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 /uv /usr/local/bin/uv
 
 # The venv and the project directory belong to the runtime user from the start, so the dev
-# container's `uv sync` can update the venv without a recursive chown, which would copy
-# the whole venv into another layer.
+# container's `uv sync` (update-dependencies.sh) can update the venv without a recursive
+# chown, which would copy the whole venv into another layer.
 RUN install -d -o ubuntu -g ubuntu /opt/venv /workspaces/youtube-whisperer
 USER ubuntu
 WORKDIR /workspaces/youtube-whisperer
@@ -52,3 +57,13 @@ RUN --mount=type=bind,from=build_common,target=/build-common \
 COPY --chown=ubuntu . .
 RUN --mount=type=bind,from=build_common,target=/build-common \
     /build-common/uv_install.sh /opt/venv
+
+FROM runtime AS dev
+
+# Build args are scoped to the stage that declares them.
+ARG PYPI_PROXY
+
+# uv pip sync makes the venv match the export exactly, so this keeps the runtime packages and
+# the editable project and only adds the dev group.
+RUN --mount=type=bind,from=build_common,target=/build-common \
+    /build-common/uv_install.sh /opt/venv --group dev
