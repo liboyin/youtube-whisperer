@@ -50,6 +50,7 @@ docker-compose*.yaml
 
 # Scripts
 check-coverage.sh
+update-dependencies.sh
 extract_subtitle_text.sh
 ls_mp4_without_srt.sh
 

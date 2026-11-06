@@ -115,17 +115,17 @@ Compose also reads a few **interpolation** variables (host-side paths and build 
 
 ## Updating dependencies
 
-`pyproject.toml` declares dependencies: runtime ones under `[project]` and dev tools in the `dev` dependency group. `uv.lock` pins the full resolution, including artifact hashes and the `pathlib-extensions` commit. Only `uv lock` and the commands below change the lock; rebuilding the container never does. Run them in the dev container:
+`pyproject.toml` declares dependencies: runtime ones under `[project]` and dev tools in the `dev` dependency group. `uv.lock` pins the full resolution, including artifact hashes and the `pathlib-extensions` commit. The lock changes only through deliberate commands (`uv lock`, the update script below, or `uv add`); rebuilding the container never changes it. Refresh it from the dev container with the update script, which locks and then applies the new lock to the dev container's venv with `uv sync --locked`:
 
 ```sh
-uv lock --upgrade                                  # refresh every package to its newest allowed version
-uv lock --upgrade-package yt-dlp                   # refresh one package (also bumps the pathlib-extensions commit when named)
-uv add <package>                                   # add a runtime dependency
-uv add --group dev <package>                       # add a dev tool
-uv sync --locked                                   # apply the lock to the dev container's venv
+./update-dependencies.sh                          # move every package to the newest version pyproject.toml allows
+./update-dependencies.sh yt-dlp                   # move only the named packages
+./update-dependencies.sh pathlib-extensions       # bump the git dependency to its latest commit
 ```
 
-Review the `uv.lock` diff, run the gates under [Testing](#testing), and commit `pyproject.toml` and `uv.lock` together. The deployed image picks up the new lock on its next build. The image installs only what the lock records, and its build does not check the lock against `pyproject.toml`; the dev container's `uv sync --locked` does. [Dependency design](DESIGN.md#dependencies-are-locked-and-installed-with-uv) records the reasoning.
+uv prints each version change. To add a dependency, use `uv add <package>` for runtime or `uv add --group dev <package>` for a dev tool; it updates `pyproject.toml`, `uv.lock` and the venv together.
+
+Then review the `uv.lock` diff, run the gates under [Testing](#testing), and commit `pyproject.toml` and `uv.lock` together. The deployed image picks up the new lock on its next build. The image installs only what the lock records, and its build does not check the lock against `pyproject.toml`; the dev container's `uv sync --locked` does. [Dependency design](DESIGN.md#dependencies-are-locked-and-installed-with-uv) records the reasoning.
 
 ## Testing
 

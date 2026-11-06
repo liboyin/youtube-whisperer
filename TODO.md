@@ -70,7 +70,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [N13](completed_work/N13.md) — Implemented: the four synchronous API endpoint bodies are underscore-prefixed internals, API tests follow source order, and archive mentions link their completion records.
 - [N14](completed_work/N14.md) — Implemented: the shell-tool tests share one owned bash-subprocess fixture, and README describes what `extract_subtitle_text.sh` removes.
 - [NB3](completed_work/NB3.md) — Implemented ([D45](DESIGN.md#d45)): `requires-python` is `>=3.12`, the only version any repository environment runs; the former `>=3.10` floor was incompatible with the source's `typing.Self` import.
-- [NB5](completed_work/NB5.md) — Resolved by NB46 ([D50](DESIGN.md#d50)): creating the devcontainer no longer rewrites a lock file; `uv lock` refreshes `uv.lock` deliberately.
+- [NB5](completed_work/NB5.md) — Resolved by NB46 ([D50](DESIGN.md#d50)): creating the devcontainer no longer rewrites a lock file; `update-dependencies.sh` refreshes `uv.lock` deliberately.
 - [NB8](completed_work/NB8.md) — Implemented: video titles and template metacharacters no longer alter download paths; titles never enter yt-dlp's output template.
 - [NB9](completed_work/NB9.md) — Implemented: every started Azure recognition session is stopped on success, timeout, cancellation, startup failure or interruption; duration inspection precedes recognizer creation, and failures write no SRT.
 - [NB11](completed_work/NB11.md) — Implemented: authorized video replacement publishes atomically after a completed staged download; failed downloads keep the previous video.
@@ -95,7 +95,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB43](completed_work/NB43.md) — Implemented ([D49](DESIGN.md#d49)): `save_segments_as_srt` and `deduplicate_srt_file` default to `ALWAYS` like `publish_srt_text`, so in-place deduplication works without an explicit policy.
 - [NB44](completed_work/NB44.md) — Implemented ([D49](DESIGN.md#d49)): the Azure worker reuses a sidecar WAV through `save_as_wav_file(..., NEVER)` instead of its own existence check; the source must now exist even when its WAV does.
 - [NB45](completed_work/NB45.md) — Implemented ([D49](DESIGN.md#d49)): video and WAV publication name their stage files through pathlib-extensions `StagedFile(..., name=...)` (pin `c679a0e`) instead of renaming inside the stage directory.
-- [NB46](completed_work/NB46.md) — Implemented ([D50](DESIGN.md#d50)): `uv.lock` replaces the `pip freeze` snapshot; the image installs it into `/opt/venv` through docker-build-common `uv_install.sh` (tag `v1.2.0`, to be pushed by the user) and the devcontainer adds the locked `dev` group; host Docker validation is pending.
+- [NB46](completed_work/NB46.md) — Implemented ([D50](DESIGN.md#d50)): `uv.lock` replaces the `pip freeze` snapshot; the image installs it into `/opt/venv` through docker-build-common `uv_install.sh` (tag `v1.2.0`); the devcontainer adds the locked `dev` group, and `update-dependencies.sh` refreshes the lock; host Docker validation is pending.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance
