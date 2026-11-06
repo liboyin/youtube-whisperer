@@ -216,6 +216,12 @@ For non-WAV input, the Azure worker calls `save_as_wav_file` under `NEVER`, whic
 
 Whisper decoding passes the input path to ffmpeg and captures the complete mono PCM16 output in Python before converting it to a one-dimensional normalized float32 waveform. If decoding produces no samples, file transcription raises an error before loading the model or writing an SRT. The worker records that failure in the dead-letter list before acknowledging and deleting the task; if recording fails, the task remains pending. An existing SRT still satisfies the worker's `NEVER` policy without decoding the media.
 
+### Future transcription platform evaluation
+
+| ID | Accepted decision and rationale | Applies to |
+|---|---|---|
+| <a id="d53"></a>D53 | **Future evaluation direction, not implemented architecture (2026-11-06):** the user wants native Apple silicon GPU/ANE transcription while retaining NVIDIA CUDA and cloud options, accepts different backends when performance justifies them, and prioritizes single-file transcription. Evaluate full Whisper large-v3 on both platforms before choosing; within-file batching remains worth testing. The user selected `media-transcriber` and `youtube-collector` as the spin-off project names: the former stays independent of inference engine/hardware, and the latter encompasses media, captions, metadata and comments. Name availability is unverified. Component/repository extraction, queue topology and production backend choices remain proposals. The user requested a written handoff for separate follow-up sessions. | [Discussion and experiment handoff](TRANSCRIPTION_REDESIGN.md); future bounded assignments in TODO |
+
 ### Dual transcription engines
 
 The project started as a privacy-focused transcriber using Whisper. Azure Speech was added later for two reasons: (1) transcribing public content where on-device privacy guarantees are unnecessary, and (2) working around occasional Whisper failures on non-English audio. The recorded selection rationale was cost in the Sydney, Australia region; this is historical context, not a current pricing comparison.

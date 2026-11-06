@@ -54,6 +54,8 @@ None open.
 
 ## Readiness and unresolved choices
 
+The [transcription redesign discussion and experiment handoff](TRANSCRIPTION_REDESIGN.md) preserves the Apple/CUDA research, single-file priority, architecture proposals and suggested follow-up sessions under [D53](DESIGN.md#d53). It is not an implementation assignment; establish bounded TODO tasks when selecting the platform experiments or later extraction work. No backend or repository split has been selected.
+
 NB2 needs its investigation gate cleared first.
 
 All entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming is settled by [D47](DESIGN.md#d47); playlist continuation is settled by [D17](DESIGN.md#d17). [D14](DESIGN.md#d14)/[D16](DESIGN.md#d16) settle the configuration and caption-error outcomes; N7/N8 are resolved; NB24 implemented D16.
