@@ -3,36 +3,52 @@ FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
 ARG APT_PROXY
 ARG PYPI_PROXY
 
+# The application runs from a uv-managed venv built from the distro's python3; uv never
+# downloads an interpreter. The venv lives outside the project directory because the dev
+# container bind-mounts the workspace over it, which would hide an in-project .venv.
+# UV_PROJECT_ENVIRONMENT points `uv sync` in the dev container at the same venv.
 ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_DRIVER_CAPABILITIES=all \
     PYTHONFAULTHANDLER=1 \
-    PYTHONUNBUFFERED=1
-
-WORKDIR /workspaces/youtube-whisperer
+    PYTHONUNBUFFERED=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH
 
 # Install OS packages and pinned Python dependencies first, so editing source does not
 # invalidate these layers and force a full dependency reinstall on every rebuild.
 #
-# The apt/pip steps use the shared build helpers, supplied as the named build context
+# The apt/uv steps use the shared build helpers, supplied as the named build context
 # `build_common` and pinned in docker-compose.cpu.yaml. They are bind-mounted rather than
 # copied: they are build-time only, so nothing is left behind in the image. A build that
 # bypasses compose must supply the context itself, otherwise BuildKit looks for an image
 # by that name on Docker Hub:
 #   docker buildx build --build-context build_common=<git-url-or-local-clone> .
+#
+# git fetches the pathlib-extensions git dependency.
 RUN --mount=type=bind,from=build_common,target=/build-common \
-    /build-common/apt_install.sh curl ffmpeg git python3 python3-pip unzip
+    /build-common/apt_install.sh curl ffmpeg git python3 unzip
 
 # Deno is yt-dlp's JavaScript runtime (`js_runtimes` in youtube_whisperer/downloaders/).
-# The symlink exposes the distro's python3 as `python`, which the compose entrypoints call.
-RUN export DENO_INSTALL=/usr/local && curl -fsSL https://deno.land/install.sh | sh \
-    && ln -s "$(which python3)" "$(dirname "$(which python3)")/python"
+RUN export DENO_INSTALL=/usr/local && curl -fsSL https://deno.land/install.sh | sh
 
-COPY --chown=ubuntu requirements.txt ./
+# uv stays in the image because the dev container runs it (`uv sync`, `uv lock`). The tag
+# names the version; the digest makes the pin immutable.
+COPY --from=ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 /uv /usr/local/bin/uv
+
+# The venv and the project directory belong to the runtime user from the start, so the dev
+# container's `uv sync` can update the venv without a recursive chown, which would copy
+# the whole venv into another layer.
+RUN install -d -o ubuntu -g ubuntu /opt/venv /workspaces/youtube-whisperer
+USER ubuntu
+WORKDIR /workspaces/youtube-whisperer
+
+COPY --chown=ubuntu pyproject.toml uv.lock .python-version ./
 RUN --mount=type=bind,from=build_common,target=/build-common \
-    /build-common/pip_install.sh requirements.txt
+    /build-common/uv_install.sh /opt/venv --no-emit-project
 
 # Copy the rest of the source and install the project itself in editable mode.
 COPY --chown=ubuntu . .
-RUN pip install -e .
-
-USER ubuntu
+RUN --mount=type=bind,from=build_common,target=/build-common \
+    /build-common/uv_install.sh /opt/venv

@@ -48,89 +48,13 @@ None open.
 
 **Validated — no `[tool.ruff]` configuration exists at 98c4518.** Only the default `E4`, `E7`, `E9`, and `F` rules are active, so nothing enforces line length, import ordering, docstring style, or common-bug patterns. AGENTS requires narrow, justified lint exceptions, but almost nothing currently produces one. **Paths:** [pyproject.toml](pyproject.toml). **Direction:** after the inventory required by the investigation gate, select a broader set. Pydocstyle with the Google convention would mechanize the docstring rule that AGENTS states in prose. **Acceptance:** `ruff check .` passes under the expanded selection and every `noqa` carries the rationale AGENTS requires. **Non-goals:** restructuring code beyond what the selected rules demand. **Current inventory — 2026-09-12:** source still uses `Any` in language-schema hooks, playlist metadata, Azure callbacks, and model parameters; several source classes lack docstrings. Tests also retain string-based patches (for example `tests/transcriber/test_model_parameters.py:7`) and alternate import forms. Inventory these separately from runtime defects, and distinguish rules Ruff can enforce from typing or test-structure work; do not claim broader lint selection alone resolves them.
 
-#### NB5 — Lock-file regeneration is a side effect of creating the container
-
-**Validated — [postCreateCommand.sh](.devcontainer/postCreateCommand.sh) at 98c4518.** Inherited from legacy finding 26. `pip freeze` rewrites `requirements.txt` on every devcontainer create, so the lock file changes on a plain rebuild rather than when dependencies actually change; the repeated "Updated dependencies" commits come from this. README now documents the behavior as it is. **Direction:** make regeneration deliberate. PLAN.md proposed an `update_lock.sh`, that script was never added, and the user has since said it is not the intended route, so the mechanism is an open question for the user. **Acceptance:** opening the devcontainer no longer modifies `requirements.txt`, and README documents how the lock file is refreshed instead. **Disposition (2026-11-06):** the user chose the mechanism, uv ([D50](DESIGN.md#d50)); NB46 resolves this finding and closes it alongside its own record.
-
-#### NB46 — Migrate dependency management to uv
-
-**Validated — revision aa840df on 2026-11-06; user-requested change under [D50](DESIGN.md#d50).** This is the full execution boundary and its single authoritative copy.
-
-**Intent.** Replace the `pip freeze` snapshot with a uv lock: dependencies resolve from `pyproject.toml` into a committed `uv.lock`; the image installs that lock into `/opt/venv` through a shared `docker-build-common` helper; the devcontainer adds the locked `dev` group; and the lock changes only when someone runs `uv lock`. This resolves [NB5](#nb5--lock-file-regeneration-is-a-side-effect-of-creating-the-container).
-
-**Dependencies.** [D50](DESIGN.md#d50) and its recorded proxy evidence; [D45](DESIGN.md#d45) and [D51](DESIGN.md#d51) (Python 3.12); the [build-helper design](DESIGN.md#build-helpers-come-from-a-shared-repository); [D10](DESIGN.md#d10) (the devcontainer starts the workers). The library helper must be pushed and tagged by the user before this repository's pin resolves without `BUILD_COMMON_CONTEXT`.
-
-**Implementation direction — `docker-build-common` (local clone `/workspaces/docker-build-common`, branch `uv` from `main` at 1b8c221).** Add `uv_install.sh <venv-dir> [uv-export-option]...`, leaving `apt_install.sh` and `pip_install.sh` unchanged. Run from the project directory, the helper:
-
-1. Fails with exit 2 when no venv directory is given or `uv` is not on `PATH`, and with exit 1 when `uv.lock` is missing.
-2. Maps a non-empty `PYPI_PROXY` to `UV_DEFAULT_INDEX`, plus `UV_INSECURE_HOST` for the derived hostname, matching `pip_install.sh`'s `index-url`/`trusted-host` semantics. These are set for the helper's own processes only and never written to persistent uv configuration, because a persistent index would make later `uv lock` runs record the proxy URL in the lock.
-3. Disables the uv cache, so no cache is left in the layer.
-4. Creates the venv if absent (`uv venv --allow-existing`), honouring the consumer's `.python-version` and uv environment.
-5. Exports the lock with `uv export --frozen --no-default-groups --format requirements.txt` plus forwarded options, to a temporary file it removes afterwards. `--frozen` is required because `--locked` fails behind a mirror (D50 evidence).
-6. Installs the export with `uv pip sync`, which makes the venv exactly match the export and verifies every hash present. When the export contains no requirements it reports that and skips the install.
-
-Without `--no-emit-project` the export includes the project itself, editable by default, so one helper serves both the dependency layer and the project install, and both go through the proxy. Bytecode is not precompiled, matching `pip_install.sh`. `tests/run.sh` gains cases that put a stub `uv` on `PATH` to record arguments and environment, without network access. README documents the helper. The intended release tag is `v1.2.0`: a minor version, because the change only adds a script (an assumption; the user owns tagging).
-
-**Implementation direction — this repository.**
-
-- `pyproject.toml`: move `dev` to `[dependency-groups]`.
-- `.python-version`: `3.12`.
-- Add a `uv.lock` seeded with the versions of the current `requirements.txt` snapshot, then confirm that an unconstrained `uv lock` keeps it unchanged.
-- Delete `requirements.txt`.
-- `Dockerfile`:
-  - Copy uv 0.13.7 from `ghcr.io/astral-sh/uv`, pinned by tag and digest, into `/usr/local/bin`, because the devcontainer needs uv at runtime.
-  - Set `VIRTUAL_ENV`, `UV_PROJECT_ENVIRONMENT=/opt/venv`, `PATH` and `UV_PYTHON_DOWNLOADS=never`.
-  - Pre-create `/opt/venv` and the project directory owned by `ubuntu`, then run the uv steps as `ubuntu`. This avoids a recursive `chown`, which would duplicate the venv into another layer, and lets the devcontainer's `uv sync` write to the venv. The runtime user can already write the editable source tree, so this adds no new write surface.
-  - Install dependencies from `pyproject.toml`, `uv.lock` and `.python-version` before `COPY . .`, then install the editable project after it.
-  - Drop `python3-pip` from the apt list and remove the `python` symlink; the venv provides `python` for the Compose entrypoints and `check-coverage.sh`.
-- Compose: pin the helper tag (`v1.2.0`).
-- `postCreateCommand.sh`: remove the `pip freeze` line, and replace `sudo pip install -e .[dev]` with `uv sync --locked`.
-- README: update the Dev Container, Compose helper pin, Local install, configuration-table and Updating dependencies sections, the last with the deliberate lock-refresh procedure (`uv lock --upgrade`, `--upgrade-package`, `uv add`).
-- DESIGN: turn D50's section into current behavior and update the build-helper section.
-- TODO: archive NB46 and NB5.
-
-**Compatibility surface.** No Python API, HTTP contract or worker CLI changes. Preserved: Compose service entrypoints (`uvicorn`, `python -m youtube_whisperer.workers ...`) resolve to the venv; the project stays editable at `/workspaces/youtube-whisperer`; the `PYPI_PROXY`, `APT_PROXY` and `BUILD_COMMON_CONTEXT` variables keep their meaning for the image build. Changed and documented: `pip install -e '.[dev]'` becomes `uv sync`, since the `dev` extra no longer exists; the devcontainer's dev-tool install no longer uses `PYPI_PROXY`; and `requirements.txt` is gone.
-
-**Non-goals.**
-
-- Upgrading any dependency version.
-- Changing the interpreter, CUDA base image or build backend (setuptools stays).
-- Precompiling bytecode or adding a uv cache mount.
-- Changing `pip_install.sh` or `apt_install.sh`.
-- Pushing or tagging the library.
-- CI.
-- NB31's Compose deduplication.
-
-**Validation.** This container has no Docker, so image builds and the library's Docker-based `tests/run.sh` cannot run here.
-
-- Locally, with all uv state in the scratchpad:
-  - Run the helper for real against the local proxy mirror into scratch venvs, covering the dependency layer and the editable project. Confirm that every artifact comes through the mirror and that a corrupted hash fails.
-  - Run the stub-based helper cases.
-  - Verify the lock seed against the snapshot.
-  - Run the full AGENTS gates in a venv built from the lock with the `dev` group.
-- The user, on the host, after the library is pushed:
-  - Run `tests/run.sh`.
-  - Rebuild the devcontainer, then confirm that `git status` is clean, that `uv sync --locked` succeeds, and that `python` and `uvicorn` resolve to `/opt/venv`.
-  - Do a Compose smoke run of the API and every worker on GPU and CPU, plus a production image check that dev tools are absent.
-
-Steps not performed are recorded as limitations. The adversarial review covers both repositories' diffs.
-
-**Done criteria.**
-
-- A devcontainer rebuild leaves the repository unmodified.
-- The image installs exactly the locked runtime set through `PYPI_PROXY` when it is set.
-- Gates pass from the locked dev environment.
-- README describes the deliberate refresh procedure.
-- The review has no unresolved Blocking findings.
-- NB46 and NB5 are archived with their records.
-
 #### NB31 — Compose repeats the shared application-service configuration
 
 **Severity: Low. Validated structural observation — source inventory at ed9b3a1 on 2026-09-14; proposed simplification.** [CPU Compose](docker-compose.cpu.yaml):25–83 repeats build, init, restart, volumes, environment, env-file, and Redis-health dependency settings across four application services. Existing anchors cover build and volumes separately but leave the common service block repeated. **Outcome:** one local extension mapping supplies common application defaults; service names, entrypoints, ports, and GPU overrides remain explicit. **Acceptance:** expanded CPU and GPU configurations match the originals using only synthetic environment values/files; preserve all services, volumes, health conditions, and overrides. **Dependencies:** [D10](DESIGN.md#d10) intentionally starts workers with the devcontainer. Keep Redis separate and do not add generated configuration, another Compose file, or altered resource sharing.
 
 ## Readiness and unresolved choices
 
-NB2 needs its investigation gate cleared first. NB46 is bounded and in progress; NB5 closes with it.
+NB2 needs its investigation gate cleared first.
 
 All entries are compact findings, not implementation assignments: expand each boundary first and honor its explicit product-policy dependencies. Naming is settled by [D47](DESIGN.md#d47); playlist continuation is settled by [D17](DESIGN.md#d17). [D14](DESIGN.md#d14)/[D16](DESIGN.md#d16) settle the configuration and caption-error outcomes; N7/N8 are resolved; NB24 implemented D16.
 
@@ -146,6 +70,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [N13](completed_work/N13.md) — Implemented: the four synchronous API endpoint bodies are underscore-prefixed internals, API tests follow source order, and archive mentions link their completion records.
 - [N14](completed_work/N14.md) — Implemented: the shell-tool tests share one owned bash-subprocess fixture, and README describes what `extract_subtitle_text.sh` removes.
 - [NB3](completed_work/NB3.md) — Implemented ([D45](DESIGN.md#d45)): `requires-python` is `>=3.12`, the only version any repository environment runs; the former `>=3.10` floor was incompatible with the source's `typing.Self` import.
+- [NB5](completed_work/NB5.md) — Resolved by NB46 ([D50](DESIGN.md#d50)): creating the devcontainer no longer rewrites a lock file; `uv lock` refreshes `uv.lock` deliberately.
 - [NB8](completed_work/NB8.md) — Implemented: video titles and template metacharacters no longer alter download paths; titles never enter yt-dlp's output template.
 - [NB9](completed_work/NB9.md) — Implemented: every started Azure recognition session is stopped on success, timeout, cancellation, startup failure or interruption; duration inspection precedes recognizer creation, and failures write no SRT.
 - [NB11](completed_work/NB11.md) — Implemented: authorized video replacement publishes atomically after a completed staged download; failed downloads keep the previous video.
@@ -170,6 +95,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB43](completed_work/NB43.md) — Implemented ([D49](DESIGN.md#d49)): `save_segments_as_srt` and `deduplicate_srt_file` default to `ALWAYS` like `publish_srt_text`, so in-place deduplication works without an explicit policy.
 - [NB44](completed_work/NB44.md) — Implemented ([D49](DESIGN.md#d49)): the Azure worker reuses a sidecar WAV through `save_as_wav_file(..., NEVER)` instead of its own existence check; the source must now exist even when its WAV does.
 - [NB45](completed_work/NB45.md) — Implemented ([D49](DESIGN.md#d49)): video and WAV publication name their stage files through pathlib-extensions `StagedFile(..., name=...)` (pin `c679a0e`) instead of renaming inside the stage directory.
+- [NB46](completed_work/NB46.md) — Implemented ([D50](DESIGN.md#d50)): `uv.lock` replaces the `pip freeze` snapshot; the image installs it into `/opt/venv` through docker-build-common `uv_install.sh` (tag `v1.2.0`, to be pushed by the user) and the devcontainer adds the locked `dev` group; host Docker validation is pending.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance
