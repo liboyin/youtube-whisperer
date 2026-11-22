@@ -1,7 +1,66 @@
 # Dev container override, layered on ../docker-compose.yaml by devcontainer.json. Only the
 # service the dev container attaches to gets the dev target, which adds the locked dev group
 # through PYPI_PROXY at build time; the workers it also starts keep the runtime image.
+#
+# `!override` (Compose 2.24.4 or later) replaces each service's production mount list instead
+# of merging with it, so no ASSETS_DIR, WHISPER_MODELS_VOLUME or FIREFOX_PROFILE_DIR setting in
+# .env can reach the dev container (DESIGN decision D54): every service gets a throwaway media
+# library, its own model cache, no browser profile and its own Redis volume. The opt-in
+# real-data configuration (real-data/) layers the real library, model cache and a read-only
+# profile back on top of this file.
+#
+# The dev container's own Compose project, which overrides the production project because the
+# last file's name wins. Production keeps its unnamed default, the repository directory's name
+# (youtube-whisperer), so its existing Redis queue and volumes are untouched. Dev Containers CLI
+# 0.60 and later reads the name from the merged configuration. The real-data configuration
+# layers on this file and shares the project.
+name: youtube-whisperer-dev
+
 services:
   app:
     build:
       target: dev
+    # The dev container runs its own command (devcontainer.json's overrideCommand), publishes no
+    # port and has no fixed container name, so it never collides with the production stack on
+    # the same Docker daemon, and is not restarted by Docker.
+    container_name: !reset null
+    ports: !reset []
+    restart: "no"
+    # Claude Code and Codex state lives on the dev_persist volume, which survives sessions and
+    # rebuilds on this machine; only `docker compose down -v` deletes it. The creation hook creates
+    # these directories. CLAUDE_CONFIG_DIR also moves ~/.claude.json, so Claude Code's settings,
+    # history, memory and sign-in persist; CODEX_HOME does the same for Codex. Nothing here is
+    # shared with other machines; only the Git repository is.
+    environment:
+      CLAUDE_CONFIG_DIR: /home/ubuntu/persist/claude
+      CODEX_HOME: /home/ubuntu/persist/codex
+    volumes: !override
+      - dev_assets:/workspaces/youtube-whisperer/assets
+      - dev_models:/home/ubuntu/.whisper
+      - dev_persist:/home/ubuntu/persist
+
+  youtube_worker:
+    volumes: !override
+      - dev_assets:/workspaces/youtube-whisperer/assets
+      - dev_models:/home/ubuntu/.whisper
+
+  whisper_worker:
+    volumes: !override
+      - dev_assets:/workspaces/youtube-whisperer/assets
+      - dev_models:/home/ubuntu/.whisper
+
+  azure_worker:
+    volumes: !override
+      - dev_assets:/workspaces/youtube-whisperer/assets
+      - dev_models:/home/ubuntu/.whisper
+
+  redis:
+    container_name: !reset null
+    volumes: !override
+      - dev_redis:/data
+
+volumes:
+  dev_assets:
+  dev_models:
+  dev_persist:
+  dev_redis:

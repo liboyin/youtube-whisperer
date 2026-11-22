@@ -1,0 +1,52 @@
+{
+    // Opt-in configuration that mounts the REAL media library and model cache, and a read-only
+    // bind mount of the real Firefox profile when FIREFOX_PROFILE_DIR is set (DESIGN decision
+    // D54). Its workers process real tasks from the development queue. Opening it authorizes no
+    // agent run against real data or live services, and tests still use only test-owned storage.
+    // Identical to ../devcontainer.json except for the name and the extra Compose file; keep them
+    // in step.
+    "name": "youtube-whisperer (REAL DATA)",
+    "dockerComposeFile": [
+        "../../docker-compose.yaml",
+        "../docker-compose.devcontainer.yaml",
+        // adds the real library, model cache and profile back; fails unless ASSETS_DIR is set
+        "docker-compose.real-data.yaml"
+    ],
+    "service": "app",
+    "features": {
+        // base image doesn't have sudo
+        "ghcr.io/devcontainers/features/common-utils:latest": {
+            "configureZshAsDefaultShell": true
+        }
+    },
+    "overrideCommand": true,
+    "postCreateCommand": "chmod +x .devcontainer/postCreateCommand.sh && ./.devcontainer/postCreateCommand.sh",
+    "remoteUser": "ubuntu",
+    "workspaceFolder": "/workspaces/youtube-whisperer",
+    "mounts": [
+        // share Git config between host and container; SSH authentication uses the agent VS Code
+        // forwards, so no key files are mounted (DESIGN decision D55)
+        "source=${localEnv:HOME}/.gitconfig,target=/home/ubuntu/.gitconfig,type=bind,readonly",
+        // overlay the image's project directory with the whole workspace, including files the
+        // build context excludes
+        "source=${localWorkspaceFolder},target=/workspaces/youtube-whisperer,type=bind"
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "anthropic.claude-code",
+                "charliermarsh.ruff",
+                "mhutchie.git-graph",
+                "ms-python.debugpy",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-vscode.live-server",
+                "openai.chatgpt",
+                "ryu1kn.partial-diff",
+                "streetsidesoftware.code-spell-checker",
+                "tamasfe.even-better-toml",
+                "yzhang.markdown-all-in-one"
+            ]
+        }
+    }
+}

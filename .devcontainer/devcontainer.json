@@ -1,7 +1,12 @@
 {
+    // Development-only storage; real-data/devcontainer.json is the opt-in configuration that
+    // mounts the real media library, model cache and Firefox profile (DESIGN decision D54). Keep
+    // the two files in step.
+    "name": "youtube-whisperer",
     "dockerComposeFile": [
         "../docker-compose.yaml",
-        // builds the app service from the Dockerfile's dev target, which adds the dev tools
+        // builds the app service from the Dockerfile's dev target and replaces every service's
+        // production mounts with development-only volumes
         "docker-compose.devcontainer.yaml"
     ],
     "service": "app",
@@ -16,10 +21,11 @@
     "remoteUser": "ubuntu",
     "workspaceFolder": "/workspaces/youtube-whisperer",
     "mounts": [
-        // share Git + SSH config between host and container
+        // share Git config between host and container; SSH authentication uses the agent VS Code
+        // forwards, so no key files are mounted (DESIGN decision D55)
         "source=${localEnv:HOME}/.gitconfig,target=/home/ubuntu/.gitconfig,type=bind,readonly",
-        "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind,readonly",
-        // override .dockerignore to mount the entire workspace
+        // overlay the image's project directory with the whole workspace, including files the
+        // build context excludes
         "source=${localWorkspaceFolder},target=/workspaces/youtube-whisperer,type=bind"
     ],
     "customizations": {

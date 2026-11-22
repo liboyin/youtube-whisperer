@@ -2924,6 +2924,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "pytest-randomly" },
+    { name = "pyyaml" },
     { name = "ruff" },
 ]
 
@@ -2951,6 +2952,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "pytest-randomly" },
+    { name = "pyyaml" },
     { name = "ruff" },
 ]
 

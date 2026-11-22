@@ -58,10 +58,22 @@ COPY --chown=ubuntu . .
 RUN --mount=type=bind,from=build_common,target=/build-common \
     /build-common/uv_install.sh /opt/venv
 
+# Mount points of the media library and the model cache, created by the runtime user. Docker
+# initializes a new named volume from the image's directory, ownership included, so the
+# runtime user can write there; without these directories a new volume, such as the dev
+# container's dev_assets and dev_models, would belong to root. The build context excludes
+# assets/, so the COPY above does not create it. These are the last runtime steps, so a change
+# here does not invalidate the dependency layers.
+RUN install -d /workspaces/youtube-whisperer/assets /home/ubuntu/.whisper
+
 FROM runtime AS dev
 
 # Build args are scoped to the stage that declares them.
 ARG PYPI_PROXY
+
+# Mount point of the dev container's dev_persist volume (Claude Code and Codex state),
+# created by the runtime user so a new volume initializes writable for it.
+RUN install -d /home/ubuntu/persist
 
 # uv pip sync makes the venv match the export exactly, so this keeps the runtime packages and
 # the editable project and only adds the dev group.

@@ -33,6 +33,7 @@ dev = [
   "pytest-cov",
   "pytest-mock",
   "pytest-randomly",
+  "pyyaml",
   "ruff",
 ]
 

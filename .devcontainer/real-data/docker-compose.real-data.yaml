@@ -1,0 +1,24 @@
+# Opt-in real-data layer for the dev container, applied after ../docker-compose.devcontainer.yaml
+# by real-data/devcontainer.json only (DESIGN decision D54). Compose merges volumes by container
+# path, so the real media library and model cache replace the throwaway volumes, the profile is
+# added read-only, and the development Redis volume stays: a development stack never shares the
+# production queue. `:?` makes the configuration fail instead of silently falling back to the
+# throwaway library when ASSETS_DIR is unset or empty. The model cache and the profile fall back
+# to development storage, as the production defaults fall back to empty named volumes.
+x-real-data: &real-data
+  environment:
+    # Lets tests and scripts tell that real data is mounted.
+    WHISPERER_REAL_DATA: "1"
+  volumes:
+    - ${ASSETS_DIR:?the real-data dev container requires ASSETS_DIR}:/workspaces/youtube-whisperer/assets
+    - ${WHISPER_MODELS_VOLUME:-dev_models}:/home/ubuntu/.whisper
+    - ${FIREFOX_PROFILE_DIR:-dev_firefox_profile}:/home/ubuntu/snap/firefox/common/.mozilla/firefox:ro
+
+services:
+  app: *real-data
+  youtube_worker: *real-data
+  whisper_worker: *real-data
+  azure_worker: *real-data
+
+volumes:
+  dev_firefox_profile:

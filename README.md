@@ -20,11 +20,37 @@ Before opening the devcontainer or starting Compose, create the required ignored
 touch .env
 ```
 
-This preserves an existing file's contents. An empty file is sufficient for non-Azure use; add `AZURE_SPEECH_API_KEY` and `AZURE_SERVICE_REGION` to use Azure. Review the host path settings in [Configuration](#configuration) before startup: the devcontainer intentionally starts workers against the configured queues and mounted volumes.
+This preserves an existing file's contents. An empty file is sufficient for non-Azure use; add `AZURE_SPEECH_API_KEY` and `AZURE_SERVICE_REGION` to use Azure. Review the host path settings in [Configuration](#configuration) before you start the production stack or the REAL DATA dev container; the default dev container ignores them.
 
 ### Dev Container (recommended)
 
-Open the repository in VS Code and reopen in the Dev Container (`.devcontainer/`). The dev container's `app` service builds the Dockerfile's `dev` target (`.devcontainer/docker-compose.devcontainer.yaml`), which installs the locked runtime and `dev` dependencies and the editable project into the venv at `/opt/venv`, first on `PATH`, with every PyPI package fetched through `PYPI_PROXY` when it is set. The workers it also starts keep the `runtime` image. The creation hook installs no Python packages: it checks offline that `uv.lock` still matches `pyproject.toml`, and fails if it doesn't, without ever rewriting the lock. It then installs Claude Code and standalone Codex with their native installers. Codex installation is noninteractive; its installer owns command installation and shell PATH setup, and the hook verifies `codex --version`. Review tooling needs no Claude Code plugin or VS Code extension binary links. Sign in with `codex login` before using direct CLI review; [the review skill](.agents/skills/adversarial-review/SKILL.md#reviewer-session) owns dispatch and authentication checks.
+Open the repository in VS Code and reopen it in the Dev Container (`.devcontainer/`).
+
+**The image.** The dev container's `app` service builds the Dockerfile's `dev` target (`.devcontainer/docker-compose.devcontainer.yaml`), which installs the locked runtime and `dev` dependencies and the editable project into the venv at `/opt/venv`, first on `PATH`, with every PyPI package fetched through `PYPI_PROXY` when it is set. The workers it also starts keep the `runtime` image.
+
+**The creation hook.** The hook installs no Python packages. It does these steps:
+
+1. It checks offline that `uv.lock` still matches `pyproject.toml`, and it fails if they differ. It never rewrites the lock.
+2. It creates the Claude Code and Codex state directories on the `dev_persist` volume, so sign-ins, settings and history survive rebuilds on this machine.
+3. It runs `.devcontainer/setup-github-ssh.sh`, which fetches GitHub's SSH host keys over HTTPS from `api.github.com/meta` and writes them to `~/.ssh/known_hosts`.
+4. It clones [agent-workflow-common](https://github.com/liboyin/agent-workflow-common) into `~/persist/agent-workflow-common` on the first creation and links it at `/workspaces/agent-workflow-common` ([D56](DESIGN.md#d56)). Later creations reuse the checkout without pulling or resetting it, so run `git pull` there yourself to update it. The hook stops, and preserves both paths, if the link path is taken by something else or the checkout is not a valid checkout with the shared tools.
+5. It installs Claude Code and standalone Codex with their native installers.
+
+Sign in with `codex login` before using direct CLI review; [the review skill](.agents/skills/adversarial-review/SKILL.md#reviewer-session) owns dispatch and authentication checks.
+
+**Git over SSH.** The container mounts your `~/.gitconfig` read-only and mounts no SSH keys ([D55](DESIGN.md#d55)). Git over SSH uses the SSH agent that VS Code forwards from the host. Load your key into the host's agent, for example with `ssh-add`, before you open the container, then check with `ssh-add -l` inside it.
+
+**The default configuration** ([D54](DESIGN.md#d54)) starts Redis, the API container and the three workers, like the production stack, but against development-only storage. Whatever `.env` sets, every service gets a throwaway `dev_assets` media library and its own `dev_models` model cache, no browser profile is mounted, and Redis keeps its queue in its own `dev_redis` volume. The first transcription therefore downloads the Whisper model into `dev_models`. The dev container's Compose project is `youtube-whisperer-dev`. It publishes no port and fixes no container name, so it can run beside the production stack, whose project keeps the repository directory's name and its existing volumes.
+
+**The REAL DATA configuration.** The second configuration, **youtube-whisperer (REAL DATA)** (`.devcontainer/real-data/`), is for sessions that deliberately need the real media library, for example to let the workers process real tasks. VS Code offers it when you reopen in the container.
+
+- It mounts `ASSETS_DIR` as the media library in the API container and every worker, and refuses to start unless `ASSETS_DIR` is set.
+- It mounts `WHISPER_MODELS_VOLUME` as the model cache, and `FIREFOX_PROFILE_DIR` read-only. Without these settings it keeps the development model cache and an empty profile volume.
+- It sets `WHISPERER_REAL_DATA=1`.
+- It keeps the development Redis volume. Tasks queued in the production stack stay there, and tasks submitted to the dev container's API stay in the development queue.
+- Opening it authorizes no agent run against real data or live services. Tests must still use only test-owned storage ([AGENTS.md](AGENTS.md#validation-and-review)).
+
+Both configurations are the same Compose project, so a switch between them recreates the containers. `docker compose down -v` in the dev container's project deletes its development volumes, including `dev_persist`.
 
 ### Full stack with Docker Compose
 
@@ -112,6 +138,8 @@ Compose also reads a few **interpolation** variables (host-side paths and build 
 | `APT_PROXY` | empty (none) | Optional apt caching proxy used during image build. |
 | `PYPI_PROXY` | empty (none) | Optional PyPI proxy for every PyPI package the image installs, including the dev container's dev tools. `update-dependencies.sh` still resolves against PyPI. |
 | `BUILD_COMMON_CONTEXT` | pinned Git URL (`docker-build-common.git#v1.2.0`) | Shared build-helper source; a local clone avoids fetching that context. |
+
+The default dev container ignores the three host-path variables. The REAL DATA dev container requires `ASSETS_DIR`, and falls back to development storage instead of the named volumes above when `WHISPER_MODELS_VOLUME` or `FIREFOX_PROFILE_DIR` is unset ([Dev Container](#dev-container-recommended)).
 
 ## Updating dependencies
 
