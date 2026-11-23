@@ -1,3 +1,5 @@
+"""Application settings, resolved from the environment at each invocation."""
+
 from pathlib import Path
 
 from pydantic import Field

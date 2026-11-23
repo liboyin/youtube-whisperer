@@ -1,3 +1,5 @@
+"""Tests for LanguageCode parsing, validation and conversion."""
+
 import pytest
 
 import youtube_whisperer.adaptors.lang_code_adaptor as testee

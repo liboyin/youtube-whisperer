@@ -1,3 +1,5 @@
+"""Tests for the rejection of hallucinated transcription text."""
+
 from types import SimpleNamespace
 
 import pytest
@@ -6,6 +8,7 @@ import youtube_whisperer.transcriber.rejection_policy as testee
 
 
 def make_segment(text: str) -> SimpleNamespace:
+    """Build a segment stand-in that carries only its text."""
     return SimpleNamespace(text=text)
 
 

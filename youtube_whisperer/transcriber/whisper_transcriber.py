@@ -1,3 +1,5 @@
+"""Transcription of a waveform or file with a faster-whisper model."""
+
 import functools
 import logging
 from collections.abc import Iterable
@@ -28,8 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def segment_to_srt_block(segment: Segment) -> SrtBlock:
-    """
-    Convert a faster-whisper Segment into an SrtBlock.
+    """Convert a faster-whisper Segment into an SrtBlock.
 
     Args:
         segment (Segment): A Whisper transcription segment with `start`, `end`, and `text` attributes.
@@ -41,8 +42,7 @@ def segment_to_srt_block(segment: Segment) -> SrtBlock:
 
 
 def transcribe_waveform(model: WhisperModel, waveform: np.ndarray, language: LanguageCode) -> Iterable[Segment]:
-    """
-    Transcribe the given waveform in its source language using the provided Whisper model.
+    """Transcribe the given waveform in its source language using the provided Whisper model.
 
     Args:
         model (WhisperModel): The Whisper model to use.
@@ -82,9 +82,10 @@ def get_default_whisper_model(*, parameters: tuple[str, str, str, str, int] | No
     )
 
 
-def transcribe_waveform_with_default_model(waveform: np.ndarray, language: LanguageCode, *, settings: Settings | None = None) -> Iterable[Segment]:
-    """
-    Transcribe the given waveform using the cached default WhisperModel.
+def transcribe_waveform_with_default_model(
+    waveform: np.ndarray, language: LanguageCode, *, settings: Settings | None = None
+) -> Iterable[Segment]:
+    """Transcribe the given waveform using the cached default WhisperModel.
 
     Args:
         waveform (np.ndarray): The waveform to transcribe.
@@ -105,9 +106,15 @@ def transcribe_waveform_with_default_model(waveform: np.ndarray, language: Langu
     return transcribe_waveform(model, waveform, language)
 
 
-def transcribe_file_with_default_model(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER, *, settings: Settings | None = None) -> Path | None:
-    """
-    Transcribe a waveform file using default model parameters and save the output to an SRT file.
+def transcribe_file_with_default_model(
+    input_file_path: Path,
+    language: LanguageCode,
+    output_file_path: Path | None = None,
+    overwrite: OverwritePolicy = OverwritePolicy.NEVER,
+    *,
+    settings: Settings | None = None,
+) -> Path | None:
+    """Transcribe a waveform file using default model parameters and save the output to an SRT file.
 
     The existing-output preflight runs before model work and its policy is reused
     for saving; complete lazy recognition and rejection finish before SRT publication.
@@ -115,7 +122,8 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
     Args:
         input_file_path (Path): Input waveform file path.
         language (LanguageCode): The source language of the waveform.
-        output_file_path (Path | None, optional): Output SRT file path. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
+        output_file_path (Path | None, optional): Output SRT file path. If `None`, it will be the input file path with a
+            `.srt` extension. Defaults to `None`.
         settings: Supplied model snapshot; None uses the process default model.
         overwrite (OverwritePolicy, optional): ALWAYS replaces an existing SRT; NEVER keeps it. Defaults to NEVER.
 
@@ -133,8 +141,14 @@ def transcribe_file_with_default_model(input_file_path: Path, language: Language
         return output_file_path
     waveform = load_whisper_waveform_from_file(input_file_path)
     if len(waveform) == 0:
-        raise ValueError(f"No audio samples decoded from {input_file_path}; check that the file contains a decodable audio track.")
-    segments = transcribe_waveform_with_default_model(waveform, language) if settings is None else transcribe_waveform_with_default_model(waveform, language, settings=settings)
+        raise ValueError(
+            f"No audio samples decoded from {input_file_path}; check that the file contains a decodable audio track."
+        )
+    segments = (
+        transcribe_waveform_with_default_model(waveform, language)
+        if settings is None
+        else transcribe_waveform_with_default_model(waveform, language, settings=settings)
+    )
     segments_generator = reject_bad_segments(segments)
     save_segments_as_srt(map(segment_to_srt_block, segments_generator), output_file_path, overwrite=overwrite)
     return output_file_path

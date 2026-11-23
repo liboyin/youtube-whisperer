@@ -1,3 +1,5 @@
+"""Tests for the ownership and closing of runtime resources."""
+
 from unittest.mock import Mock, patch
 
 import pytest

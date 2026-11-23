@@ -8,8 +8,7 @@ This file holds the recommended order, the constraints that several tasks share,
 
 ## Recommended order
 
-1. NB2 (Ruff rule set) clears its investigation gate first. Its outcome also lets AGENTS drop its prose rule for Google-style docstrings.
-2. NB31 (Compose repetition) can land at any time. It changes no behavior.
+1. NB31 (Compose repetition) can land at any time. It changes no behavior.
 
 These items are outside the sequence:
 
@@ -37,5 +36,4 @@ These items are outside the sequence:
 
 ## Open tasks
 
-- [NB2](open/NB2.md) — Non-blocking. Ruff runs with its default rule set.
 - [NB31](open/NB31.md) — Non-blocking, Low. Compose repeats the shared application-service configuration.

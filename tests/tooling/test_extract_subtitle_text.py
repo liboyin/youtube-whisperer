@@ -72,7 +72,9 @@ def test_crlf_input_matches_lf_output(run_shell_script):
 @pytest.mark.parametrize('last', ['Final words', '2026'])
 def test_last_line_without_final_newline_is_kept(run_shell_script, ending, last):
     """An unterminated final line, including a held digits-only line, is printed with LF."""
-    content = ending.join(['1', '00:00:01,000 --> 00:00:02,000', 'First', '', '2', '00:00:03,000 --> 00:00:04,000', last])
+    content = ending.join(
+        ['1', '00:00:01,000 --> 00:00:02,000', 'First', '', '2', '00:00:03,000 --> 00:00:04,000', last]
+    )
     assert_output(extract(run_shell_script, content.encode()), f'First\n{last}\n'.encode())
 
 

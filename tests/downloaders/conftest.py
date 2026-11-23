@@ -1,3 +1,5 @@
+"""A fake yt-dlp client and the fixture that installs it."""
+
 import pytest
 
 

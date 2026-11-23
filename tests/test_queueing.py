@@ -1,3 +1,5 @@
+"""Tests for the Redis queue operations."""
+
 import json
 from unittest.mock import call
 
@@ -11,6 +13,7 @@ from youtube_whisperer.models import DeadLetter, Task, TaskQueues
 
 @pytest.fixture
 def mock_redis(mocker):
+    """Provide a mock Redis client."""
     return mocker.MagicMock()
 
 

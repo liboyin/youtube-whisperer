@@ -1,3 +1,5 @@
+"""Tests for task resolution and routing before queueing."""
+
 import subprocess
 import sys
 from dataclasses import FrozenInstanceError
@@ -20,13 +22,19 @@ def test_preparation_import_loads_no_http_or_redis_layers_and_creates_no_resourc
         import pydantic_settings
 
         with (
-            patch.object(pydantic_settings.BaseSettings, '__init__', side_effect=AssertionError('Settings construction')),
+            patch.object(
+                pydantic_settings.BaseSettings, '__init__', side_effect=AssertionError('Settings construction')
+            ),
             patch.object(socket, 'socket', side_effect=AssertionError('network access')),
         ):
             import youtube_whisperer.task_preparation as testee
 
-            loaded = sorted(name for name in sys.modules if name.split('.')[0] in {'fastapi', 'starlette', 'redis'}
-                            or name in {'youtube_whisperer.config', 'youtube_whisperer.utils', 'youtube_whisperer.queueing'})
+            loaded = sorted(
+                name
+                for name in sys.modules
+                if name.split('.')[0] in {'fastapi', 'starlette', 'redis'}
+                or name in {'youtube_whisperer.config', 'youtube_whisperer.utils', 'youtube_whisperer.queueing'}
+            )
             assert loaded == [], loaded
             prepared = testee.prepare_tasks([testee.Task(source='https://example.com/video')])
             assert prepared.youtube == prepared.successful
@@ -106,7 +114,9 @@ def test_resolve_filesystem_tasks_retains_files_and_file_symlinks(tmp_path, owne
 
 
 @pytest.mark.parametrize('absolute_pattern', [False, True])
-def test_resolve_filesystem_tasks_anchors_paths_preserving_aliases_and_order(tmp_path, monkeypatch, mocker, absolute_pattern):
+def test_resolve_filesystem_tasks_anchors_paths_preserving_aliases_and_order(
+    tmp_path, monkeypatch, mocker, absolute_pattern
+):
     """Relative and absolute matches preserve spaces, symlink spelling, metadata, and glob order."""
     monkeypatch.chdir(tmp_path)
     media = tmp_path / 'original file.custom'
@@ -115,7 +125,9 @@ def test_resolve_filesystem_tasks_anchors_paths_preserving_aliases_and_order(tmp
     alias.symlink_to(media)
     paths = [alias, media]
     matches = [str(path) if absolute_pattern else path.name for path in paths]
-    pattern = Task(source=str(tmp_path / '*.custom') if absolute_pattern else '*.custom', language='zh-cn', transcriber='azure')
+    pattern = Task(
+        source=str(tmp_path / '*.custom') if absolute_pattern else '*.custom', language='zh-cn', transcriber='azure'
+    )
     glob = mocker.patch.object(testee.glob, 'glob', return_value=matches)
 
     result = testee.resolve_filesystem_tasks(pattern)

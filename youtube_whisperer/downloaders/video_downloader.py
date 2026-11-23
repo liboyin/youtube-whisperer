@@ -1,3 +1,5 @@
+"""Video download through yt-dlp, with overwrite policies."""
+
 import os
 from pathlib import Path
 
@@ -18,8 +20,7 @@ from youtube_whisperer.overwrite import require_supported_policy, resolve_output
 
 
 def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> None:
-    """
-    Download into a `StagedFile` and atomically publish the literal target path.
+    """Download into a `StagedFile` and atomically publish the literal target path.
 
     Failed downloads preserve previous output. NEVER also preserves competing
     files; ALWAYS replacements follow symlinks and retain mode bits. yt-dlp
@@ -34,7 +35,8 @@ def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> N
         overwrite (OverwritePolicy): ALWAYS replaces an existing video; NEVER keeps it.
 
     Raises:
-        ValueError: If `overwrite` is not ALWAYS or NEVER, or yt-dlp would expand environment variables in the stage path.
+        ValueError: If `overwrite` is not ALWAYS or NEVER, or yt-dlp would expand environment variables in the stage
+            path.
         FileNotFoundError: If the download leaves no regular staged video.
         OSError: If preparation, mode restoration, or atomic publication fails.
     """
@@ -57,16 +59,18 @@ def download_video(url: str, target_path: Path, overwrite: OverwritePolicy) -> N
             raise FileNotFoundError(f'Download did not produce a regular staged video: {staged.path}')
 
 
-def download_video_with_default_title(url: str, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path:
-    """
-    Download a video into the target directory under its default name, 'Title [videoID].mp4'.
+def download_video_with_default_title(
+    url: str, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER
+) -> Path:
+    """Download a video into the target directory under its default name, 'Title [videoID].mp4'.
 
     An existing title-only file from before video IDs were added is reused instead
     (see `resolve_default_media_path`).
 
     Args:
         url (str): The URL of the video to download.
-        target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to settings resolved at invocation.
+        target_dir (Path, optional): The directory where the downloaded video will be saved. Defaults to settings
+            resolved at invocation.
         overwrite (OverwritePolicy, optional): ALWAYS replaces an existing video; NEVER keeps it. Defaults to NEVER.
 
     Returns:

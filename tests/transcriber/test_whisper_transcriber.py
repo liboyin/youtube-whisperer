@@ -1,3 +1,5 @@
+"""Tests for Whisper transcription, with a fake model."""
+
 import builtins
 import inspect
 import logging
@@ -22,12 +24,25 @@ LANGUAGE = LanguageCode("zh")
 
 
 def make_segment(text: str) -> SimpleNamespace:
+    """Build a segment stand-in that carries only its text."""
     return SimpleNamespace(text=text)
 
 
 def test_segment_to_srt_block():
     """Converts a faster-whisper Segment's start/end/text into an SrtBlock."""
-    segment = Segment(id=1, seek=2704, start=0.0, end=1.24, text='Segment', tokens=[50365, 4511], temperature=0.0, avg_logprob=-0.31, compression_ratio=1.28, no_speech_prob=0.72, words=None)
+    segment = Segment(
+        id=1,
+        seek=2704,
+        start=0.0,
+        end=1.24,
+        text='Segment',
+        tokens=[50365, 4511],
+        temperature=0.0,
+        avg_logprob=-0.31,
+        compression_ratio=1.28,
+        no_speech_prob=0.72,
+        words=None,
+    )
     srt_block = testee.segment_to_srt_block(segment)
     assert isinstance(srt_block, SrtBlock)
     assert srt_block.start_time == '00:00:00,000'
@@ -89,9 +104,19 @@ def test_transcribe_waveform_requests_source_language_transcription(caplog, sour
 def test_whisper_helpers_expose_source_language_signatures():
     """Test that Python entry points retire operation arguments while retaining other parameters."""
     assert tuple(inspect.signature(testee.transcribe_waveform).parameters) == ('model', 'waveform', 'language')
-    assert tuple(inspect.signature(testee.transcribe_waveform_with_default_model).parameters) == ('waveform', 'language', 'settings')
-    assert inspect.signature(testee.transcribe_waveform_with_default_model).parameters['settings'].kind == inspect.Parameter.KEYWORD_ONLY
-    assert inspect.signature(testee.transcribe_file_with_default_model).parameters['settings'].kind == inspect.Parameter.KEYWORD_ONLY
+    assert tuple(inspect.signature(testee.transcribe_waveform_with_default_model).parameters) == (
+        'waveform',
+        'language',
+        'settings',
+    )
+    assert (
+        inspect.signature(testee.transcribe_waveform_with_default_model).parameters['settings'].kind
+        == inspect.Parameter.KEYWORD_ONLY
+    )
+    assert (
+        inspect.signature(testee.transcribe_file_with_default_model).parameters['settings'].kind
+        == inspect.Parameter.KEYWORD_ONLY
+    )
     assert tuple(inspect.signature(testee.transcribe_file_with_default_model).parameters) == (
         'input_file_path', 'language', 'output_file_path', 'overwrite', 'settings',
     )
@@ -192,8 +217,20 @@ def test_snapshot_models_are_lazy_reused_and_isolated_by_resolved_constructor_id
                 assert testee.transcribe_waveform_with_default_model(waveform, LANGUAGE, settings=snapshot) == ['owned']
                 transcribe.assert_called_with(model, waveform, LANGUAGE)
         assert constructor.call_args_list == [
-            mocker.call(model_size_or_path='first', download_root=str(tmp_path / 'first'), device='cpu', compute_type='int8', cpu_threads=4),
-            mocker.call(model_size_or_path='second', download_root=str(tmp_path / 'second'), device='cuda', compute_type='float32', cpu_threads=0),
+            mocker.call(
+                model_size_or_path='first',
+                download_root=str(tmp_path / 'first'),
+                device='cpu',
+                compute_type='int8',
+                cpu_threads=4,
+            ),
+            mocker.call(
+                model_size_or_path='second',
+                download_root=str(tmp_path / 'second'),
+                device='cuda',
+                compute_type='float32',
+                cpu_threads=0,
+            ),
         ]
         assert testee.get_default_whisper_model.cache_info().currsize == 2
     assert testee.get_default_whisper_model.cache_info().currsize == 0
@@ -312,14 +349,26 @@ def test_transcribe_file_with_default_model_late_rejection_preserves_final_and_r
         yield SimpleNamespace(start=2.0, end=3.0, text=REJECTED_SUBSTRINGS[0])
 
     transcribe = mocker.patch.object(testee, 'transcribe_waveform_with_default_model', return_value=segments())
-    with patch.object(testee.Path, "open", side_effect=AssertionError("premature write")) as opened, pytest.raises(RejectedTranscriptionError):
-        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS)
+    with (
+        patch.object(testee.Path, "open", side_effect=AssertionError("premature write")) as opened,
+        pytest.raises(RejectedTranscriptionError),
+    ):
+        testee.transcribe_file_with_default_model(
+            input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS
+        )
     opened.assert_not_called()
     assert consumed == ["good", "bad"]
     assert output.read_text() == "original" if existing else not output.exists()
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
-    transcribe.return_value = iter([SimpleNamespace(start=0.0, end=1.0, text="Good"), SimpleNamespace(start=2.0, end=3.0, text="Done")])
-    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS) == output
+    transcribe.return_value = iter(
+        [SimpleNamespace(start=0.0, end=1.0, text="Good"), SimpleNamespace(start=2.0, end=3.0, text="Done")]
+    )
+    assert (
+        testee.transcribe_file_with_default_model(
+            input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS
+        )
+        == output
+    )
     assert output.read_text() == "1\n00:00:00,000 --> 00:00:01,000\nGood\n\n2\n00:00:02,000 --> 00:00:03,000\nDone\n"
     assert list(tmp_path.iterdir()) == [output]
 
@@ -332,26 +381,53 @@ def test_transcribe_file_with_default_model_publication_failure_preserves_final_
     if existing:
         output.write_text("original")
     mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
-    mocker.patch.object(testee, "transcribe_waveform_with_default_model", side_effect=lambda *args: iter([SimpleNamespace(start=0.0, end=1.0, text="Good")]))
-    with patch.object(testee.Path, "replace", side_effect=OSError("failed publication")), pytest.raises(OSError, match="failed publication"):
-        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS)
+    mocker.patch.object(
+        testee,
+        "transcribe_waveform_with_default_model",
+        side_effect=lambda *args: iter([SimpleNamespace(start=0.0, end=1.0, text="Good")]),
+    )
+    with (
+        patch.object(testee.Path, "replace", side_effect=OSError("failed publication")),
+        pytest.raises(OSError, match="failed publication"),
+    ):
+        testee.transcribe_file_with_default_model(
+            input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS
+        )
     assert output.read_text() == "original" if existing else not output.exists()
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
-    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS) == output
+    assert (
+        testee.transcribe_file_with_default_model(
+            input_path, LANGUAGE, output_file_path=output, overwrite=OverwritePolicy.ALWAYS
+        )
+        == output
+    )
     assert output.read_text() == "1\n00:00:00,000 --> 00:00:01,000\nGood\n"
     assert list(tmp_path.iterdir()) == [output]
 
 
-@pytest.mark.parametrize(("overwrite", "replaced"), [({}, False), ({"overwrite": OverwritePolicy.NEVER}, False), ({"overwrite": OverwritePolicy.ALWAYS}, True)])
-def test_transcribe_file_with_default_model_existing_output_policy_is_decided_before_model_work(mocker, tmp_path, overwrite, replaced):
+@pytest.mark.parametrize(
+    ("overwrite", "replaced"),
+    [({}, False), ({"overwrite": OverwritePolicy.NEVER}, False), ({"overwrite": OverwritePolicy.ALWAYS}, True)],
+)
+def test_transcribe_file_with_default_model_existing_output_policy_is_decided_before_model_work(
+    mocker, tmp_path, overwrite, replaced
+):
     """The default NEVER and explicit policies decide existing output before audio/model work, without reading stdin."""
     input_path = tmp_path / "audio.wav"
     output = tmp_path / "audio.srt"
     output.write_text("original")
     mocker.patch.object(builtins, "input", side_effect=AssertionError("unexpected stdin read"))
-    load = mocker.patch.object(testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32))
-    transcribe = mocker.patch.object(testee, "transcribe_waveform_with_default_model", return_value=iter([SimpleNamespace(start=0.0, end=1.0, text="Good")]))
-    assert testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, **overwrite) == output
+    load = mocker.patch.object(
+        testee, "load_whisper_waveform_from_file", return_value=np.array([1.0], dtype=np.float32)
+    )
+    transcribe = mocker.patch.object(
+        testee,
+        "transcribe_waveform_with_default_model",
+        return_value=iter([SimpleNamespace(start=0.0, end=1.0, text="Good")]),
+    )
+    assert (
+        testee.transcribe_file_with_default_model(input_path, LANGUAGE, output_file_path=output, **overwrite) == output
+    )
     assert load.call_count == int(replaced)
     assert transcribe.call_count == int(replaced)
     assert output.read_text() == ("1\n00:00:00,000 --> 00:00:01,000\nGood\n" if replaced else "original")

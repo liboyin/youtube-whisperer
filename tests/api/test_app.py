@@ -1,3 +1,5 @@
+"""Tests for the REST API endpoints."""
+
 import asyncio
 import threading
 from pathlib import Path
@@ -17,6 +19,7 @@ from youtube_whisperer.models import DeadLetter, Task, TaskQueues
 
 @pytest.fixture
 def mock_redis_client():
+    """Provide a StrictRedis-shaped mock with empty lists and successful writes."""
     mock_client = MagicMock(spec=StrictRedis)
     mock_client.lrange.return_value = []
     mock_client.rpush.return_value = 1
@@ -26,13 +29,19 @@ def mock_redis_client():
 
 @pytest.fixture
 def mock_assets_dir(tmp_path):
+    """Provide a test-owned assets directory."""
     return tmp_path
 
 
 @pytest.fixture(autouse=True)
 def override_dependencies(mock_redis_client, mock_assets_dir, monkeypatch):
     """Bind API dependencies and direct dependency calls to test-owned resources."""
-    monkeypatch.setattr(testee.app.state, 'runtime', SimpleNamespace(client=mock_redis_client, assets_dir=mock_assets_dir), raising=False)
+    monkeypatch.setattr(
+        testee.app.state,
+        'runtime',
+        SimpleNamespace(client=mock_redis_client, assets_dir=mock_assets_dir),
+        raising=False,
+    )
     monkeypatch.setattr(testee.app, 'dependency_overrides', {
         testee.get_redis_client: lambda: mock_redis_client,
         testee.get_assets_dir: lambda: mock_assets_dir,
@@ -41,6 +50,7 @@ def override_dependencies(mock_redis_client, mock_assets_dir, monkeypatch):
 
 @pytest.fixture
 def client():
+    """Provide a test client for the application."""
     return TestClient(testee.app)
 
 
@@ -51,7 +61,9 @@ def test_resolve_filesystem_tasks_is_reexported_preparation_function():
 
 def test_unhandled_exception_returns_sanitized_500(mocker):
     """The global exception handler must return 500 with a generic detail and not leak the original message."""
-    mocker.patch.object(testee, 'list_task_queues', side_effect=RuntimeError("internal connection string secret=hunter2"))
+    mocker.patch.object(
+        testee, 'list_task_queues', side_effect=RuntimeError("internal connection string secret=hunter2")
+    )
     swallowing_client = TestClient(testee.app, raise_server_exceptions=False)
 
     response = swallowing_client.get("/tasks")
@@ -172,7 +184,9 @@ def test_openapi_documents_source_language_without_mode_or_targets(client):
         assert schema['properties']['language']['examples'] == ['en', 'en-us']
 
 
-def test_add_tasks_submits_url_work_before_filesystem_work_keeping_response_order(client, mocker, tmp_path, owned_path_probes):
+def test_add_tasks_submits_url_work_before_filesystem_work_keeping_response_order(
+    client, mocker, tmp_path, owned_path_probes
+):
     """URL work is submitted before filesystem work while the response keeps input and expansion order."""
     first, second = tmp_path / 'first.wav', tmp_path / 'second.wav'
     first.touch()
@@ -250,7 +264,9 @@ def test_add_tasks_mixed_matches_queue_only_files(client, mocker, tmp_path, owne
     transcription_enqueue.assert_called_once_with(ANY, [resolved])
 
 
-def test_add_tasks_binds_worker_to_api_file_across_working_directories(client, mock_redis_client, tmp_path, monkeypatch):
+def test_add_tasks_binds_worker_to_api_file_across_working_directories(
+    client, mock_redis_client, tmp_path, monkeypatch
+):
     """Actual queued payload dispatch reads the API file despite a same-named worker-directory decoy."""
     api_dir = tmp_path / 'api'
     worker_dir = tmp_path / 'worker'
@@ -490,7 +506,9 @@ def test_redundant_media_paths_never_selects_mp4_or_srt():
     """Test that the mp4 and srt of a completed stem are never marked redundant, in any case."""
     stem = Path('/assets/video')
 
-    result = testee.redundant_media_paths({stem: [stem.with_suffix(suffix) for suffix in ('.mp4', '.MP4', '.srt', '.SRT')]})
+    result = testee.redundant_media_paths(
+        {stem: [stem.with_suffix(suffix) for suffix in ('.mp4', '.MP4', '.srt', '.SRT')]}
+    )
 
     assert result == []
 
@@ -673,7 +691,9 @@ def configure_clean_assets(mocker, record, tmp_path, redis_client):
     configure_get_tasks, configure_add_tasks, configure_clear_tasks, configure_get_dead_letters,
     configure_clear_dead_letters, configure_list_assets, configure_clean_assets,
 ], ids=lambda configure: configure.__name__.removeprefix('configure_'))
-def test_endpoint_blocking_work_runs_off_event_loop(configure, mocker, monkeypatch, mock_redis_client, tmp_path, owned_worker_threads):
+def test_endpoint_blocking_work_runs_off_event_loop(
+    configure, mocker, monkeypatch, mock_redis_client, tmp_path, owned_worker_threads
+):
     """Every endpoint's dependencies and blocking Redis or filesystem calls run outside the event-loop thread."""
     threads = {}
 
@@ -722,7 +742,11 @@ def test_create_app_isolates_lifespan_snapshots_clients_and_asset_paths(tmp_path
         root.mkdir()
         (root / 'owned.srt').write_text('complete')
     applications = [testee.create_app(snapshot, client) for snapshot, client in zip(settings, clients, strict=True)]
-    lookup = mocker.patch.object(testee, 'list_task_queues', return_value=TaskQueues(youtube=[], whisper_pending=[], whisper_active=[], azure_pending=[], azure_active=[]))
+    lookup = mocker.patch.object(
+        testee,
+        'list_task_queues',
+        return_value=TaskQueues(youtube=[], whisper_pending=[], whisper_active=[], azure_pending=[], azure_active=[]),
+    )
     with TestClient(applications[0]) as first, TestClient(applications[1]) as second:
         monkeypatch.setenv('WHISPER_ASSETS_DIR', str(tmp_path / 'changed'))
         for api, application, root, snapshot, client in zip(

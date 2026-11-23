@@ -1,3 +1,5 @@
+"""Command-line entry point that runs one worker role against its queue."""
+
 import argparse
 import logging
 import socket
@@ -13,7 +15,9 @@ if TYPE_CHECKING:
     from youtube_whisperer.workers.youtube_worker import YouTubeWorker
 
 
-class WorkerRole(str, Enum):
+class WorkerRole(str, Enum):  # noqa: UP042 - StrEnum would change str() and f-string output
+    """The worker roles that the command line accepts."""
+
     YOUTUBE = 'youtube'
     WHISPER = 'whisper'
     AZURE = 'azure'
@@ -30,8 +34,7 @@ class WorkerRole(str, Enum):
 
 
 def resolve_worker_slot(slot: str | None, role_name: str, *, settings: Settings | None = None) -> str:
-    """
-    Resolve the slot name a worker uses as its Redis Stream consumer identity.
+    """Resolve the slot name a worker uses as its Redis Stream consumer identity.
 
     Args:
         slot: Explicit slot override, used verbatim when non-empty.
@@ -102,7 +105,13 @@ def __getattr__(name: str) -> "type[YouTubeWorker | WhisperWorker | AzureWorker]
         raise AttributeError(f'module {__name__!r} has no attribute {name!r}') from exc
 
 
-def process_queue(role: WorkerRole | str = WorkerRole.WHISPER, slot: str | None = None, poll_interval_seconds: int = 5, *, settings: Settings | None = None) -> None:
+def process_queue(
+    role: WorkerRole | str = WorkerRole.WHISPER,
+    slot: str | None = None,
+    poll_interval_seconds: int = 5,
+    *,
+    settings: Settings | None = None,
+) -> None:
     """Dispatch queue processing to the selected worker implementation.
 
     This entrypoint normalizes the requested worker role and forwards execution
@@ -171,7 +180,14 @@ def main() -> None:
     settings = Settings()
     parser = argparse.ArgumentParser()
     parser.add_argument('role', nargs='?', choices=WorkerRole.values(), default=settings.worker_role)
-    parser.add_argument('--slot', default=None, help="Consumer identity for the worker in its stream's consumer group. Defaults to <role>-<WORKER_SLOT_ID> when WORKER_SLOT_ID is set, then machine hostname.")
+    parser.add_argument(
+        '--slot',
+        default=None,
+        help=(
+            "Consumer identity for the worker in its stream's consumer group. "
+            "Defaults to <role>-<WORKER_SLOT_ID> when WORKER_SLOT_ID is set, then machine hostname."
+        ),
+    )
     parser.add_argument('--poll-interval-seconds', type=positive_poll_interval, default=5)
     args = parser.parse_args()
     process_queue(role=args.role, slot=args.slot, poll_interval_seconds=args.poll_interval_seconds, settings=settings)

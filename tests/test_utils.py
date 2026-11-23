@@ -1,3 +1,5 @@
+"""Tests for Redis pool construction and the lazy legacy exports."""
+
 import os
 import subprocess
 import sys

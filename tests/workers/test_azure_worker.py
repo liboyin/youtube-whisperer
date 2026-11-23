@@ -1,3 +1,5 @@
+"""Tests for the Azure worker."""
+
 from pathlib import Path
 
 import pytest
@@ -34,7 +36,9 @@ def test_dispatch_task_with_conversion(mocker, tmp_path, owned_path_probes, work
         worker.dispatch_task(task, source_path)
 
     mock_save_wav.assert_called_once_with(source_path, output_file_path=wav_path, overwrite=OverwritePolicy.NEVER)
-    mock_transcribe.assert_called_once_with(wav_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings)
+    mock_transcribe.assert_called_once_with(
+        wav_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings
+    )
 
 
 def test_dispatch_task_reuses_existing_sidecar_wav(mocker, tmp_path, worker):
@@ -50,7 +54,9 @@ def test_dispatch_task_reuses_existing_sidecar_wav(mocker, tmp_path, worker):
 
     assert wav_path.read_bytes() == b'existing wav'
     assert sorted(tmp_path.iterdir()) == [source_path, wav_path]
-    mock_transcribe.assert_called_once_with(wav_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings)
+    mock_transcribe.assert_called_once_with(
+        wav_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings
+    )
 
 
 def test_dispatch_task_requires_source_even_when_sidecar_wav_exists(mocker, tmp_path, worker):
@@ -79,10 +85,14 @@ def test_dispatch_task_without_conversion(mocker, worker):
     worker.dispatch_task(task, source_path)
 
     mock_save_wav.assert_not_called()
-    mock_transcribe.assert_called_once_with(source_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings)
+    mock_transcribe.assert_called_once_with(
+        source_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings
+    )
 
 
-def test_dispatch_task_transcribes_sidecar_when_conversion_keeps_existing_wav(mocker, tmp_path, owned_path_probes, worker):
+def test_dispatch_task_transcribes_sidecar_when_conversion_keeps_existing_wav(
+    mocker, tmp_path, owned_path_probes, worker
+):
     """A None result, meaning NEVER kept an existing sidecar WAV, still transcribes that sidecar."""
     mock_save = mocker.patch.object(testee, "save_as_wav_file", return_value=None)
     mock_transcribe = mocker.patch.object(testee, "transcribe_audio_file")
@@ -97,4 +107,6 @@ def test_dispatch_task_transcribes_sidecar_when_conversion_keeps_existing_wav(mo
         output_file_path=tmp_path / "audio.wav",
         overwrite=OverwritePolicy.NEVER,
     )
-    mock_transcribe.assert_called_once_with(tmp_path / "audio.wav", task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings)
+    mock_transcribe.assert_called_once_with(
+        tmp_path / "audio.wav", task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings
+    )

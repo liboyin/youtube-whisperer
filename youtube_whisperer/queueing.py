@@ -1,3 +1,5 @@
+"""Redis stream names and the operations that queue, list and dead-letter tasks."""
+
 from typing import cast
 
 import redis
@@ -14,8 +16,7 @@ WORKERS_GROUP = 'workers'
 
 
 def decode_redis_value(value: str | bytes) -> str:
-    """
-    Convert a Redis string payload into a normalized Python string.
+    """Convert a Redis string payload into a normalized Python string.
 
     Args:
         value (str | bytes): A value returned by redis-py, which may be bytes or str.
@@ -29,8 +30,7 @@ def decode_redis_value(value: str | bytes) -> str:
 
 
 def get_stream_name(transcriber: TranscriberType) -> str:
-    """
-    Resolve the stream name for a transcriber type.
+    """Resolve the stream name for a transcriber type.
 
     Args:
         transcriber: Transcriber whose stream is being requested.
@@ -51,8 +51,7 @@ def get_stream_name(transcriber: TranscriberType) -> str:
 
 
 def ensure_consumer_group(redis_client: StrictRedis, stream_name: str, group_name: str) -> None:
-    """
-    Ensure the continuous Stream and Consumer Group topology is instantiated idempotently.
+    """Ensure the continuous Stream and Consumer Group topology is instantiated idempotently.
 
     A missing group is created from the start of the stream (ID ``0``), not at its end, so
     entries appended while the group was absent are still delivered. For example, a submission
@@ -73,8 +72,7 @@ def ensure_consumer_group(redis_client: StrictRedis, stream_name: str, group_nam
 
 
 def list_stream_tasks(redis_client: StrictRedis, stream_name: str, group_name: str) -> tuple[list[Task], list[Task]]:
-    """
-    Load all tasks currently in the stream and partition them by pending vs active state.
+    """Load all tasks currently in the stream and partition them by pending vs active state.
 
     Args:
         redis_client (StrictRedis): The Redis client to query.
@@ -106,8 +104,7 @@ def list_stream_tasks(redis_client: StrictRedis, stream_name: str, group_name: s
 
 
 def list_dead_letters(redis_client: StrictRedis) -> list[DeadLetter]:
-    """
-    Load and deserialize every entry in the dead-letter queue.
+    """Load and deserialize every entry in the dead-letter queue.
 
     Args:
         redis_client (StrictRedis): The Redis client to query.
@@ -120,8 +117,8 @@ def list_dead_letters(redis_client: StrictRedis) -> list[DeadLetter]:
 
 
 def list_task_queues(redis_client: StrictRedis) -> TaskQueues:
-    """
-    Build a snapshot of all user-visible task streams.
+    """Build a snapshot of all user-visible task streams.
+
     This maintains the original TaskQueues API contract by mapping Unclaimed -> Pending, and Claimed (PEL) -> Active.
 
     Args:
@@ -143,8 +140,7 @@ def list_task_queues(redis_client: StrictRedis) -> TaskQueues:
 
 
 def queue_youtube_task(redis_client: StrictRedis, task: Task) -> None:
-    """
-    Append a single serialized YouTube extraction task to its dedicated stream.
+    """Append a single serialized YouTube extraction task to its dedicated stream.
 
     Args:
         redis_client (StrictRedis): The Redis client to issue the command on.
@@ -155,8 +151,7 @@ def queue_youtube_task(redis_client: StrictRedis, task: Task) -> None:
 
 
 def queue_transcription_tasks(redis_client: StrictRedis, tasks: list[Task]) -> None:
-    """
-    Append tasks to their transcriber-specific streams in bulk.
+    """Append tasks to their transcriber-specific streams in bulk.
 
     Args:
         redis_client (StrictRedis): The Redis client to issue the commands on.
@@ -172,8 +167,7 @@ def queue_transcription_tasks(redis_client: StrictRedis, tasks: list[Task]) -> N
 
 
 def queue_dead_letter(redis_client: StrictRedis, task: Task, stream_name: str, error_message: str) -> DeadLetter:
-    """
-    Record a failed task in the dead-letter queue list.
+    """Record a failed task in the dead-letter queue list.
 
     Args:
         redis_client (StrictRedis): The Redis client to issue the command on.
@@ -190,8 +184,7 @@ def queue_dead_letter(redis_client: StrictRedis, task: Task, stream_name: str, e
 
 
 def clear_task_queues(redis_client: StrictRedis) -> TaskQueues:
-    """
-    Delete all routing streams after snapshotting them.
+    """Delete all routing streams after snapshotting them.
 
     Args:
         redis_client (StrictRedis): The Redis client to issue the commands on.

@@ -1,3 +1,5 @@
+"""Caption discovery and download through the YouTube transcript API."""
+
 import logging
 import re
 from collections.abc import Collection
@@ -82,8 +84,7 @@ def get_video_id(url: str) -> str:
 
 
 def get_first_matching_lang_code(candidates: Collection[str], requested: LanguageCode) -> str | None:
-    """
-    Finds the first matching language code from candidate language codes based on the requested language code.
+    """Finds the first matching language code from candidate language codes based on the requested language code.
 
     Args:
         candidates (Collection[str]): Candidate language codes for a video.
@@ -103,8 +104,7 @@ def get_first_matching_lang_code(candidates: Collection[str], requested: Languag
 
 
 def list_video_transcripts(url: str, http_client: Session | None = None) -> TranscriptList | None:
-    """
-    List transcripts using a supplied session or a fresh timeout session.
+    """List transcripts using a supplied session or a fresh timeout session.
 
     A supplied session remains caller-owned and is not closed by this helper.
     When omitted, a fresh CaptionSession stays with the returned transcript list
@@ -128,9 +128,10 @@ def list_video_transcripts(url: str, http_client: Session | None = None) -> Tran
     return None
 
 
-def fetch_matching_transcript(transcripts: TranscriptList, language: LanguageCode, url: str) -> FetchedTranscript | None:
-    """
-    Fetches the transcript matching the requested language from a transcript list.
+def fetch_matching_transcript(
+    transcripts: TranscriptList, language: LanguageCode, url: str
+) -> FetchedTranscript | None:
+    """Fetches the transcript matching the requested language from a transcript list.
 
     Args:
         transcripts (TranscriptList): Transcripts available for the video.
@@ -138,7 +139,8 @@ def fetch_matching_transcript(transcripts: TranscriptList, language: LanguageCod
         url (str): The YouTube video URL, used only for logging.
 
     Returns:
-        FetchedTranscript | None: The fetched transcript in the requested language, or `None` if no matching transcript is found.
+        FetchedTranscript | None: The fetched transcript in the requested language, or `None` if no matching transcript
+            is found.
     """
     lang_code = get_first_matching_lang_code([x.language_code for x in transcripts], language)
     if lang_code is None:
@@ -152,6 +154,8 @@ def fetch_matching_transcript(transcripts: TranscriptList, language: LanguageCod
 
 
 class TranscriptDownloader:
+    """Download the captions of one video in one requested language."""
+
     def __init__(self, url: str, language: LanguageCode) -> None:
         """Bind a transcript downloader to a single video URL and requested source language.
 
@@ -163,14 +167,14 @@ class TranscriptDownloader:
         self.language = language
 
     def download(self) -> FetchedTranscript | None:
-        """
-        Download captions with one owned session spanning listing and fetching.
+        """Download captions with one owned session spanning listing and fetching.
 
         Close the session on success, missing captions, or failure. Service errors
         and timeouts propagate; media orchestration decides whether to fall back.
 
         Returns:
-            FetchedTranscript | None: Downloaded transcript, or `None` if no transcript in the requested language is available.
+            FetchedTranscript | None: Downloaded transcript, or `None` if no transcript in the requested language is
+                available.
         """
         with CaptionSession() as http_client:
             if (transcripts := list_video_transcripts(self.url, http_client)) is not None:
@@ -178,20 +182,19 @@ class TranscriptDownloader:
         return None
 
     def download_as_srt_text(self) -> str | None:
-        """
-        Downloads the transcript of a YouTube video and returns it as SRT text.
+        """Downloads the transcript of a YouTube video and returns it as SRT text.
 
         Returns:
-            str | None: The transcript as an SRT formatted text, or None if no transcript in the requested language is available.
+            str | None: The transcript as an SRT formatted text, or None if no transcript in the requested language is
+                available.
         """
         transcript = self.download()
         if transcript is None:
             return None
         return SRTFormatter().format_transcript(transcript)
-    
+
     def download_as_srt_file(self, output_file_path: Path, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> bool:
-        """
-        Download captions and publish complete SRT text after closing it inside a `StagedFile`.
+        """Download captions and publish complete SRT text after closing it inside a `StagedFile`.
 
         Declined overwrites avoid the caption request. Publication preserves prior
         valid output on failure and keeps any competing output under NEVER.
@@ -214,16 +217,18 @@ class TranscriptDownloader:
         logger.info("About to write to SRT file: %s", output_file_path)
         publish_srt_text(output_file_path, srt_text, overwrite=overwrite)
         return True
-    
-    def download_as_srt_file_with_default_title(self, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path | None:
-        """
-        Download the transcript as an SRT file under its default name, 'Title [videoID].srt'.
+
+    def download_as_srt_file_with_default_title(
+        self, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER
+    ) -> Path | None:
+        """Download the transcript as an SRT file under its default name, 'Title [videoID].srt'.
 
         An existing title-only SRT from before video IDs were added is reused instead
         (see `resolve_default_media_path`).
 
         Args:
-            target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to settings resolved at invocation.
+            target_dir (Path, optional): The target directory where the SRT file will be saved. Defaults to settings
+                resolved at invocation.
             overwrite (OverwritePolicy, optional): ALWAYS replaces an existing SRT; NEVER keeps it. Defaults to NEVER.
 
         Returns:

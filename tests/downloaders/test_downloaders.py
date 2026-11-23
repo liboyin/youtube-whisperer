@@ -1,3 +1,5 @@
+"""Tests for the combined video and caption download."""
+
 import logging
 from xml.etree.ElementTree import ParseError
 
@@ -51,11 +53,15 @@ def test_download_video_and_transcript_with_default_title_delegates(mocker, tmp_
 
 def test_download_video_and_transcript_with_default_title_rejects_rename_before_any_work(mocker):
     """RENAME fails before settings, media download or caption work."""
-    video = mocker.patch.object(testee, 'download_video_with_default_title', side_effect=AssertionError('video downloaded'))
+    video = mocker.patch.object(
+        testee, 'download_video_with_default_title', side_effect=AssertionError('video downloaded')
+    )
     captions = mocker.patch.object(testee, 'TranscriptDownloader', side_effect=AssertionError('captions requested'))
     settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
     with pytest.raises(ValueError, match='RENAME.*is not supported'):
-        testee.download_video_and_transcript_with_default_title('https://youtu.be/n9xhJrPXop4', LANGUAGE, overwrite=OverwritePolicy.RENAME)
+        testee.download_video_and_transcript_with_default_title(
+            'https://youtu.be/n9xhJrPXop4', LANGUAGE, overwrite=OverwritePolicy.RENAME
+        )
     video.assert_not_called()
     captions.assert_not_called()
     settings.assert_not_called()
@@ -71,17 +77,29 @@ def test_combined_download_keeps_videos_apart_when_title_ends_in_another_id(mock
     captions = mocker.patch.object(testee, 'TranscriptDownloader').return_value
     captions.download_as_srt_file.side_effect = lambda path, overwrite: path.write_text('captions') or True
 
-    first, _ = testee.download_video_and_transcript_with_default_title('url-a', LANGUAGE, tmp_path, OverwritePolicy.NEVER)
-    second, _ = testee.download_video_and_transcript_with_default_title('url-b', LANGUAGE, tmp_path, OverwritePolicy.NEVER)
+    first, _ = testee.download_video_and_transcript_with_default_title(
+        'url-a', LANGUAGE, tmp_path, OverwritePolicy.NEVER
+    )
+    second, _ = testee.download_video_and_transcript_with_default_title(
+        'url-b', LANGUAGE, tmp_path, OverwritePolicy.NEVER
+    )
 
     assert first == tmp_path / 'Title [aaaaaaaaaaa].mp4'
     assert second == tmp_path / 'Title [aaaaaaaaaaa] [bbbbbbbbbbb].mp4'
     assert (first.read_text(), second.read_text()) == ('url-a', 'url-b')
-    assert [call.args[0] for call in captions.download_as_srt_file.call_args_list] == [first.with_suffix('.srt'), second.with_suffix('.srt')]
+    assert [call.args[0] for call in captions.download_as_srt_file.call_args_list] == [
+        first.with_suffix('.srt'),
+        second.with_suffix('.srt'),
+    ]
+
 
 @pytest.mark.parametrize("phase", ['watch', 'caption'])
-@pytest.mark.parametrize("error_type", [RequestBlocked, VideoUnavailable, requests.ReadTimeout, requests.ConnectionError])
-def test_caption_service_failure_preserves_media_returns_missing_and_warns(mocker, tmp_path, caption_http, caplog, phase, error_type):
+@pytest.mark.parametrize(
+    "error_type", [RequestBlocked, VideoUnavailable, requests.ReadTimeout, requests.ConnectionError]
+)
+def test_caption_service_failure_preserves_media_returns_missing_and_warns(
+    mocker, tmp_path, caption_http, caplog, phase, error_type
+):
     """Listing/fetch service failures retain downloaded media and report URL plus traceback."""
     url = 'https://youtu.be/n9xhJrPXop4'
     media = tmp_path / 'media.mp4'
@@ -96,7 +114,9 @@ def test_caption_service_failure_preserves_media_returns_missing_and_warns(mocke
 
     mocker.patch.object(testee, 'download_video_with_default_title', side_effect=download_media)
     with caplog.at_level(logging.WARNING, logger=testee.__name__):
-        assert testee.download_video_and_transcript_with_default_title(url, LANGUAGE, tmp_path, OverwritePolicy.NEVER) == (media, False)
+        assert testee.download_video_and_transcript_with_default_title(
+            url, LANGUAGE, tmp_path, OverwritePolicy.NEVER
+        ) == (media, False)
     assert media.read_bytes() == b'owned media'
     assert not media.with_suffix('.srt').exists()
     assert caption_http.calls[-1][0] == phase
@@ -147,7 +167,9 @@ def test_srt_publication_failure_propagates_and_preserves_existing_output(mocker
     mocker.patch.object(testee, 'download_video_with_default_title', return_value=media)
     mocker.patch.object(caption_testee.Path, 'replace', side_effect=OSError('owned publication failure'))
     with pytest.raises(OSError, match='owned publication failure'):
-        testee.download_video_and_transcript_with_default_title('https://youtu.be/n9xhJrPXop4', LANGUAGE, tmp_path, OverwritePolicy.ALWAYS)
+        testee.download_video_and_transcript_with_default_title(
+            'https://youtu.be/n9xhJrPXop4', LANGUAGE, tmp_path, OverwritePolicy.ALWAYS
+        )
     assert media.read_bytes() == b'owned media'
     assert srt.read_text() == 'original subtitles'
     assert sorted(tmp_path.iterdir()) == sorted([media, srt])

@@ -1,3 +1,5 @@
+"""Tests for the default Whisper model parameters."""
+
 from unittest import mock
 
 import pytest

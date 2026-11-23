@@ -1,3 +1,5 @@
+"""Tests for caption discovery and download; no test contacts YouTube."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -115,6 +117,7 @@ def test_get_first_matching_lang_code():
 
 @pytest.fixture
 def downloader():
+    """Provide a transcript downloader bound to a synthetic video URL."""
     return testee.TranscriptDownloader('https://www.youtube.com/watch?v=test_video_id', LanguageCode('en'))
 
 
@@ -205,7 +208,9 @@ def test_fetch_matching_transcript_returns_none_when_transcript_lookup_fails(moc
     mock_transcript_metadata_en.language_code = 'en'
     mock_transcript_list.__iter__.return_value = iter([mock_transcript_metadata_en])
     mocker.patch.object(testee, 'get_first_matching_lang_code', return_value='en')
-    mock_transcript_list.find_transcript.return_value.fetch.side_effect = testee.NoTranscriptFound(mock_video_id, ['en'], {})
+    mock_transcript_list.find_transcript.return_value.fetch.side_effect = testee.NoTranscriptFound(
+        mock_video_id, ['en'], {}
+    )
 
     result = testee.fetch_matching_transcript(mock_transcript_list, LanguageCode('en'), 'https://www.youtube.com/watch?v=test_video_id')
 
@@ -289,9 +294,14 @@ def test_download_as_srt_text_success(mocker, downloader):
     mocker.patch.object(downloader, 'download', return_value=mock_transcript_body)
     mock_formatter = mocker.patch.object(testee, 'SRTFormatter')
     mock_formatter_instance = mock_formatter.return_value
-    mock_formatter_instance.format_transcript.return_value = "1\n00:00:00,000 --> 00:00:02,000\nHello world\n\n2\n00:00:02,000 --> 00:00:04,000\nThis is a test\n\n"
+    mock_formatter_instance.format_transcript.return_value = (
+        "1\n00:00:00,000 --> 00:00:02,000\nHello world\n\n2\n00:00:02,000 --> 00:00:04,000\nThis is a test\n\n"
+    )
     result = downloader.download_as_srt_text()
-    assert result == "1\n00:00:00,000 --> 00:00:02,000\nHello world\n\n2\n00:00:02,000 --> 00:00:04,000\nThis is a test\n\n"
+    assert (
+        result
+        == "1\n00:00:00,000 --> 00:00:02,000\nHello world\n\n2\n00:00:02,000 --> 00:00:04,000\nThis is a test\n\n"
+    )
     downloader.download.assert_called_once_with()
     mock_formatter_instance.format_transcript.assert_called_once_with(mock_transcript_body)
 
@@ -331,17 +341,25 @@ def test_download_as_srt_file_preserves_final_on_publication_failure_and_retry(m
     if existing:
         output.write_text("original")
     mocker.patch.object(downloader, 'download_as_srt_text', return_value="complete\n\n")
-    with patch.object(testee.Path, 'replace', side_effect=OSError("injected publication failure")), pytest.raises(OSError, match="injected publication failure"):
+    with (
+        patch.object(testee.Path, 'replace', side_effect=OSError("injected publication failure")),
+        pytest.raises(OSError, match="injected publication failure"),
+    ):
         downloader.download_as_srt_file(output, OverwritePolicy.ALWAYS)
     assert output.read_text() == "original" if existing else not output.exists()
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
-    assert downloader.download_as_srt_file(output, OverwritePolicy.NEVER if not existing else OverwritePolicy.ALWAYS) is True
+    assert (
+        downloader.download_as_srt_file(output, OverwritePolicy.NEVER if not existing else OverwritePolicy.ALWAYS)
+        is True
+    )
     assert output.read_text() == "complete\n\n"
 
 
 @pytest.mark.parametrize("existing", [False, True])
 @pytest.mark.parametrize("overwrite", [OverwritePolicy.NEVER])
-def test_download_as_srt_file_never_preserves_competitor_and_avoids_denied_download(mocker, tmp_path, downloader, existing, overwrite):
+def test_download_as_srt_file_never_preserves_competitor_and_avoids_denied_download(
+    mocker, tmp_path, downloader, existing, overwrite
+):
     """Denied captions avoid network work and a competitor appearing during download wins."""
     output = tmp_path / "output.srt"
     if existing:
@@ -447,7 +465,9 @@ def test_download_as_srt_file_with_default_title_long_and_invalid_title(mocker, 
     assert '"' not in result.name
 
 
-def test_download_as_srt_file_with_default_title_truncates_long_dotted_title_keeping_srt_suffix(mocker, tmp_path, downloader):
+def test_download_as_srt_file_with_default_title_truncates_long_dotted_title_keeping_srt_suffix(
+    mocker, tmp_path, downloader
+):
     """A long title containing dots is truncated to 220 bytes and keeps its ID tag and .srt suffix."""
     title = 'Mr. Smith Goes to Washington ' + 'x' * 300
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=(title, 'n9xhJrPXop4'))

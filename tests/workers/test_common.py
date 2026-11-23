@@ -1,3 +1,5 @@
+"""Tests for task consumption, claiming and dead-lettering."""
+
 import json
 from pathlib import Path
 
@@ -45,7 +47,9 @@ def test_yield_task_preserves_stage_logs_and_payload_validation(mock_redis, mock
     assert caplog.messages == [f'{log_prefix} task from stream: {payload.decode()}']
 
 
-@pytest.mark.parametrize('poll,idle,error', [(0, 21600, 'poll_interval'), (-1, 21600, 'poll_interval'), (5, -1, 'claim_min_idle')])
+@pytest.mark.parametrize(
+    'poll,idle,error', [(0, 21600, 'poll_interval'), (-1, 21600, 'poll_interval'), (5, -1, 'claim_min_idle')]
+)
 def test_yield_task_rejects_invalid_timing_before_any_redis_command(mock_redis, poll, idle, error):
     """Invalid generator timing fails on first iteration before group creation."""
     generator = testee.yield_task(mock_redis, 'stream', 'group', 'consumer', poll, idle)
@@ -169,8 +173,11 @@ def test_yield_task_claims_stranded_tasks_from_dead_consumers(mock_redis, mocker
 
     assert msg_id == b'4242-0'
     assert task == Task(source='/tmp/audio.wav', language='en')
-    # The configured idle threshold (seconds) is passed to XAUTOCLAIM in milliseconds so live in-flight tasks are not stolen.
-    mock_redis.xautoclaim.assert_called_once_with('stream:name', 'grp', 'c1', min_idle_time=120_000, start_id='0-0', count=1)
+    # The configured idle threshold (seconds) is passed to XAUTOCLAIM in milliseconds, so live in-flight
+    # tasks are not stolen.
+    mock_redis.xautoclaim.assert_called_once_with(
+        'stream:name', 'grp', 'c1', min_idle_time=120_000, start_id='0-0', count=1
+    )
 
 
 def test_yield_task_rereads_the_pel_after_claiming_a_stranded_task(mock_redis, mocker):
@@ -410,8 +417,10 @@ def test_model_copy_preserves_non_source_fields():
 
 
 class MockWorker(testee.TranscriptionWorker):
+    """A transcription worker whose dispatch does nothing."""
+
     def dispatch_task(self, task: Task, source: Path) -> None:
-        pass
+        """Accept the task without work."""
 
 
 def test_base_worker_supports_explicit_identity_and_legacy_accessor_overrides(mocker, mock_redis):
@@ -598,7 +607,9 @@ def test_process_active_slot_queue_full_flow(mocker, mock_redis):
     dispatch_task.assert_called_once_with(task, Path('/tmp/audio.wav'))
     mock_dead_letter.assert_not_called()
     mock_pipe = mock_redis.pipeline.return_value
-    mock_pipe.xack.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'000-1')
+    mock_pipe.xack.assert_called_once_with(
+        testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'000-1'
+    )
     mock_pipe.xdel.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), b'000-1')
     mock_pipe.execute.assert_called_once()
 
@@ -622,7 +633,9 @@ def test_process_active_slot_queue_dead_letters_failures(mocker, mock_redis):
         'boom',
     )
     mock_pipe = mock_redis.pipeline.return_value
-    mock_pipe.xack.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'999-8')
+    mock_pipe.xack.assert_called_once_with(
+        testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'999-8'
+    )
     mock_pipe.execute.assert_called_once()
 
 
@@ -645,7 +658,9 @@ def test_process_active_slot_queue_dead_letters_url_tasks(mocker, mock_redis):
         f"Transcription worker received URL task: {task.source}",
     )
     mock_pipe = mock_redis.pipeline.return_value
-    mock_pipe.xack.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'123-1')
+    mock_pipe.xack.assert_called_once_with(
+        testee.get_stream_name(TranscriberType.WHISPER), testee.WORKERS_GROUP, b'123-1'
+    )
     mock_pipe.xdel.assert_called_once_with(testee.get_stream_name(TranscriberType.WHISPER), b'123-1')
     mock_pipe.execute.assert_called_once()
 

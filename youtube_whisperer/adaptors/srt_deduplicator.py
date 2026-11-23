@@ -1,3 +1,5 @@
+"""SRT block parsing, formatting, deduplication and publication."""
+
 import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -19,8 +21,7 @@ ARROW = '-->'
 
 @dataclass
 class SrtBlock:
-    """
-    Represents a subtitle block within an SRT file, including its start and end times, along with the subtitle content.
+    """Represents a subtitle block within an SRT file: its start and end times, and its content.
 
     Attributes:
         start_time (str): Start time of the subtitle block.
@@ -33,8 +34,7 @@ class SrtBlock:
 
     @classmethod
     def from_lines(cls, lines: list[str]) -> 'SrtBlock':
-        """
-        Creates an SrtBlock instance from a list of strings.
+        """Creates an SrtBlock instance from a list of strings.
 
         Args:
             lines (list[str]): The lines of a single SRT block: a sequence number, a
@@ -54,8 +54,7 @@ class SrtBlock:
         return cls(start_time, end_time, lines[2:])
 
     def to_lines(self, line_number: int) -> list[str]:
-        """
-        Converts the SrtBlock instance back into a list of strings suitable for writing to an SRT file.
+        """Converts the SrtBlock instance back into a list of strings suitable for writing to an SRT file.
 
         Args:
             line_number (int): The 1-based sequence number to assign to this block.
@@ -114,12 +113,11 @@ def timestamps_to_srt_block(start: float, end: float, text: str) -> SrtBlock:
 
 
 def yield_srt_blocks_from_lines(lines: Iterable[str]) -> Iterator[SrtBlock]:
-    """
-    Yields SrtBlock instances from an iterable of lines from an SRT file.
-    
+    """Yields SrtBlock instances from an iterable of lines from an SRT file.
+
     Args:
-        text (Iterable[str]): Iterable of strings representing the SRT file content.
-    
+        lines (Iterable[str]): Iterable of strings representing the SRT file content.
+
     Yields:
         SrtBlock instances.
     """
@@ -139,12 +137,11 @@ def yield_srt_blocks_from_lines(lines: Iterable[str]) -> Iterator[SrtBlock]:
 
 
 def yield_deduplicated_srt_blocks(blocks: Iterable[SrtBlock]) -> Iterator[SrtBlock]:
-    """
-    Yields deduplicated SrtBlock instances from an iterable of SrtBlock instances.
-    
+    """Yields deduplicated SrtBlock instances from an iterable of SrtBlock instances.
+
     Args:
         blocks (Iterable[SrtBlock]): Iterable of SrtBlock instances.
-    
+
     Yields:
         Deduplicated SrtBlock instances.
     """
@@ -161,8 +158,7 @@ def yield_deduplicated_srt_blocks(blocks: Iterable[SrtBlock]) -> Iterator[SrtBlo
 
 
 def yield_lines_from_srt_blocks(blocks: Iterable[SrtBlock]) -> Iterator[str]:
-    """
-    Yields lines from an iterable of SrtBlock objects.
+    """Yields lines from an iterable of SrtBlock objects.
 
     Args:
         blocks (Iterable[SrtBlock]): An iterable of SrtBlock objects.
@@ -175,12 +171,11 @@ def yield_lines_from_srt_blocks(blocks: Iterable[SrtBlock]) -> Iterator[str]:
 
 
 def convert_srt_blocks_to_str(blocks: Iterable[SrtBlock]) -> str:
-    """
-    Converts an iterable of SrtBlock instances to a single string suitable for writing to an SRT file.
-    
+    """Converts an iterable of SrtBlock instances to a single string suitable for writing to an SRT file.
+
     Args:
         blocks (Iterable[SrtBlock]): An iterable of SrtBlock objects.
-    
+
     Returns:
         String representation of the SRT file content.
     """
@@ -218,15 +213,20 @@ def publish_srt_text(file_path: Path, text: str, overwrite: OverwritePolicy = Ov
         writer.write(text)
 
 
-def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicate: bool = True, overwrite: OverwritePolicy = OverwritePolicy.ALWAYS) -> None:
-    """
-    Serialize all SrtBlocks before publishing complete SRT text atomically.
+def save_segments_as_srt(
+    blocks: Iterable[SrtBlock],
+    file_path: Path,
+    deduplicate: bool = True,
+    overwrite: OverwritePolicy = OverwritePolicy.ALWAYS,
+) -> None:
+    """Serialize all SrtBlocks before publishing complete SRT text atomically.
 
     Declined overwrites avoid lazy consumption. Serialization and rejection finish
     before staging, preserving the previous output if they raise.
 
     Args:
-        blocks (Iterable[SrtBlock]): SrtBlock objects to write, typically produced by mapping a transcriber-specific converter over recognition results.
+        blocks (Iterable[SrtBlock]): SrtBlock objects to write, typically produced by mapping a transcriber-specific
+            converter over recognition results.
         file_path (Path): The path to the output SRT file.
         deduplicate (bool, optional): Whether to merge consecutive blocks with identical content. Defaults to True.
         overwrite (OverwritePolicy, optional): ALWAYS replaces an existing file; NEVER keeps it. Defaults to ALWAYS,
@@ -243,16 +243,18 @@ def save_segments_as_srt(blocks: Iterable[SrtBlock], file_path: Path, deduplicat
     publish_srt_text(file_path, convert_srt_blocks_to_str(blocks), overwrite=overwrite)
 
 
-def deduplicate_srt_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.ALWAYS) -> Path:
-    """
-    Read and deduplicate an SRT file before atomically publishing complete text.
+def deduplicate_srt_file(
+    input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.ALWAYS
+) -> Path:
+    """Read and deduplicate an SRT file before atomically publishing complete text.
 
     In-place deduplication fully reads and closes input before staging output;
     publication failure preserves the prior file.
 
     Args:
         input_file_path (Path): The path to the input SRT file.
-        output_file_path (Path | None, optional): The path to the output file. If `None`, the input file will be overwritten. Defaults to `None`.
+        output_file_path (Path | None, optional): The path to the output file. If `None`, the input file will be
+            overwritten. Defaults to `None`.
         overwrite (OverwritePolicy, optional): ALWAYS replaces an existing output file; NEVER keeps it,
             so in-place deduplication under NEVER changes nothing. Defaults to ALWAYS, like every SRT
             helper in this module (D49).

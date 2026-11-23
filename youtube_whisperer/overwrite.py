@@ -7,8 +7,7 @@ __all__ = ['require_supported_policy', 'resolve_output_path']
 
 
 def require_supported_policy(policy: OverwritePolicy) -> OverwritePolicy:
-    """
-    Return `policy` if this application can publish under it.
+    """Return `policy` if this application can publish under it.
 
     Only the ALWAYS and NEVER members are supported (D49). The library's RENAME writes a
     numbered copy, such as 'Title [id].1.mp4', and a numbered SRT beside its video would break
@@ -32,8 +31,7 @@ def require_supported_policy(policy: OverwritePolicy) -> OverwritePolicy:
 
 
 def resolve_output_path(path: Path, policy: OverwritePolicy) -> Path | None:
-    """
-    Decide before any expensive work whether output may be written at `path`.
+    """Decide before any expensive work whether output may be written at `path`.
 
     Delegates to `OverwritePolicy.resolve` after `require_supported_policy`, so a rejected
     policy fails before anything is downloaded, converted or transcribed.

@@ -1,3 +1,5 @@
+"""Tests for SRT parsing, formatting, deduplication and publication."""
+
 import os
 import shutil
 import subprocess
@@ -240,7 +242,10 @@ def test_publish_srt_text_never_removes_another_writers_stage(tmp_path, fails):
     unrelated.mkdir()
     (unrelated / "output.srt").write_text("other writer")
     if fails:
-        with patch.object(testee.Path, 'replace', side_effect=OSError("injected replace failure")), pytest.raises(OSError, match="injected replace failure"):
+        with (
+            patch.object(testee.Path, 'replace', side_effect=OSError("injected replace failure")),
+            pytest.raises(OSError, match="injected replace failure"),
+        ):
             testee.publish_srt_text(output, "candidate")
     else:
         testee.publish_srt_text(output, "candidate")
@@ -295,7 +300,10 @@ def test_publish_srt_text_preserves_final_and_cleans_stage_on_replace_failure(tm
     unrelated.write_text("unrelated")
     if existing:
         output.write_text("original")
-    with patch.object(testee.Path, 'replace', side_effect=OSError("injected replace failure")), pytest.raises(OSError, match="injected replace failure"):
+    with (
+        patch.object(testee.Path, 'replace', side_effect=OSError("injected replace failure")),
+        pytest.raises(OSError, match="injected replace failure"),
+    ):
         testee.publish_srt_text(output, "complete")
     assert output.read_text() == "original" if existing else not output.exists()
     assert set(tmp_path.iterdir()) == ({output, unrelated} if existing else {unrelated})
@@ -333,11 +341,23 @@ class InterruptedWriter:
     def __exit__(self, *args):
         """Close the stream if control returns normally."""
         self.stream.close()
-with patch.object(testee.Path, 'open', lambda path, mode='r', **kwargs: InterruptedWriter(path) if mode == 'x' else original_open(path, mode, **kwargs)):
+with patch.object(
+    testee.Path,
+    'open',
+    lambda path, mode='r', **kwargs: InterruptedWriter(path) if mode == 'x' else original_open(path, mode, **kwargs),
+):
     testee.publish_srt_text(Path('output.srt'), 'complete')
 '''
     source_root = Path(testee.__file__).parents[2]
-    result = subprocess.run([sys.executable, '-c', script], cwd=tmp_path, env={'PYTHONPATH': str(source_root)}, capture_output=True, text=True, timeout=10, check=False)
+    result = subprocess.run(
+        [sys.executable, '-c', script],
+        cwd=tmp_path,
+        env={'PYTHONPATH': str(source_root)},
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
     assert result.returncode == 73, result.stderr
     assert output.read_text() == "original" if existing else not output.exists()
     stages = set(tmp_path.iterdir()) - {output}
@@ -552,7 +572,10 @@ def test_publish_srt_text_no_clobber_preserves_competitor_created_after_stage_cl
 def test_publish_srt_text_link_failure_cleans_stage_and_allows_retry(tmp_path):
     """Unsupported no-clobber publication propagates without creating a completion marker."""
     output = tmp_path / "output.srt"
-    with patch.object(os, 'link', side_effect=OSError("unsupported link")), pytest.raises(OSError, match="unsupported link"):
+    with (
+        patch.object(os, 'link', side_effect=OSError("unsupported link")),
+        pytest.raises(OSError, match="unsupported link"),
+    ):
         testee.publish_srt_text(output, "candidate", overwrite=OverwritePolicy.NEVER)
     assert list(tmp_path.iterdir()) == []
     testee.publish_srt_text(output, "complete", overwrite=OverwritePolicy.NEVER)
@@ -590,7 +613,11 @@ def test_save_segments_as_srt_writes_blocks(tmp_path):
     ]
     output_file_path = tmp_path / "output.srt"
     testee.save_segments_as_srt(iter(blocks), output_file_path, deduplicate=False, overwrite=OverwritePolicy.ALWAYS)
-    expected = "1\n00:00:00,000 --> 00:00:01,240\nSegment\n\n2\n00:00:01,240 --> 00:00:04,240\nto\n\n3\n00:00:04,240 --> 00:00:06,240\nSRT\n"
+    expected = (
+        "1\n00:00:00,000 --> 00:00:01,240\nSegment\n\n"
+        "2\n00:00:01,240 --> 00:00:04,240\nto\n\n"
+        "3\n00:00:04,240 --> 00:00:06,240\nSRT\n"
+    )
     assert output_file_path.is_file()
     assert output_file_path.read_text() == expected
 
@@ -667,7 +694,10 @@ def test_save_segments_as_srt_consumes_all_lazy_blocks_before_opening_stage(tmp_
             yield testee.SrtBlock("00:00:00,000", "00:00:01,000", [content])
         raise ValueError("late generator failure")
 
-    with patch.object(testee.Path, 'open', side_effect=AssertionError("premature write")) as opened, pytest.raises(ValueError, match="late generator failure"):
+    with (
+        patch.object(testee.Path, 'open', side_effect=AssertionError("premature write")) as opened,
+        pytest.raises(ValueError, match="late generator failure"),
+    ):
         testee.save_segments_as_srt(blocks(), output, overwrite=OverwritePolicy.ALWAYS)
     opened.assert_not_called()
     assert consumed == ["first", "second"]
@@ -675,7 +705,10 @@ def test_save_segments_as_srt_consumes_all_lazy_blocks_before_opening_stage(tmp_
     assert list(tmp_path.iterdir()) == ([output] if existing else [])
 
 
-@pytest.mark.parametrize(("overwrite", "approved"), [({}, True), ({"overwrite": OverwritePolicy.NEVER}, False), ({"overwrite": OverwritePolicy.ALWAYS}, True)])
+@pytest.mark.parametrize(
+    ("overwrite", "approved"),
+    [({}, True), ({"overwrite": OverwritePolicy.NEVER}, False), ({"overwrite": OverwritePolicy.ALWAYS}, True)],
+)
 def test_save_segments_as_srt_existing_output_policy_is_decided_before_lazy_work(tmp_path, overwrite, approved):
     """NEVER skips lazy serialization entirely; ALWAYS, the default, consumes it and publishes."""
     output = tmp_path / "output.srt"
@@ -763,7 +796,10 @@ def test_deduplicate_srt_file_in_place_preserves_input_on_publication_failure_an
     output = tmp_path / "input.srt"
     original = "1\n00:00:00,000 --> 00:00:01,000\nSame\n\n2\n00:00:03,000 --> 00:00:04,000\nSame\n"
     output.write_text(original)
-    with patch.object(testee.Path, 'replace', side_effect=failure("injected publication failure")), pytest.raises(failure, match="injected publication failure"):
+    with (
+        patch.object(testee.Path, 'replace', side_effect=failure("injected publication failure")),
+        pytest.raises(failure, match="injected publication failure"),
+    ):
         testee.deduplicate_srt_file(output, overwrite=OverwritePolicy.ALWAYS)
     assert output.read_text() == original
     assert list(tmp_path.iterdir()) == [output]

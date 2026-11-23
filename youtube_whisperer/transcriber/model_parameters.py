@@ -1,3 +1,5 @@
+"""Default Whisper model parameters, derived from the settings."""
+
 import multiprocessing
 from typing import TypedDict
 
@@ -22,8 +24,7 @@ class WhisperModelParameters(_RequiredModelParameters, total=False):
 
 
 def get_default_cuda_flag(settings: Settings | None = None) -> bool:
-    """
-    Determines whether to use CUDA for GPU acceleration.
+    """Determines whether to use CUDA for GPU acceleration.
 
     Args:
         settings: Supplied snapshot, or environment settings resolved at invocation.
@@ -39,8 +40,7 @@ def get_default_cuda_flag(settings: Settings | None = None) -> bool:
 
 
 def get_default_whisper_model_parameters(settings: Settings | None = None) -> WhisperModelParameters:
-    """
-    Returns default parameters for the WhisperModel.
+    """Returns default parameters for the WhisperModel.
 
     Resolve one snapshot and preserve explicit CUDA overrides and hardware auto-probing.
 

@@ -1,3 +1,5 @@
+"""yt-dlp options, video metadata lookup and default media file naming."""
+
 import logging
 import re
 from functools import cache
@@ -37,8 +39,7 @@ def build_youtube_dl_options(cookies_available: bool) -> dict[str, object]:
 
 
 def _extract_video_info(url: str) -> dict[str, object]:
-    """
-    Fetch a video's metadata through yt-dlp without downloading it.
+    """Fetch a video's metadata through yt-dlp without downloading it.
 
     Args:
         url (str): The URL of the video.
@@ -53,8 +54,7 @@ def _extract_video_info(url: str) -> dict[str, object]:
 
 
 def get_video_title(url: str) -> str:
-    """
-    Retrieves the title of a video given its URL.
+    """Retrieves the title of a video given its URL.
 
     Args:
         url (str): The URL of the video.
@@ -66,8 +66,7 @@ def get_video_title(url: str) -> str:
 
 
 def get_video_title_and_id(url: str) -> tuple[str, str]:
-    """
-    Retrieve the title and the extractor's ID of a video with one metadata request.
+    """Retrieve the title and the extractor's ID of a video with one metadata request.
 
     Args:
         url (str): The URL of the video.
@@ -80,8 +79,7 @@ def get_video_title_and_id(url: str) -> tuple[str, str]:
 
 
 def default_media_filename(title: str, video_id: str, suffix: str) -> str:
-    """
-    Name a downloaded file after its video title and ID, such as 'Title [n9xhJrPXop4].mp4'.
+    """Name a downloaded file after its video title and ID, such as 'Title [n9xhJrPXop4].mp4'.
 
     The ID keeps videos with equal titles apart (D47). Reserved characters are replaced, and
     only the title is truncated, so the ID and suffix always survive the byte limit.
@@ -102,8 +100,7 @@ def default_media_filename(title: str, video_id: str, suffix: str) -> str:
 
 
 def legacy_media_filename(title: str, suffix: str) -> str | None:
-    """
-    Return the title-only name that downloads used before video IDs were added to names.
+    """Return the title-only name that downloads used before video IDs were added to names.
 
     Args:
         title (str): The video title.
@@ -120,8 +117,7 @@ def legacy_media_filename(title: str, suffix: str) -> str | None:
 
 
 def resolve_default_media_path(target_dir: Path, title: str, video_id: str, suffix: str) -> Path:
-    """
-    Choose where a video's default-named file lives in `target_dir`.
+    """Choose where a video's default-named file lives in `target_dir`.
 
     The ID-tagged name is used unless only a legacy title-only file exists, which is then
     reused so earlier downloads are not repeated. That legacy match is by title alone, so
@@ -157,9 +153,7 @@ def resolve_default_media_path(target_dir: Path, title: str, video_id: str, suff
 
 @cache
 def is_firefox_cookies_available() -> bool:
-    """
-    Returns whether the Firefox cookies file is available in the file system.
-    """
+    """Returns whether the Firefox cookies file is available in the file system."""
     for search_dir_path in [
         '~/.mozilla/firefox',
         '~/snap/firefox/common/.mozilla/firefox',

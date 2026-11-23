@@ -1,3 +1,5 @@
+"""Tests for the YouTube worker."""
+
 import os
 from pathlib import Path
 from unittest import mock
@@ -78,7 +80,9 @@ def test_process_video_queues_follow_up_when_transcript_is_missing(mocker, clien
 
     testee.YouTubeWorker('youtube-0', client=client).process_video(task)
 
-    mock_download.assert_called_once_with(VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
+    mock_download.assert_called_once_with(
+        VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER
+    )
     mock_queue.assert_called_once_with(client, [concrete_task(playlist_task, '/owned/video-1.mp4')])
 
 
@@ -108,15 +112,21 @@ def test_process_video_with_none_transcriber_downloads_without_queueing_follow_u
 
     testee.YouTubeWorker('youtube-0', client=client).process_video(task)
 
-    mock_download.assert_called_once_with(VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
+    mock_download.assert_called_once_with(
+        VIDEO_1, task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER
+    )
     mock_queue.assert_not_called()
 
 
-def test_process_video_uses_supplied_snapshot_asset_path_after_environment_mutation(mocker, client, playlist_task, tmp_path, monkeypatch):
+def test_process_video_uses_supplied_snapshot_asset_path_after_environment_mutation(
+    mocker, client, playlist_task, tmp_path, monkeypatch
+):
     """Separate YouTube workers send downloads to their own configured asset paths."""
     snapshots = [testee.Settings(whisper_assets_dir=tmp_path / name) for name in ['one', 'two']]
     workers = [testee.YouTubeWorker('owned', client, settings=snapshot) for snapshot in snapshots]
-    download = mocker.patch.object(testee, 'download_video_and_transcript_with_default_title', return_value=(tmp_path / 'media.mp4', True))
+    download = mocker.patch.object(
+        testee, 'download_video_and_transcript_with_default_title', return_value=(tmp_path / 'media.mp4', True)
+    )
     monkeypatch.setenv('WHISPER_ASSETS_DIR', str(tmp_path / 'changed'))
     for worker, snapshot in zip(workers, snapshots, strict=True):
         worker.process_video(playlist_task)
@@ -126,8 +136,12 @@ def test_process_video_uses_supplied_snapshot_asset_path_after_environment_mutat
 
 @pytest.mark.parametrize("transcriber", [TranscriberType.WHISPER, TranscriberType.AZURE, TranscriberType.NONE])
 @pytest.mark.parametrize("phase", ['watch', 'caption'])
-@pytest.mark.parametrize("error_type", [RequestBlocked, VideoUnavailable, requests.ReadTimeout, requests.ConnectionError])
-def test_process_task_caption_service_failure_completes_or_enqueues_without_dead_letter(mocker, tmp_path, client, caption_http, transcriber, phase, error_type):
+@pytest.mark.parametrize(
+    "error_type", [RequestBlocked, VideoUnavailable, requests.ReadTimeout, requests.ConnectionError]
+)
+def test_process_task_caption_service_failure_completes_or_enqueues_without_dead_letter(
+    mocker, tmp_path, client, caption_http, transcriber, phase, error_type
+):
     """Real caption failures retain media and preserve each selected transcriber's routing."""
     url = 'https://youtu.be/n9xhJrPXop4'
     task = Task(source=url, language='en', transcriber=transcriber)
@@ -177,7 +191,9 @@ def test_process_task_local_failures_still_dead_letter_only_that_video(mocker, t
         # NEVER publishes through a hard link; this fault follows the real caption fetch.
         mocker.patch.object(os, 'link', side_effect=OSError('owned publication failure'))
     elif failure == 'programming':
-        mocker.patch.object(caption_testee, 'get_first_matching_lang_code', side_effect=RuntimeError('owned programming failure'))
+        mocker.patch.object(
+            caption_testee, 'get_first_matching_lang_code', side_effect=RuntimeError('owned programming failure')
+        )
     mocker.patch.object(testee, 'yield_flattened_video_urls', return_value=iter([url]))
     queue = mocker.patch.object(testee, 'queue_transcription_tasks')
     dead_letter = mocker.patch.object(testee, 'queue_dead_letter')
@@ -209,8 +225,18 @@ def test_process_task_queues_follow_ups_only_for_videos_missing_a_transcript(moc
     testee.YouTubeWorker('youtube-0', client=client).process_task(playlist_task)
 
     assert mock_download.call_count == 2
-    mock_download.assert_any_call(VIDEO_1, playlist_task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
-    mock_download.assert_any_call(VIDEO_2, playlist_task.language, target_dir=common_testee.Settings().whisper_assets_dir, overwrite=OverwritePolicy.NEVER)
+    mock_download.assert_any_call(
+        VIDEO_1,
+        playlist_task.language,
+        target_dir=common_testee.Settings().whisper_assets_dir,
+        overwrite=OverwritePolicy.NEVER,
+    )
+    mock_download.assert_any_call(
+        VIDEO_2,
+        playlist_task.language,
+        target_dir=common_testee.Settings().whisper_assets_dir,
+        overwrite=OverwritePolicy.NEVER,
+    )
     mock_queue.assert_called_once_with(client, [concrete_task(playlist_task, '/owned/video-2.mp4')])
     mock_dead_letter.assert_not_called()
 

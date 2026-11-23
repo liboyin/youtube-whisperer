@@ -50,7 +50,15 @@ def test_lists_only_mp4_files_missing_sibling_srt_in_glob_order(run_script, tmp_
     """Spaced names resolve their own SRT sibling and missing ones print as `<directory>/<name>.mp4`."""
     media = tmp_path / 'media library'
     media.mkdir()
-    for name in ('b no sub.mp4', 'a with sub.mp4', 'a with sub.srt', 'c.mp4', 'd done.mp4', 'd done.srt', 'e other.srt'):
+    for name in (
+        'b no sub.mp4',
+        'a with sub.mp4',
+        'a with sub.srt',
+        'c.mp4',
+        'd done.mp4',
+        'd done.srt',
+        'e other.srt',
+    ):
         (media / name).write_text('owned')
     result = run_script(str(media))
     assert (result.returncode, result.stdout, result.stderr) == (0, f'{media}/b no sub.mp4\n{media}/c.mp4\n', '')

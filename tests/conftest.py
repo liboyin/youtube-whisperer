@@ -1,3 +1,5 @@
+"""Suite-wide isolation with synthetic settings and owned temporary paths, plus shared probe fixtures."""
+
 import atexit
 import os
 import sys
@@ -11,7 +13,9 @@ import pytest
 # Explicit compatibility-resource access or helper calls can resolve configuration during
 # collection. Establish owned values first, then restore the inherited process environment.
 if any(name in sys.modules for name in ('youtube_whisperer.config', 'youtube_whisperer.utils')):
-    raise pytest.UsageError('Run tests in a fresh Python process; application settings were imported before test isolation.')
+    raise pytest.UsageError(
+        'Run tests in a fresh Python process; application settings were imported before test isolation.'
+    )
 _bootstrap_cleanup = ExitStack()
 atexit.register(_bootstrap_cleanup.close)
 try:
@@ -29,7 +33,13 @@ try:
         'WORKER_ROLE': 'whisper',
         'WORKER_CLAIM_MIN_IDLE_SECONDS': '17',
     }
-    _removed_names = ('AZURE_SPEECH_API_KEY', 'AZURE_SERVICE_REGION', 'ASSETS_DIR', 'FIREFOX_PROFILE_DIR', 'WHISPER_MODELS_VOLUME')
+    _removed_names = (
+        'AZURE_SPEECH_API_KEY',
+        'AZURE_SERVICE_REGION',
+        'ASSETS_DIR',
+        'FIREFOX_PROFILE_DIR',
+        'WHISPER_MODELS_VOLUME',
+    )
     _controlled_names = {name.lower() for name in (*_synthetic_values, *_removed_names)}
     # Pydantic normalizes case. Reverse deletion preserves alias precedence during undo.
     for name in reversed(tuple(os.environ)):
@@ -97,7 +107,13 @@ def caption_http(monkeypatch):
         def send(self, request, **kwargs):
             """Return controlled payloads or a finite-timeout simulated stall failure."""
             assert not self.closed, 'Caption session closed before fetch completed'
-            phase = 'innertube' if request.method == 'POST' else 'caption' if request.url.startswith('https://captions.test.invalid/') else 'watch'
+            phase = (
+                'innertube'
+                if request.method == 'POST'
+                else 'caption'
+                if request.url.startswith('https://captions.test.invalid/')
+                else 'watch'
+            )
             timeout = kwargs.get('timeout')
             self.calls.append((phase, timeout))
             # A missing timeout completes synthetically instead of hanging the test.

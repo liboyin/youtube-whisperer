@@ -1,3 +1,5 @@
+"""Tests for loading Whisper waveforms from audio files."""
+
 from pathlib import Path
 
 import ffmpeg
@@ -8,26 +10,35 @@ import youtube_whisperer.transcriber.waveform_loader as testee
 
 
 class FakeFFmpegError(ffmpeg.Error):
+    """An ffmpeg error that carries only its stderr output."""
+
     def __init__(self, stderr: bytes) -> None:
+        """Store the stderr output without calling the base constructor."""
         self.stderr = stderr
 
 
 class FakeStream:
+    """An ffmpeg stream stand-in that records its calls and returns canned output."""
+
     def __init__(self, *, stdout: bytes = b"", stderr: bytes = b"", error: Exception | None = None) -> None:
+        """Store the canned output, or the error that `run` raises."""
         self.stdout = stdout
         self.stderr = stderr
         self.error = error
         self.run_calls = []
 
     def output(self, *args, **kwargs):
+        """Record the output arguments and return this stream."""
         self.output_args = args
         self.output_kwargs = kwargs
         return self
 
     def get_args(self):
+        """Return a fixed ffmpeg command line."""
         return ["ffmpeg", "-i", "pipe:"]
 
     def run(self, **kwargs):
+        """Record the call, then raise the configured error or return the canned output."""
         self.run_calls.append(kwargs)
         if self.error:
             raise self.error

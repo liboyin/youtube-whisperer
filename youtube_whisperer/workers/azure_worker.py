@@ -1,3 +1,5 @@
+"""The worker that transcribes queued tasks with Azure Speech."""
+
 from pathlib import Path
 
 from pathlib_extensions import OverwritePolicy
@@ -15,7 +17,14 @@ from youtube_whisperer.workers.common import TranscriptionWorker
 class AzureWorker(TranscriptionWorker):
     """Consume Azure tasks using one runtime credential snapshot."""
 
-    def __init__(self, slot: str, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
+    def __init__(
+        self,
+        slot: str,
+        client: StrictRedis | None = None,
+        *,
+        settings: Settings | None = None,
+        runtime: Runtime | None = None,
+    ) -> None:
         """Initialize the Azure transcription worker.
 
         Args:

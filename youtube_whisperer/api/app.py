@@ -99,8 +99,7 @@ AssetsDirDep = Annotated[Path, Depends(get_assets_dir)]
 
 @router.get("/tasks", response_model=TaskQueues)
 async def get_tasks(redis_client: RedisClientDep) -> TaskQueues:
-    """
-    Retrieve all pending and active tasks from the Redis queues.
+    """Retrieve all pending and active tasks from the Redis queues.
 
     Returns:
         TaskQueues: A snapshot of every routing stream partitioned into pending and active tasks.
@@ -131,9 +130,8 @@ def _submit_tasks(patterns: list[Task], redis_client: StrictRedis) -> AddTasksRe
 
 
 @router.post("/tasks", response_model=AddTasksResponse, status_code=status.HTTP_201_CREATED)
-async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTasksResponse:
-    """
-    Add new tasks to the appropriate Redis queues.
+async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTasksResponse:  # noqa: D417 - FastAPI publishes this docstring; the injected client is not part of the API
+    """Add new tasks to the appropriate Redis queues.
 
     Args:
         patterns (list[Task]): List of task patterns.
@@ -151,8 +149,7 @@ async def add_tasks(patterns: list[Task], redis_client: RedisClientDep) -> AddTa
 
 @router.delete("/tasks", response_model=TaskQueues)
 async def clear_tasks(redis_client: RedisClientDep) -> TaskQueues:
-    """
-    Clear all pending and active tasks from the Redis queues.
+    """Clear all pending and active tasks from the Redis queues.
 
     Returns:
         TaskQueues: Snapshot of the deleted tasks.
@@ -162,8 +159,7 @@ async def clear_tasks(redis_client: RedisClientDep) -> TaskQueues:
 
 @router.get("/dead-letters", response_model=list[DeadLetter])
 async def get_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
-    """
-    Retrieve failed tasks from the dead-letter queue.
+    """Retrieve failed tasks from the dead-letter queue.
 
     Returns:
         list[DeadLetter]: Every dead-lettered task in insertion order.
@@ -189,8 +185,7 @@ def _delete_dead_letters(redis_client: StrictRedis) -> list[DeadLetter]:
 
 @router.delete("/dead-letters", response_model=list[DeadLetter])
 async def clear_dead_letters(redis_client: RedisClientDep) -> list[DeadLetter]:
-    """
-    Clear the dead-letter queue.
+    """Clear the dead-letter queue.
 
     Returns:
         list[DeadLetter]: The dead-lettered tasks that were removed.
@@ -212,8 +207,7 @@ def _sorted_asset_paths(dir_path: Path) -> list[str]:
 
 @router.get("/assets", response_model=list[str])
 async def list_assets(dir_path: AssetsDirDep) -> list[str]:
-    """
-    List all contents of the specified directory.
+    """List all contents of the specified directory.
 
     Returns:
         list[str]: Sorted paths of every entry found recursively under the asset directory.
@@ -290,8 +284,7 @@ def _remove_redundant_media(dir_path: Path) -> list[str]:
 
 @router.delete("/assets", response_model=list[str])
 async def clean_assets(dir_path: AssetsDirDep) -> list[str]:
-    """
-    Clean up redundant files in the specified directory.
+    """Clean up redundant files in the specified directory.
 
     If the same path without suffix exists as MP4 and SRT, remove its MKV/WAV/MP3 files,
     matching suffixes case-insensitively. A selected file that is already gone when this

@@ -1,3 +1,5 @@
+"""Pydantic models for tasks, queue listings and dead letters."""
+
 from collections.abc import Mapping
 
 from pydantic import BaseModel, field_validator, model_validator
@@ -65,12 +67,12 @@ class Task(BaseModel):
         return x
 
 
-class AddTasksResponse(BaseModel):
+class AddTasksResponse(BaseModel):  # noqa: D101 - Pydantic would publish a docstring as this schema's OpenAPI description
     successful: list[Task]
     failed: list[Task]
 
 
-class TaskQueues(BaseModel):
+class TaskQueues(BaseModel):  # noqa: D101 - Pydantic would publish a docstring as this schema's OpenAPI description
     youtube: list[Task]
     whisper_pending: list[Task]
     whisper_active: list[Task]
@@ -78,7 +80,7 @@ class TaskQueues(BaseModel):
     azure_active: list[Task]
 
 
-class DeadLetter(BaseModel):
+class DeadLetter(BaseModel):  # noqa: D101 - Pydantic would publish a docstring as this schema's OpenAPI description
     task: Task
     queue: str
     error: str

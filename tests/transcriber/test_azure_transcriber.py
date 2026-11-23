@@ -1,3 +1,5 @@
+"""Tests for Azure Speech transcription, with a fake SDK."""
+
 import builtins
 import json
 import subprocess
@@ -295,7 +297,9 @@ def test_recognition_result_to_srt_block_imports_no_whisper_or_ctranslate2(tmp_p
 
         with (
             patch.object(builtins, '__import__', guarded_import),
-            patch.object(pydantic_settings.BaseSettings, '__init__', side_effect=AssertionError('Settings construction')),
+            patch.object(
+                pydantic_settings.BaseSettings, '__init__', side_effect=AssertionError('Settings construction')
+            ),
             patch.object(redis.ConnectionPool, '__init__', side_effect=AssertionError('Redis pool construction')),
             patch.object(redis.Redis, '__init__', side_effect=AssertionError('Redis client construction')),
             patch.object(socket, 'socket', side_effect=AssertionError('network access')),
@@ -334,7 +338,9 @@ def test_recognition_result_to_srt_block_imports_no_whisper_or_ctranslate2(tmp_p
     assert json.loads(result.stdout) == {'attempts': [], 'start': '00:00:00,000', 'end': '00:00:00,002'}
 
 
-def test_transcribe_audio_file_returns_existing_output_when_overwrite_denied(mocker, tmp_path, owned_path_probes, synthetic_azure_settings):
+def test_transcribe_audio_file_returns_existing_output_when_overwrite_denied(
+    mocker, tmp_path, owned_path_probes, synthetic_azure_settings
+):
     """Test that an existing SRT is returned without contacting Azure when overwrite is denied."""
     input_path = tmp_path / "audio.wav"
     output_path = tmp_path / "audio.srt"
@@ -355,7 +361,9 @@ def test_transcribe_audio_file_returns_existing_output_when_overwrite_denied(moc
     synthetic_azure_settings.assert_not_called()
 
 
-def test_transcribe_audio_file_rejects_rename_before_contacting_azure(mocker, tmp_path, owned_path_probes, synthetic_azure_settings):
+def test_transcribe_audio_file_rejects_rename_before_contacting_azure(
+    mocker, tmp_path, owned_path_probes, synthetic_azure_settings
+):
     """RENAME is refused before audio inspection, settings or any Azure object."""
     duration = mocker.patch.object(testee, "get_audio_duration_seconds", side_effect=AssertionError("audio inspected"))
     speech = mocker.patch.object(testee.speechsdk, "SpeechConfig")
@@ -371,7 +379,9 @@ def test_transcribe_audio_file_rejects_rename_before_contacting_azure(mocker, tm
     ('test-subscription', 'test-region'),
     ('alternate-subscription', 'alternate-region'),
 ])
-def test_transcribe_audio_file_successfully_saves_srt(mocker, tmp_path, owned_path_probes, synthetic_azure_settings, subscription, region):
+def test_transcribe_audio_file_successfully_saves_srt(
+    mocker, tmp_path, owned_path_probes, synthetic_azure_settings, subscription, region
+):
     """Test that recognized non-empty results are saved as a deduplicated SRT."""
     synthetic_azure_settings.return_value = SimpleNamespace(
         azure_speech_api_key=subscription,
@@ -415,7 +425,9 @@ def test_transcribe_audio_file_successfully_saves_srt(mocker, tmp_path, owned_pa
     (OverwritePolicy.NEVER, True),
     (OverwritePolicy.NEVER, False),
 ])
-def test_transcribe_audio_file_honors_noninteractive_overwrite_policy(mocker, tmp_path, owned_path_probes, synthetic_azure_settings, overwrite, existing_before_start):
+def test_transcribe_audio_file_honors_noninteractive_overwrite_policy(
+    mocker, tmp_path, owned_path_probes, synthetic_azure_settings, overwrite, existing_before_start
+):
     """Keep or replace actual output according to policy without reading stdin."""
     input_path = tmp_path / 'audio.wav'
     output_path = tmp_path / 'audio.srt'
@@ -590,7 +602,9 @@ def test_transcribe_audio_file_applies_timeout_floor(mocker, tmp_path, owned_pat
     assert recorded["timeout"] == expected_timeout
 
 
-def test_transcribe_audio_file_surfaces_azure_cancellation_error_without_timing_out(tmp_path, owned_path_probes, callback_owner):
+def test_transcribe_audio_file_surfaces_azure_cancellation_error_without_timing_out(
+    tmp_path, owned_path_probes, callback_owner
+):
     """Test that an Azure cancellation error is surfaced instead of timing out."""
     error_details = "bad credentials"
 
@@ -626,7 +640,9 @@ def test_transcribe_audio_file_saves_results_after_non_error_cancellation(mocker
     def on_start(recognizer: FakeSpeechRecognizerSync) -> None:
         """Deliver one result, then a cancellation whose reason is not an error."""
         recognizer.recognized.emit(SimpleNamespace(result=MockSpeechRecognitionResult(0, 10_000_000, 'hello')))
-        recognizer.canceled.emit(SimpleNamespace(cancellation_details=SimpleNamespace(reason=object(), error_details='')))
+        recognizer.canceled.emit(
+            SimpleNamespace(cancellation_details=SimpleNamespace(reason=object(), error_details=''))
+        )
 
     fake_speechsdk = FakeSpeechSDK(on_start)
     mocker.patch.object(testee, 'speechsdk', fake_speechsdk)
@@ -675,7 +691,9 @@ def test_transcribe_audio_file_startup_failure_stops_recognition_without_saving(
     save_mock.assert_not_called()
 
 
-def test_transcribe_audio_file_interrupted_wait_stops_recognition_without_saving(mocker, tmp_path, owned_path_probes, callback_owner):
+def test_transcribe_audio_file_interrupted_wait_stops_recognition_without_saving(
+    mocker, tmp_path, owned_path_probes, callback_owner
+):
     """An interruption while waiting stops recognition, joins pending callbacks and saves nothing."""
     fake_speechsdk = FakeSpeechSDK(lambda recognizer: recognizer.owner.cancelled.wait(), callback_owner)
     completion = mock.Mock()
@@ -710,7 +728,9 @@ def test_async_fake_accounts_for_callback_failure():
     assert str(owner.errors[0]) == "callback failed"
 
 
-def test_transcribe_audio_file_uses_supplied_credentials_after_environment_mutation(mocker, monkeypatch, tmp_path, synthetic_azure_settings):
+def test_transcribe_audio_file_uses_supplied_credentials_after_environment_mutation(
+    mocker, monkeypatch, tmp_path, synthetic_azure_settings
+):
     """Two supplied Azure snapshots bypass ambient credentials and Settings construction."""
     from youtube_whisperer.config import Settings
 
@@ -730,7 +750,9 @@ def test_transcribe_audio_file_uses_supplied_credentials_after_environment_mutat
     synthetic_azure_settings.assert_not_called()
 
 
-def test_standalone_azure_defaults_observe_current_owned_environment(mocker, monkeypatch, tmp_path, synthetic_azure_settings):
+def test_standalone_azure_defaults_observe_current_owned_environment(
+    mocker, monkeypatch, tmp_path, synthetic_azure_settings
+):
     """Successive uncached Azure invocations resolve newly supplied environment credentials."""
     from youtube_whisperer.config import Settings
 

@@ -55,3 +55,14 @@ branch = true
 
 [tool.setuptools.packages.find]
 include = ["youtube_whisperer*"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# pycodestyle, Pyflakes, import order, bugbear, pyupgrade and pydocstyle. The target Python
+# comes from requires-python.
+select = ["E", "W", "F", "I", "B", "UP", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

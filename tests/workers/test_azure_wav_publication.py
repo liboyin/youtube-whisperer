@@ -1,3 +1,5 @@
+"""Tests for the Azure worker's reuse and retry of WAV files."""
+
 import io
 import wave
 from pathlib import Path
@@ -62,7 +64,12 @@ def test_dispatch_task_failed_conversion_retries_complete_wav_and_reuses_good_si
         assert audio_path.read_bytes() == complete_wav
         assert not list(tmp_path.glob('.staging-*'))
         with wave.open(str(audio_path), 'rb') as reader:
-            assert (reader.getnchannels(), reader.getsampwidth(), reader.getframerate(), reader.getnframes()) == (1, 2, 16000, 160)
+            assert (reader.getnchannels(), reader.getsampwidth(), reader.getframerate(), reader.getnframes()) == (
+                1,
+                2,
+                16000,
+                160,
+            )
         completed_calls.append(audio_path)
 
     service = mocker.patch.object(testee, 'transcribe_audio_file', side_effect=transcribe)

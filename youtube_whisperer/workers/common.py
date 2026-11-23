@@ -1,3 +1,5 @@
+"""Task consumption, claiming and dead-lettering shared by all workers."""
+
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
@@ -102,7 +104,14 @@ def yield_task(
                     continue
             claim_cursor, claimed_messages, *_deleted = cast(
                 XAutoClaimResponse,
-                client.xautoclaim(stream_name, group_name, consumer_name, min_idle_time=claim_min_idle_ms, start_id=claim_cursor, count=1),
+                client.xautoclaim(
+                    stream_name,
+                    group_name,
+                    consumer_name,
+                    min_idle_time=claim_min_idle_ms,
+                    start_id=claim_cursor,
+                    count=1,
+                ),
             )
             if claimed_messages:
                 msg_id, fields = claimed_messages[0]
@@ -134,7 +143,15 @@ def yield_task(
 class BaseWorker(ABC):
     """Abstract base worker providing a robust task-processing loop via Redis Streams."""
 
-    def __init__(self, client: StrictRedis | None = None, *, stream_name: str | None = None, slot: str | None = None, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
+    def __init__(
+        self,
+        client: StrictRedis | None = None,
+        *,
+        stream_name: str | None = None,
+        slot: str | None = None,
+        settings: Settings | None = None,
+        runtime: Runtime | None = None,
+    ) -> None:
         """Bind the worker to the Redis client it consumes and acknowledges tasks on.
 
         Args:
@@ -150,7 +167,9 @@ class BaseWorker(ABC):
         if slot is not None:
             self.slot = slot
         self._owns_runtime = runtime is None
-        self.runtime = runtime if runtime is not None else Runtime(settings if settings is not None else Settings(), client)
+        self.runtime = (
+            runtime if runtime is not None else Runtime(settings if settings is not None else Settings(), client)
+        )
         self.settings = self.runtime.settings
         self.client = self.runtime.client
 
@@ -255,7 +274,15 @@ class BaseWorker(ABC):
 class TranscriptionWorker(BaseWorker):
     """Base class for transcriber workers utilizing Native Streams."""
 
-    def __init__(self, transcriber: TranscriberType, slot: str, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
+    def __init__(
+        self,
+        transcriber: TranscriberType,
+        slot: str,
+        client: StrictRedis | None = None,
+        *,
+        settings: Settings | None = None,
+        runtime: Runtime | None = None,
+    ) -> None:
         """Initialize the transcription worker.
 
         Args:
@@ -265,7 +292,9 @@ class TranscriptionWorker(BaseWorker):
             settings: Supplied snapshot, or invocation-time environment defaults.
             runtime: Borrowed runtime supplying resources and its snapshot.
         """
-        super().__init__(client, stream_name=get_stream_name(transcriber), slot=slot, settings=settings, runtime=runtime)
+        super().__init__(
+            client, stream_name=get_stream_name(transcriber), slot=slot, settings=settings, runtime=runtime
+        )
         self.transcriber = transcriber
 
     def process_task(self, task: Task) -> None:

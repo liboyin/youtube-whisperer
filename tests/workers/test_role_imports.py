@@ -73,14 +73,27 @@ elif case == 'legacy':
 elif case == 'selected':
     import youtube_whisperer.runtime as runtime_testee
     from youtube_whisperer.workers.common import BaseWorker
-    settings = testee.Settings(worker_slot_id='owned', whisper_assets_dir=Path.home() / 'assets', whisper_models_dir=Path.home() / 'models')
+    settings = testee.Settings(
+        worker_slot_id='owned', whisper_assets_dir=Path.home() / 'assets', whisper_models_dir=Path.home() / 'models'
+    )
     pool, client = Mock(), Mock()
     calls = []
 
     def bounded_run(self, poll_interval_seconds=5):
-        calls.append((type(self).__name__, type(self).__module__, self.get_consumer_name(), poll_interval_seconds, self.runtime.settings is settings, self.runtime.client is client))
+        calls.append((
+            type(self).__name__,
+            type(self).__module__,
+            self.get_consumer_name(),
+            poll_interval_seconds,
+            self.runtime.settings is settings,
+            self.runtime.client is client,
+        ))
 
-    with patch.object(runtime_testee, 'create_redis_pool', return_value=pool), patch.object(runtime_testee.redis, 'StrictRedis', return_value=client), patch.object(BaseWorker, 'process_queue', bounded_run):
+    with (
+        patch.object(runtime_testee, 'create_redis_pool', return_value=pool),
+        patch.object(runtime_testee.redis, 'StrictRedis', return_value=client),
+        patch.object(BaseWorker, 'process_queue', bounded_run),
+    ):
         testee.process_queue(role, poll_interval_seconds=13, settings=settings)
     assert calls == [(class_name[role], module_name[role], role + '-owned', 13, True, True)], calls
     client.close.assert_called_once_with()

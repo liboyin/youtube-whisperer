@@ -1,3 +1,4 @@
+"""The worker that downloads queued YouTube tasks and queues their transcription."""
 
 import logging
 
@@ -24,14 +25,23 @@ logger = logging.getLogger(__name__)
 
 class YouTubeWorker(BaseWorker):
     """The YouTube worker expands playlists or channels and dispatches transcription tasks."""
-    def __init__(self, slot: str, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
+
+    def __init__(
+        self,
+        slot: str,
+        client: StrictRedis | None = None,
+        *,
+        settings: Settings | None = None,
+        runtime: Runtime | None = None,
+    ) -> None:
         """Initialize the YouTube worker binding the slot to the consumer identity.
 
         Args:
             slot: The consumer identity this worker uses to claim and recover tasks.
             settings: Supplied snapshot, or invocation-time environment defaults.
             runtime: Borrowed runtime supplying resources and its snapshot.
-            client: Redis client used for queueing follow-up tasks. Borrowed when supplied; otherwise owned by this worker.
+            client: Redis client used for queueing follow-up tasks. Borrowed when supplied; otherwise owned by this
+                worker.
         """
         super().__init__(client, stream_name=YOUTUBE_STREAM, slot=slot, settings=settings, runtime=runtime)
 

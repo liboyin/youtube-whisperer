@@ -1,3 +1,5 @@
+"""Redis pool construction, and the lazily resolved legacy exports."""
+
 import atexit
 from pathlib import Path
 from typing import TYPE_CHECKING

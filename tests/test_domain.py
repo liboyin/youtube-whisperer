@@ -1,3 +1,5 @@
+"""Tests for the domain values and source classification."""
+
 import subprocess
 import sys
 from pathlib import Path
@@ -67,7 +69,9 @@ def test_domain_imports_and_model_construction_create_no_resources(tmp_path, mod
         import redis
 
         with (
-            patch.object(pydantic_settings.BaseSettings, '__init__', side_effect=AssertionError('Settings construction')),
+            patch.object(
+                pydantic_settings.BaseSettings, '__init__', side_effect=AssertionError('Settings construction')
+            ),
             patch.object(redis.ConnectionPool, '__init__', side_effect=AssertionError('Redis pool construction')),
             patch.object(redis.Redis, '__init__', side_effect=AssertionError('Redis client construction')),
             patch.object(socket, 'socket', side_effect=AssertionError('network access')),

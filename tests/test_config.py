@@ -1,3 +1,5 @@
+"""Tests for settings resolution."""
+
 import pytest
 from pydantic import ValidationError
 

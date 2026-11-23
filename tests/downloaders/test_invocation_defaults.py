@@ -1,3 +1,5 @@
+"""Tests that downloads resolve the asset directory once per invocation."""
+
 from unittest.mock import patch
 
 import pytest
@@ -18,9 +20,13 @@ def test_combined_download_resolves_one_current_asset_directory(mocker, monkeypa
         monkeypatch.setenv('WHISPER_ASSETS_DIR', str(target))
         if explicit:
             with patch.object(testee, 'Settings', side_effect=AssertionError('settings construction')):
-                result = testee.download_video_and_transcript_with_default_title('owned-url', LanguageCode('en'), target, OverwritePolicy.NEVER)
+                result = testee.download_video_and_transcript_with_default_title(
+                    'owned-url', LanguageCode('en'), target, OverwritePolicy.NEVER
+                )
         else:
-            result = testee.download_video_and_transcript_with_default_title('owned-url', LanguageCode('en'), overwrite=OverwritePolicy.NEVER)
+            result = testee.download_video_and_transcript_with_default_title(
+                'owned-url', LanguageCode('en'), overwrite=OverwritePolicy.NEVER
+            )
         download.assert_called_with('owned-url', target, OverwritePolicy.NEVER)
         transcript.download_as_srt_file.assert_called_with(tmp_path / 'video.srt', OverwritePolicy.NEVER)
         assert result[0] == tmp_path / 'video.mp4'

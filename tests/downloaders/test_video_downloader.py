@@ -1,3 +1,5 @@
+"""Tests for video download and its overwrite policies."""
+
 import stat
 from copy import deepcopy
 from pathlib import Path
@@ -66,7 +68,9 @@ def staged_youtube_dl_factory(mocker, tmp_path):
 
 
 @pytest.mark.parametrize('cookies_available', [False, True])
-def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(cookies_available, staged_youtube_dl_factory, mocker, monkeypatch, tmp_path):
+def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(
+    cookies_available, staged_youtube_dl_factory, mocker, monkeypatch, tmp_path
+):
     """Each operation retains exact defaults and uses lazy cached owned discovery."""
     monkeypatch.setenv('HOME', str(tmp_path))
     detector = testee.is_firefox_cookies_available
@@ -81,7 +85,11 @@ def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(coo
         assert detector.cache_info().misses == 0
         discovery.assert_not_called()
         testee.download_video('url', tmp_path / 'video.mp4', OverwritePolicy.ALWAYS)
-        expected = {'verbose': True, 'js_runtimes': {'deno': {}}, 'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]'}
+        expected = {
+            'verbose': True,
+            'js_runtimes': {'deno': {}},
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
+        }
         if cookies_available:
             expected['cookiesfrombrowser'] = ('firefox',)
         assert {key: value for key, value in created.instances[0].options.items() if key != 'outtmpl'} == expected
@@ -179,7 +187,9 @@ def test_download_video_propagates_error_and_exits_context(tmp_path, staged_yout
 
 @pytest.mark.parametrize('name', ['ordinary', '100%', '%%', 'Progress %(id)s', 'Price $NB8_UNSET'])
 @pytest.mark.parametrize('directory', ['ordinary', 'dir%', 'dir%%', 'dir%(id)s', 'dir$NB8_UNSET'])
-def test_download_video_publishes_literal_names_after_real_template_evaluation(name, directory, monkeypatch, tmp_path, staged_youtube_dl_factory):
+def test_download_video_publishes_literal_names_after_real_template_evaluation(
+    name, directory, monkeypatch, tmp_path, staged_youtube_dl_factory
+):
     """Titles and directory metacharacters survive installed yt-dlp evaluation."""
     monkeypatch.delenv('NB8_UNSET', raising=False)
     target = tmp_path / directory / f'{name}.mp4'
@@ -195,7 +205,9 @@ def test_download_video_publishes_literal_names_after_real_template_evaluation(n
     assert list(target.parent.iterdir()) == [target]
 
 
-def test_download_video_rejects_expanding_parent_before_staging(monkeypatch, mocker, tmp_path, staged_youtube_dl_factory):
+def test_download_video_rejects_expanding_parent_before_staging(
+    monkeypatch, mocker, tmp_path, staged_youtube_dl_factory
+):
     """A set variable in the parent fails before staging or downloader construction."""
     monkeypatch.setenv('NB8_SET', 'owned-expanded')
     parent = tmp_path / '$NB8_SET'
@@ -224,7 +236,9 @@ def test_download_video_keeps_set_variable_in_title_literal(monkeypatch, tmp_pat
     assert list(tmp_path.iterdir()) == [target]
 
 
-def test_download_video_replaces_authorized_existing_file_and_preserves_mode(mocker, tmp_path, staged_youtube_dl_factory):
+def test_download_video_replaces_authorized_existing_file_and_preserves_mode(
+    mocker, tmp_path, staged_youtube_dl_factory
+):
     """ALWAYS replacement publishes new bytes with the previous permission bits."""
     target = tmp_path / 'video.mp4'
     target.write_bytes(b'previous video')
@@ -246,7 +260,9 @@ def test_download_video_replaces_authorized_existing_file_and_preserves_mode(moc
 
 
 @pytest.mark.parametrize('policy', [OverwritePolicy.NEVER])
-def test_download_video_preserves_existing_file_without_constructing_downloader(policy, tmp_path, staged_youtube_dl_factory):
+def test_download_video_preserves_existing_file_without_constructing_downloader(
+    policy, tmp_path, staged_youtube_dl_factory
+):
     """Existing files satisfy NEVER without staging or downloader work."""
     target = tmp_path / 'video.mp4'
     target.write_bytes(b'previous video')
@@ -273,7 +289,9 @@ def test_download_video_publishes_absent_output_under_preserving_policies(policy
 
 @pytest.mark.parametrize('policy', [OverwritePolicy.NEVER])
 @pytest.mark.parametrize('collision', ['file', 'directory', 'dangling-symlink', 'file-symlink'])
-def test_download_video_preserves_competing_file_and_propagates_other_collisions(policy, collision, tmp_path, staged_youtube_dl_factory):
+def test_download_video_preserves_competing_file_and_propagates_other_collisions(
+    policy, collision, tmp_path, staged_youtube_dl_factory
+):
     """Create-if-absent keeps competing files and reports non-file collisions."""
     target = tmp_path / 'video.mp4'
     other = tmp_path / 'other.mp4'
@@ -350,7 +368,9 @@ def test_download_video_cleans_stage_on_interruption(tmp_path, staged_youtube_dl
 
 
 @pytest.mark.parametrize(('policy', 'existing'), [(OverwritePolicy.ALWAYS, True), (OverwritePolicy.NEVER, False)])
-def test_download_video_publishes_only_after_downloader_context_exit(policy, existing, tmp_path, staged_youtube_dl_factory):
+def test_download_video_publishes_only_after_downloader_context_exit(
+    policy, existing, tmp_path, staged_youtube_dl_factory
+):
     """A failing downloader exit after a complete download publishes nothing and removes the stage."""
     target = tmp_path / 'video.mp4'
     if existing:
@@ -419,7 +439,9 @@ def test_download_video_with_default_title_names_file_after_title_and_id(mocker,
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=('bad:/title', 'n9xhJrPXop4'))
     mock_download = mocker.patch.object(testee, 'download_video')
 
-    result = testee.download_video_with_default_title('https://example.com/watch?v=3', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
+    result = testee.download_video_with_default_title(
+        'https://example.com/watch?v=3', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER
+    )
 
     assert result == tmp_path / 'bad__title [n9xhJrPXop4].mp4'
     mock_download.assert_called_once_with('https://example.com/watch?v=3', result, overwrite=OverwritePolicy.NEVER)
@@ -442,7 +464,9 @@ def test_download_video_with_default_title_reuses_existing_title_only_video(mock
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=('Title', 'n9xhJrPXop4'))
     mock_download = mocker.patch.object(testee, 'download_video')
 
-    result = testee.download_video_with_default_title('https://example.com/watch?v=5', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
+    result = testee.download_video_with_default_title(
+        'https://example.com/watch?v=5', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER
+    )
 
     assert result == legacy
     mock_download.assert_called_once_with('https://example.com/watch?v=5', legacy, overwrite=OverwritePolicy.NEVER)
@@ -454,7 +478,9 @@ def test_download_video_with_default_title_truncates_long_dotted_title_keeping_m
     mocker.patch.object(testee, 'get_video_title_and_id', return_value=(title, 'n9xhJrPXop4'))
     mock_download = mocker.patch.object(testee, 'download_video')
 
-    result = testee.download_video_with_default_title('https://example.com/watch?v=4', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
+    result = testee.download_video_with_default_title(
+        'https://example.com/watch?v=4', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER
+    )
 
     assert result == tmp_path / (title[:220 - len(' [n9xhJrPXop4].mp4')] + ' [n9xhJrPXop4].mp4')
     mock_download.assert_called_once_with('https://example.com/watch?v=4', result, overwrite=OverwritePolicy.NEVER)
@@ -464,7 +490,9 @@ def test_download_video_with_default_title_keeps_videos_apart_when_title_ends_in
     """Video B titled like video A's tagged name gets its own file, not A's media."""
     metadata = {'url-a': ('Title', 'aaaaaaaaaaa'), 'url-b': ('Title [aaaaaaaaaaa]', 'bbbbbbbbbbb')}
     mocker.patch.object(testee, 'get_video_title_and_id', side_effect=metadata.__getitem__)
-    downloads = mocker.patch.object(testee, 'download_video', side_effect=lambda url, path, overwrite: path.write_text(url))
+    downloads = mocker.patch.object(
+        testee, 'download_video', side_effect=lambda url, path, overwrite: path.write_text(url)
+    )
 
     first = testee.download_video_with_default_title('url-a', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)
     second = testee.download_video_with_default_title('url-b', target_dir=tmp_path, overwrite=OverwritePolicy.NEVER)

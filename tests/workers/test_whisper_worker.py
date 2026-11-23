@@ -1,3 +1,5 @@
+"""Tests for the Whisper worker and its GPU health check."""
+
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -84,13 +86,17 @@ def test_dispatch_task_for_whisper_transcriber(mocker, worker):
     worker.dispatch_task(task, source_path)
 
     mock_validate_gpu.assert_called_once()
-    mock_transcribe.assert_called_once_with(source_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings)
+    mock_transcribe.assert_called_once_with(
+        source_path, task.language, overwrite=OverwritePolicy.NEVER, settings=worker.settings
+    )
 
 
 def test_dispatch_task_propagates_transcription_failure(mocker, worker):
     """Test that a Whisper transcription failure propagates so the worker loop can dead-letter the task."""
     mocker.patch.object(testee, 'validate_gpu_health_or_exit')
-    mocker.patch.object(testee, 'transcribe_file_with_default_model', side_effect=RejectedTranscriptionError('bad output'))
+    mocker.patch.object(
+        testee, 'transcribe_file_with_default_model', side_effect=RejectedTranscriptionError('bad output')
+    )
     task = Task(source='/path.mp4', transcriber=TranscriberType.WHISPER)
 
     with pytest.raises(RejectedTranscriptionError, match='bad output'):
@@ -119,7 +125,9 @@ def test_dispatch_task_rechecks_gpu_for_each_task_using_supplied_snapshot(mocker
 
 
 @pytest.mark.parametrize('dead_letter_fails', [False, True])
-def test_process_queue_empty_decoded_input_dead_letters_before_ack_or_stays_pending(mocker, worker, client, tmp_path, dead_letter_fails):
+def test_process_queue_empty_decoded_input_dead_letters_before_ack_or_stays_pending(
+    mocker, worker, client, tmp_path, dead_letter_fails
+):
     """Real empty-input decoding reaches durable dead-letter storage before stream removal."""
     source = tmp_path / 'empty.wav'
     source.write_bytes(b'owned media placeholder')

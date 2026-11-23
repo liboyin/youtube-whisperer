@@ -1,3 +1,5 @@
+"""Tests for staged WAV conversion, its cleanup and its child processes."""
+
 import errno
 import io
 import os
@@ -122,8 +124,16 @@ def test_conversion_interrupt_reaps_real_owned_child_before_stage_removal(mocker
         """Block an owned child on stdin after signalling its partial write."""
         stage = Path(stream.output.call_args.args[0])
         stages.append(stage)
-        script = "import pathlib,sys; pathlib.Path(sys.argv[1]).write_bytes(b'partial'); sys.stdout.buffer.write(b'ready'); sys.stdout.flush(); sys.stdin.buffer.read()"
-        child = subprocess.Popen([sys.executable, '-c', script, str(stage)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        script = (
+            "import pathlib,sys; pathlib.Path(sys.argv[1]).write_bytes(b'partial'); "
+            "sys.stdout.buffer.write(b'ready'); sys.stdout.flush(); sys.stdin.buffer.read()"
+        )
+        child = subprocess.Popen(
+            [sys.executable, '-c', script, str(stage)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         children.append(child)
         communicate = child.communicate
 
@@ -261,7 +271,11 @@ def test_save_as_wav_file_approved_overwrite_publishes_after_completion(conversi
     assert output.read_bytes() == b'complete audio'
     conversion.input.assert_called_once_with(str(conversion.source))
     assert conversion.stream.output.call_args.kwargs == {'acodec': 'pcm_s16le', 'ac': 1, 'ar': 16000}
-    assert conversion.stream.run_async.call_args.kwargs == {'overwrite_output': True, 'pipe_stdout': True, 'pipe_stderr': True}
+    assert conversion.stream.run_async.call_args.kwargs == {
+        'overwrite_output': True,
+        'pipe_stdout': True,
+        'pipe_stderr': True,
+    }
     assert all(not stage.exists() for stage in conversion.stages)
 
 
@@ -383,7 +397,9 @@ def test_save_as_wav_file_never_removes_another_writers_stage(conversion, tmp_pa
             testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS)
     else:
         assert testee.save_as_wav_file(conversion.source, output, OverwritePolicy.ALWAYS) == output
-    assert set(tmp_path.iterdir()) == ({conversion.source, unrelated} if fails else {conversion.source, unrelated, output})
+    assert set(tmp_path.iterdir()) == (
+        {conversion.source, unrelated} if fails else {conversion.source, unrelated, output}
+    )
     assert (unrelated / 'output.wav').read_bytes() == b'another writer'
 
 
@@ -427,6 +443,11 @@ def test_save_as_wav_file_real_ffmpeg_publishes_mono_pcm16_at_16khz(tmp_path):
     output = tmp_path / 'output.wav'
     assert testee.save_as_wav_file(source, output) == output
     with wave.open(str(output), 'rb') as reader:
-        assert (reader.getnchannels(), reader.getsampwidth(), reader.getframerate(), reader.getnframes()) == (1, 2, 16000, 1600)
+        assert (reader.getnchannels(), reader.getsampwidth(), reader.getframerate(), reader.getnframes()) == (
+            1,
+            2,
+            16000,
+            1600,
+        )
         assert len(reader.readframes(1600)) == 3200
     assert not list(tmp_path.glob('.staging-*'))

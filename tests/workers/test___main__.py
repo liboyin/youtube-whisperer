@@ -1,3 +1,5 @@
+"""Tests for worker role selection, slot resolution and the command line."""
+
 from importlib import import_module
 from types import SimpleNamespace
 

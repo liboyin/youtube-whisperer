@@ -1,3 +1,5 @@
+"""Tests for the supported overwrite policies and the existing-output preflight."""
+
 import pytest
 from pathlib_extensions import NotAFileError, OverwriteMode, OverwritePolicy
 

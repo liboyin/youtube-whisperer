@@ -1,3 +1,5 @@
+"""The worker that transcribes queued tasks with Whisper, after a GPU health check."""
+
 import logging
 import subprocess
 import sys
@@ -60,7 +62,14 @@ def validate_gpu_health_or_exit(settings: Settings | None = None) -> None:
 class WhisperWorker(TranscriptionWorker):
     """Consume Whisper tasks with one configured, lazily resident model."""
 
-    def __init__(self, slot: str, client: StrictRedis | None = None, *, settings: Settings | None = None, runtime: Runtime | None = None) -> None:
+    def __init__(
+        self,
+        slot: str,
+        client: StrictRedis | None = None,
+        *,
+        settings: Settings | None = None,
+        runtime: Runtime | None = None,
+    ) -> None:
         """Initialize the Whisper transcription worker.
 
         Args:
@@ -93,4 +102,6 @@ class WhisperWorker(TranscriptionWorker):
                 loop so the task is dead-lettered.
         """
         validate_gpu_health_or_exit(self.settings)
-        transcribe_file_with_default_model(source, task.language, overwrite=OverwritePolicy.NEVER, settings=self.settings)
+        transcribe_file_with_default_model(
+            source, task.language, overwrite=OverwritePolicy.NEVER, settings=self.settings
+        )

@@ -4,7 +4,7 @@ import re
 from enum import Enum
 
 
-class TranscriberType(str, Enum):
+class TranscriberType(str, Enum):  # noqa: UP042 - StrEnum would change str() and f-string output
     """Identify the transcription engine or download-only task policy.
 
     Declaration order is part of the public choices contract. ``none`` requests
@@ -37,4 +37,6 @@ def is_url(text: str) -> bool:
     Returns:
         True when the source starts with a matching HTTP(S) URL.
     """
-    return bool(re.match(r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)", text))
+    return bool(
+        re.match(r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)", text)
+    )

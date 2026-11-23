@@ -80,7 +80,7 @@ These rules settle conflicts between documents:
 - Update the documentation that the change makes stale.
 - Distinguish current behavior, accepted decisions, proposals and unverified hypotheses.
 - Documentation that you add or change MUST follow [STYLE.md](STYLE.md).
-- New or changed non-test functions, methods and classes MUST have Google-style docstrings. A docstring covers the purpose and any non-obvious contracts, side effects or constraints.
+- New or changed non-test functions, methods and classes MUST have docstrings. A docstring covers the purpose and any non-obvious contracts, side effects or constraints.
 - Comments explain non-obvious reasons or trade-offs.
 
 # Governance Files

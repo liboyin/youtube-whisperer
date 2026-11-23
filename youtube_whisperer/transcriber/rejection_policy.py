@@ -1,3 +1,5 @@
+"""Rejection of transcriptions that contain known hallucinated text."""
+
 import logging
 from collections.abc import Generator, Iterable
 
@@ -12,14 +14,11 @@ REJECTED_SUBSTRINGS: tuple[str, ...] = (
 
 
 class RejectedTranscriptionError(RuntimeError):
-    """
-    Raised when Whisper emits a known bad output substring.
-    """
+    """Raised when Whisper emits a known bad output substring."""
 
 
 def get_rejected_substring(text: str) -> str | None:
-    """
-    Returns the matched rejected substring, if any.
+    """Returns the matched rejected substring, if any.
 
     Args:
         text (str): The segment text to inspect.
@@ -34,8 +33,7 @@ def get_rejected_substring(text: str) -> str | None:
 
 
 def reject_bad_segments(segments_generator: Iterable[Segment]) -> Generator[Segment, None, None]:
-    """
-    Re-yield Whisper segments, rejecting the whole run if a known bad output is seen.
+    """Re-yield Whisper segments, rejecting the whole run if a known bad output is seen.
 
     Args:
         segments_generator (Iterable[Segment]): Lazily produced Whisper segments.

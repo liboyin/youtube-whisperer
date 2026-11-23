@@ -1,3 +1,5 @@
+"""Transcription of an audio file with Azure Speech continuous recognition."""
+
 import logging
 import threading
 from pathlib import Path
@@ -38,11 +40,11 @@ def get_audio_duration_seconds(audio_file: Path) -> float:
 
 
 def recognition_result_to_srt_block(segment: SpeechRecognitionResult) -> SrtBlock:
-    """
-    Convert an Azure SpeechRecognitionResult into an SrtBlock.
+    """Convert an Azure SpeechRecognitionResult into an SrtBlock.
 
     Args:
-        segment (SpeechRecognitionResult): An Azure recognition result whose `offset` and `duration` are expressed in 100-nanosecond ticks.
+        segment (SpeechRecognitionResult): An Azure recognition result whose `offset` and `duration` are expressed in
+            100-nanosecond ticks.
 
     Returns:
         SrtBlock: The SrtBlock representation of the input recognition result.
@@ -53,7 +55,9 @@ def recognition_result_to_srt_block(segment: SpeechRecognitionResult) -> SrtBloc
 
 
 # The quoted SDK type keeps definition-time evaluation away from stubbed SDK modules in import-isolation tests.
-def _recognize_continuously(speech_recognizer: "speechsdk.SpeechRecognizer", timeout_seconds: float) -> list[SpeechRecognitionResult]:
+def _recognize_continuously(
+    speech_recognizer: "speechsdk.SpeechRecognizer", timeout_seconds: float
+) -> list[SpeechRecognitionResult]:
     """Run one continuous Azure recognition session and stop it on every exit path.
 
     Callbacks are connected in the order recognized, canceled, session_stopped.
@@ -115,9 +119,15 @@ def _recognize_continuously(speech_recognizer: "speechsdk.SpeechRecognizer", tim
     return recognition_results
 
 
-def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER, *, settings: Settings | None = None) -> Path | None:
-    """
-    Transcribes an audio file using Azure AI Speech service.
+def transcribe_audio_file(
+    input_file_path: Path,
+    language: LanguageCode,
+    output_file_path: Path | None = None,
+    overwrite: OverwritePolicy = OverwritePolicy.NEVER,
+    *,
+    settings: Settings | None = None,
+) -> Path | None:
+    """Transcribes an audio file using Azure AI Speech service.
 
     This function blocks until Azure recognition completes, fails, or times
     out. The synchronous behavior keeps queue state aligned with actual task
@@ -127,9 +137,11 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     Args:
         input_file_path (Path): The path to the audio file to transcribe.
         language (LanguageCode): The language of the audio file.
-        output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file path with a `.srt` extension. Defaults to `None`.
+        output_file_path (Path | None, optional): The path to the output SRT file. If `None`, it will be the input file
+            path with a `.srt` extension. Defaults to `None`.
         settings: Supplied credential snapshot, or invocation-time environment defaults.
-        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing SRT at preflight and final saving; NEVER keeps it. Defaults to NEVER.
+        overwrite (OverwritePolicy, optional): ALWAYS replaces an existing SRT at preflight and final saving; NEVER
+            keeps it. Defaults to NEVER.
 
     Returns:
         Path | None: The output SRT file path. When the output already exists and
@@ -157,11 +169,18 @@ def transcribe_audio_file(input_file_path: Path, language: LanguageCode, output_
     # Time out after 1.5x audio duration, but never below the floor so short clips still allow startup.
     # Inspect duration before creating the recognizer so an inspection failure leaves nothing started.
     timeout_seconds = max(MIN_AZURE_TIMEOUT_SECONDS, get_audio_duration_seconds(input_file_path) * 1.5)
-    speech_config = speechsdk.SpeechConfig(subscription=settings.azure_speech_api_key, region=settings.azure_service_region)
+    speech_config = speechsdk.SpeechConfig(
+        subscription=settings.azure_speech_api_key, region=settings.azure_service_region
+    )
     speech_config.speech_recognition_language = language.get_source_as_BCP()
     audio_config = speechsdk.audio.AudioConfig(filename=str(input_file_path))
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     recognition_results = _recognize_continuously(speech_recognizer, timeout_seconds)
 
-    save_segments_as_srt(map(recognition_result_to_srt_block, recognition_results), output_file_path, deduplicate=True, overwrite=overwrite)
+    save_segments_as_srt(
+        map(recognition_result_to_srt_block, recognition_results),
+        output_file_path,
+        deduplicate=True,
+        overwrite=overwrite,
+    )
     return output_file_path

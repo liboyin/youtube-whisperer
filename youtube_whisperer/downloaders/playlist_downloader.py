@@ -1,3 +1,5 @@
+"""Playlist expansion into video URLs, and playlist downloads under default titles."""
+
 from collections.abc import Generator, Iterable
 from pathlib import Path
 from typing import Any
@@ -82,14 +84,14 @@ def yield_video_urls_from_playlist(url: str) -> Generator[str, None, None]:
 
 
 def yield_flattened_video_urls(urls: Iterable[str]) -> Generator[str, None, None]:
-    """
-    Yields individual YouTube video URLs from an iterable of URLs, flattening any playlist, channel, or tab URLs.
+    """Yields individual YouTube video URLs from an iterable of URLs, flattening any playlist, channel, or tab URLs.
 
     Each URL is flat-extracted and branched on whether it resolves to multiple videos (a playlist,
     channel, or tab) or a single video, so channel and tab URLs are handled correctly.
 
     Args:
-        urls (Iterable[str]): An iterable of YouTube URLs, which may include individual video URLs or playlist/channel URLs.
+        urls (Iterable[str]): An iterable of YouTube URLs, which may include individual video URLs or playlist/channel
+            URLs.
 
     Yields:
         Iterable[str]: An iterable of individual YouTube video URLs.
@@ -98,15 +100,17 @@ def yield_flattened_video_urls(urls: Iterable[str]) -> Generator[str, None, None
         yield from yield_video_urls_from_playlist(url)
 
 
-def download_playlist_with_default_titles(url: str, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> list[Path]:
-    """
-    Downloads all videos in a YouTube playlist and saves them with default titles in the target directory.
-    
+def download_playlist_with_default_titles(
+    url: str, target_dir: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER
+) -> list[Path]:
+    """Downloads all videos in a YouTube playlist and saves them with default titles in the target directory.
+
     Args:
         url (str): The URL of the YouTube playlist.
-        target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to settings resolved at invocation.
+        target_dir (Path, optional): The directory where the downloaded videos will be saved. Defaults to settings
+            resolved at invocation.
         overwrite (OverwritePolicy, optional): ALWAYS replaces existing videos; NEVER keeps them. Defaults to NEVER.
-    
+
     Returns:
         list[Path]: A list of paths to downloaded video files.
 

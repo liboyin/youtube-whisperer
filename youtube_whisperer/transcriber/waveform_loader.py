@@ -1,3 +1,5 @@
+"""Audio loading for Whisper, and staged conversion to WAV files."""
+
 import logging
 from pathlib import Path
 
@@ -17,8 +19,7 @@ DEFAULT_SAMPLE_RATE = 16000
 
 
 def load_whisper_waveform_from_file(path: Path, sample_rate: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
-    """
-    Load Whisper-style waveform from a file and return it as a NumPy array.
+    """Load Whisper-style waveform from a file and return it as a NumPy array.
 
     ffmpeg receives the input path; Python captures the complete decoded PCM byte
     buffer before converting its one-dimensional int16 view to float32 samples.
@@ -84,7 +85,9 @@ def _convert_audio_to_stage(input_file_path: Path, stage: Path) -> None:
                 pipe.close()
 
 
-def save_as_wav_file(input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER) -> Path | None:
+def save_as_wav_file(
+    input_file_path: Path, output_file_path: Path | None = None, overwrite: OverwritePolicy = OverwritePolicy.NEVER
+) -> Path | None:
     """Convert audio to a completed sidecar before atomically publishing it.
 
     Early overwrite preflight avoids needless conversion. Staging

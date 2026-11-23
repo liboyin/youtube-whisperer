@@ -1,3 +1,5 @@
+"""Tests for yt-dlp options, metadata lookup and default media file naming."""
+
 import logging
 
 import pytest
@@ -16,7 +18,9 @@ def clear_firefox_cookies_cache():
 @pytest.mark.parametrize('cookies_available', [False, True])
 def test_build_youtube_dl_options_returns_independent_nested_defaults(cookies_available, mocker):
     """Baseline options are exact, independent at every mapping level, and pure."""
-    detector = mocker.patch.object(testee, 'is_firefox_cookies_available', side_effect=AssertionError('unexpected discovery'))
+    detector = mocker.patch.object(
+        testee, 'is_firefox_cookies_available', side_effect=AssertionError('unexpected discovery')
+    )
     expected = {'verbose': True, 'js_runtimes': {'deno': {}}}
     if cookies_available:
         expected['cookiesfrombrowser'] = ('firefox',)
@@ -34,7 +38,9 @@ def test_build_youtube_dl_options_returns_independent_nested_defaults(cookies_av
 
 
 @pytest.mark.parametrize('cookies_available', [False, True])
-def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(cookies_available, youtube_dl_factory, mocker, monkeypatch, tmp_path):
+def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(
+    cookies_available, youtube_dl_factory, mocker, monkeypatch, tmp_path
+):
     """Each operation retains exact defaults and uses lazy cached owned discovery."""
     monkeypatch.setenv('HOME', str(tmp_path))
     detector = testee.is_firefox_cookies_available
@@ -95,7 +101,9 @@ def test_get_video_title_omits_cookies_when_unavailable(youtube_dl_factory):
 
 def test_get_video_title_and_id_reads_both_from_one_metadata_request(youtube_dl_factory):
     """Title and ID come from a single simulated yt-dlp extraction."""
-    created = youtube_dl_factory(testee, cookies_available=False, extract_info_result={'title': 'Owned Title', 'id': 'n9xhJrPXop4'})
+    created = youtube_dl_factory(
+        testee, cookies_available=False, extract_info_result={'title': 'Owned Title', 'id': 'n9xhJrPXop4'}
+    )
     assert testee.get_video_title_and_id('https://example.com/watch?v=3') == ('Owned Title', 'n9xhJrPXop4')
     assert len(created.instances) == 1
     assert created.instances[0].options['simulate'] is True
@@ -138,7 +146,10 @@ def test_legacy_media_filename_is_none_when_no_legacy_name_could_exist():
 
 def test_resolve_default_media_path_uses_id_tagged_name_by_default(tmp_path):
     """Without existing files the ID-tagged path is chosen."""
-    assert testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4') == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+    assert (
+        testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4')
+        == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+    )
 
 
 def test_resolve_default_media_path_reuses_existing_legacy_file(tmp_path):
@@ -151,19 +162,27 @@ def test_resolve_default_media_path_prefers_existing_id_tagged_file(tmp_path):
     """When both names exist, the ID-tagged file wins over the legacy one."""
     (tmp_path / 'Title.mp4').write_text('legacy')
     (tmp_path / 'Title [aaaaaaaaaaa].mp4').write_text('tagged')
-    assert testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4') == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+    assert (
+        testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4')
+        == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+    )
 
 
 def test_resolve_default_media_path_ignores_legacy_directory(tmp_path):
     """Only a legacy regular file is reused, never a directory with that name."""
     (tmp_path / 'Title.mp4').mkdir()
-    assert testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4') == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+    assert (
+        testee.resolve_default_media_path(tmp_path, 'Title', 'aaaaaaaaaaa', '.mp4')
+        == tmp_path / 'Title [aaaaaaaaaaa].mp4'
+    )
 
 
 def test_resolve_default_media_path_uses_tagged_name_when_no_legacy_name_could_exist(tmp_path):
     """A title the old naming rejected resolves straight to its ID-tagged name."""
     title = 'x.' + 'a' * 300
-    assert testee.resolve_default_media_path(tmp_path, title, 'aaaaaaaaaaa', '.mp4') == tmp_path / (title[:220 - len(' [aaaaaaaaaaa].mp4')] + ' [aaaaaaaaaaa].mp4')
+    assert testee.resolve_default_media_path(tmp_path, title, 'aaaaaaaaaaa', '.mp4') == tmp_path / (
+        title[: 220 - len(' [aaaaaaaaaaa].mp4')] + ' [aaaaaaaaaaa].mp4'
+    )
 
 
 @pytest.mark.parametrize('suffix', ['.mp4', '.srt'])
@@ -177,19 +196,28 @@ def test_resolve_default_media_path_never_reuses_another_videos_tagged_file(tmp_
 def test_resolve_default_media_path_reuses_legacy_file_tagged_with_its_own_id(tmp_path):
     """A legacy name ending in this video's own ID tag is still this video's file."""
     (tmp_path / 'Title [bbbbbbbbbbb].mp4').write_text('legacy')
-    assert testee.resolve_default_media_path(tmp_path, 'Title [bbbbbbbbbbb]', 'bbbbbbbbbbb', '.mp4') == tmp_path / 'Title [bbbbbbbbbbb].mp4'
+    assert (
+        testee.resolve_default_media_path(tmp_path, 'Title [bbbbbbbbbbb]', 'bbbbbbbbbbb', '.mp4')
+        == tmp_path / 'Title [bbbbbbbbbbb].mp4'
+    )
 
 
 def test_resolve_default_media_path_reuses_legacy_file_whose_tag_is_followed_by_a_newline(tmp_path):
     """Only a tag at the very end of the stem blocks reuse, not one before a trailing newline."""
     (tmp_path / 'Title [aaaaaaaaaaa]\n.mp4').write_text('legacy')
-    assert testee.resolve_default_media_path(tmp_path, 'Title [aaaaaaaaaaa]\n', 'bbbbbbbbbbb', '.mp4') == tmp_path / 'Title [aaaaaaaaaaa]\n.mp4'
+    assert (
+        testee.resolve_default_media_path(tmp_path, 'Title [aaaaaaaaaaa]\n', 'bbbbbbbbbbb', '.mp4')
+        == tmp_path / 'Title [aaaaaaaaaaa]\n.mp4'
+    )
 
 
 def test_resolve_default_media_path_reuses_legacy_file_with_non_id_bracket(tmp_path):
     """Ordinary bracketed title text does not block reuse of a legacy file."""
     (tmp_path / 'Song [Official Video].mp4').write_text('legacy')
-    assert testee.resolve_default_media_path(tmp_path, 'Song [Official Video]', 'bbbbbbbbbbb', '.mp4') == tmp_path / 'Song [Official Video].mp4'
+    assert (
+        testee.resolve_default_media_path(tmp_path, 'Song [Official Video]', 'bbbbbbbbbbb', '.mp4')
+        == tmp_path / 'Song [Official Video].mp4'
+    )
 
 
 def test_is_firefox_cookies_available_detects_cookie_file(monkeypatch, tmp_path, caplog):

@@ -1,3 +1,5 @@
+"""Tests for playlist expansion and playlist downloads."""
+
 import inspect
 
 import pytest
@@ -7,7 +9,9 @@ import youtube_whisperer.downloaders.playlist_downloader as testee
 
 
 @pytest.mark.parametrize('cookies_available', [False, True])
-def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(cookies_available, youtube_dl_factory, mocker, monkeypatch, tmp_path):
+def test_operation_retains_exact_options_and_discovers_cookies_at_invocation(
+    cookies_available, youtube_dl_factory, mocker, monkeypatch, tmp_path
+):
     """Each operation retains exact defaults and uses lazy cached owned discovery."""
     monkeypatch.setenv('HOME', str(tmp_path))
     detector = testee.is_firefox_cookies_available
@@ -182,7 +186,9 @@ def test_download_playlist_with_default_titles_downloads_each_url(mocker, tmp_pa
 def test_download_playlist_with_default_titles_rejects_rename_before_expansion(mocker, urls):
     """RENAME fails before the playlist is expanded, including for an empty playlist."""
     expand = mocker.patch.object(testee, 'yield_video_urls_from_playlist', return_value=iter(urls))
-    download = mocker.patch.object(testee, 'download_video_with_default_title', side_effect=AssertionError('video downloaded'))
+    download = mocker.patch.object(
+        testee, 'download_video_with_default_title', side_effect=AssertionError('video downloaded')
+    )
     settings = mocker.patch.object(testee, 'Settings', side_effect=AssertionError('settings resolved'))
     with pytest.raises(ValueError, match='RENAME.*is not supported'):
         testee.download_playlist_with_default_titles('https://example.com/playlist', overwrite=OverwritePolicy.RENAME)

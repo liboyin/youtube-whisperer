@@ -1,3 +1,5 @@
+"""Registered language codes, and their conversion between BCP-47 and ISO 639-1."""
+
 import re
 from dataclasses import dataclass
 from typing import Any, Self
@@ -9,16 +11,19 @@ from pydantic_core.core_schema import (
     to_string_ser_schema,
 )
 
-BCP_LANG_CODES = {'en-us', 'zh-cn'}  # Azure uses BCP-47 language codes. They can be downcasted to ISO 639-1, but not vice versa.
+BCP_LANG_CODES = {
+    'en-us',
+    'zh-cn',
+}  # Azure uses BCP-47 language codes. They can be downcasted to ISO 639-1, but not vice versa.
 ISO_LANG_CODES = {x.split('-')[0] for x in BCP_LANG_CODES}  # Whisper uses ISO 639-1 language codes
 
 
 class UnregisteredLanguageCode(Exception):
-    pass
+    """A language code is neither a registered BCP-47 code nor a registered ISO 639-1 code."""
 
 
 class UnableToConvertLanguageCode(Exception):
-    pass
+    """A language code cannot be converted to the requested form, such as ISO 639-1 to BCP-47."""
 
 
 @dataclass(frozen=True)
@@ -46,8 +51,7 @@ class LanguageCode:
 
     @classmethod
     def from_str(cls, text: str) -> Self:
-        """
-        Creates an instance of the class from the output of `cls.__str__`.
+        """Creates an instance of the class from the output of `cls.__str__`.
 
         Args:
             text (str): A single source code, normalized by stripping whitespace and lowercasing.
@@ -67,8 +71,7 @@ class LanguageCode:
 
     @classmethod
     def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: GetCoreSchemaHandler) -> CoreSchema:
-        """
-        Returns a Pydantic CoreSchema that defines how to validate and serialize a LanguageCode.
+        """Returns a Pydantic CoreSchema that defines how to validate and serialize a LanguageCode.
 
         The validator raises `ValueError` for every rejected input, so Pydantic reports it as an ordinary
         `ValidationError` (HTTP 422 through FastAPI) instead of propagating an unhandled exception.
@@ -123,7 +126,10 @@ class LanguageCode:
         return {
             'type': 'string',
             'default': 'en-us',
-            'examples': ['en', 'en-us'],  # FastAPI uses the first value here to generate examples in the documentation UI
+            'examples': [
+                'en',
+                'en-us',
+            ],  # FastAPI uses the first value here to generate examples in the documentation UI
         }
 
     def is_source_BCP(self) -> bool:
@@ -135,8 +141,7 @@ class LanguageCode:
         return self.source in BCP_LANG_CODES
 
     def get_source_as_BCP(self) -> str:
-        """
-        Returns the source language as a BCP-47 code.
+        """Returns the source language as a BCP-47 code.
 
         Raises:
             UnableToConvertLanguageCode: If the source language is not a BCP-47 code.
@@ -144,7 +149,7 @@ class LanguageCode:
         if self.is_source_BCP():
             return self.source
         raise UnableToConvertLanguageCode(self.source)
-    
+
     def get_source_as_ISO(self) -> str:
         """Return the source language as an ISO 639-1 code.
 
@@ -155,11 +160,9 @@ class LanguageCode:
             str: The ISO 639-1 form of the source.
         """
         return self.source.split('-', 1)[0]
-    
+
     def get_source_as_BCP_and_ISO(self) -> list[str]:
-        """
-        Returns both the BCP-47 (if possible) and ISO 639-1 representations of the source language.
-        """
+        """Returns both the BCP-47 (if possible) and ISO 639-1 representations of the source language."""
         result = []
         if self.is_source_BCP():
             result.append(self.get_source_as_BCP())
