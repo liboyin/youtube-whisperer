@@ -1,51 +1,54 @@
 # Scratch Testing Recipe
 
-Use this recipe when the [review procedure](../SKILL.md#procedure) requires scratch execution. It supplies examples, not a substitute for AGENTS' test-ownership rules.
+Read this recipe before the first scratch run of a review.
 
-Create a scratch copy only when writable execution is needed. Within one agent's assessment of a fixed candidate, reuse one owned scratch tree for focused checks and mutants where practical, restoring the candidate before each mutation and using fresh test processes. Do not share a writable scratch tree between agents. A new assessment must use its current candidate; changing import-lifecycle requirements may justify a separate copy. Evidence inspection alone needs no scratch copy.
+[mutate.py](mutate.py) does the mechanical work. It makes an isolated scratch copy, runs each selection in a fresh process, checks where modules came from, and writes the evidence. Its `--help` text describes the modes and the mutants file. This recipe covers the choices that the tool cannot make.
 
-## Mutation selection and containment
+## Choose the tests
 
-Choose a focused test set that observes the protected behavior and owns every side effect reachable under the mutant. Inspect changed failure and routing paths before running it: a mutant that bypasses validation can reach resource creation that the passing test never exercised. Supply owned service doubles or appropriate scratch-only guards for those paths; an invalid hostname, synthetic credentials or temporary settings do not prevent network attempts. Preserve the import lifecycle under test when adding guards. For example, a routing probe can change the selected worker after role validation; a validation-bypass probe must also contain the resource creation that invalid input could now reach.
+- Select the narrowest tests that observe the protected invariant, for each mutant.
+- If you probe premature acknowledgement or publication, make the mutant perform that side effect. A mutant that only prepares the operation proves nothing, unless the preparation is the protected invariant.
+- Before a `KILLED` mutant counts as evidence, read its failure detail. The tool treats only `SyntaxError`, `ImportError` and `NameError` as broken code. A `TypeError` or an `AttributeError` that the mutated code itself raises is still marked `KILLED`, so change such a mutant until the code runs.
+- If you show that a new test fails on the code before the change, the test MUST NOT use names that the change introduces. Give the test its own copies of those values.
 
-Establish a passing unmutated baseline for the selected tests with the same bootstrap, isolation and provenance checks. A mutation kill requires a behavioral failure for the named invariant. When probing premature acknowledgement or publication, make the mutant perform that side effect, rather than merely prepare an unexecuted operation, unless preparation itself is the protected invariant.
+## Contain the side effects
 
-If a run escapes ownership or fails provenance, record it as invalid regardless of other assertion failures. Stop that probe, quiesce owned work, restore the candidate, and correct its containment or test selection before retrying; do not repeat the unsafe command unchanged. Retain a brief account of the escaped operation and any verified access or cleanup, without secrets. Follow the [evidence rules](../SKILL.md#evidence-retention) to rerun affected cases rather than automatically restart an otherwise valid batch.
+A mutant can reach code that the passing test never ran. For example, a mutant that bypasses validation can reach the creation of a resource.
 
-## Fresh-process execution and provenance
+- Before the run, inspect the failure paths and routing paths that the mutant changes.
+- The selected tests must own every side effect that the mutant can reach.
+- If a path is not owned, supply a service double or a guard. Add it to the scratch copy with `--add`.
+- When adding a probe or guard, preserve the existing test bootstrap, fixtures and hooks. This includes each `conftest.py` file.
+- If the probe intentionally changes a safeguard, record that change and contain its side effects separately.
+- An invalid hostname, synthetic credentials or temporary settings do not prevent a network attempt.
+- If you add a guard, preserve the import lifecycle under test.
+- A mutant that weakens a guard removes that guard's protection. Its probes MUST target destinations that reach nothing, such as the TEST-NET-1 address `192.0.2.1` (RFC 5737) or a name under `.invalid` (RFC 2606).
 
-Run fresh Python processes from the prepared scratch root using `python -m pytest`, with `PYTHONPATH` pointing to that root and `TMPDIR` plus pytest's `--basetemp` inside an owned scratch subdirectory. Preserve the copied `tests/conftest.py` configuration bootstrap. Add scratch-only provenance checks in the process exercising the code without changing application import timing; a separate `find_spec` probe does not certify the pytest process. For focused tests whose exercised modules remain loaded, prefer checking `sys.modules` after execution. Add the following example only to the scratch copy of `tests/conftest.py`, adapting the expected module names to the selected tests and preserving existing hooks and imports:
+## Limits of the provenance check
 
-```python
-from pathlib import Path
-import sys
+The tool checks module locations in the pytest process, at the end of the session.
 
-import pytest
+- The check does not cover a child process that a test starts. Add a location check inside each child with `--add`.
+- If a test unloads or replaces a module, check the location immediately after the import that the test controls.
 
+## Mutants that break a stop signal
 
-def pytest_sessionfinish(session, exitstatus):
-    """Verify exercised API provenance without preloading application modules."""
-    scratch_root = Path(__file__).resolve().parents[1]
-    names = ("youtube_whisperer.api.app",)
-    for name in names:
-        module = sys.modules.get(name)
-        if module is None:
-            raise pytest.UsageError(f"Expected exercised module is absent: {name}")
-        location = Path(module.__file__).resolve()
-        if not location.is_relative_to(scratch_root):
-            raise pytest.UsageError(f"Application import escaped scratch: {name}: {location}")
-    print(f"ACTUAL_IMPORT_PROVENANCE scratch={scratch_root} verified={','.join(names)}")
-```
+A mutant that breaks a stop signal or a shutdown signal can leave threads alive. The evidence lists them.
 
-List only modules the selected tests are expected to exercise; modules intentionally kept absent MUST remain absent. If tests unload or replace modules, check provenance immediately after the relevant test-controlled import instead of relying on the session-end hook. For test-spawned child processes, add equivalent scratch-only location checks inside each child after its own configuration setup and controlled imports. A parent pytest check does not certify a child's imports. From the scratch root, a focused API run is:
+- Record the leaked threads as the mutant's behavioral effect.
+- Give that mutant only the test that observes the invariant, so that the leaked work cannot reach another test.
+- After the run, verify that the process exited and that no owned process remains.
+- A run in which leaked work could reach another test is invalid evidence. Repeat it with the narrower selection.
 
-```bash
-mkdir -p owned-temp
-PYTHONPATH="$PWD" PYTHONDONTWRITEBYTECODE=1 TMPDIR="$PWD/owned-temp" python -m pytest tests/api/test_app.py --no-cov --basetemp="$PWD/owned-temp/pytest"
-```
+## If a run is not evidence
 
-A run failing the import check is invalid evidence, rather than a surviving or killed mutant. Save required evidence outside disposable scratch before cleanup. `PYTHONPATH` and owned temporary paths do not replace the test bootstrap's settings isolation or service doubles.
+The tool marks a run INVALID, or exits with status 2, and writes an `advice:` line.
 
-The focused command uses `--no-cov` because the repository's default pytest coverage threshold applies to the whole application. Preserve pytest-randomly's reported seed when reproducing a failure, and identify order-dependent results.
+- Follow the advice. Do not reclassify the run by hand.
 
-Retain the provenance line and the pytest outcome line for every run. For mutants, also retain the mutant diff and the excerpt of the relevant behavioral failure; full passing output, repeated tracebacks and per-test progress lines are not evidence.
+If a run escaped the tests' ownership:
+
+1. Stop the probe and wait until the owned work is quiet.
+2. Correct the containment or the test selection before you retry.
+3. Record briefly what escaped, what it accessed and what you cleaned up. Do not record secrets.
+4. Rerun only the affected cases, as [Evidence Retention](../SKILL.md#evidence-retention) describes.

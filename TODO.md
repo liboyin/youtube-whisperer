@@ -100,6 +100,7 @@ All entries are compact findings, not implementation assignments: expand each bo
 - [NB46](completed_work/NB46.md) — Implemented ([D50](DESIGN.md#d50)): `uv.lock` replaces the `pip freeze` snapshot; the image installs it into `/opt/venv` through docker-build-common `uv_install.sh` (tag `v1.2.0`); the devcontainer adds the locked `dev` group, and `update-dependencies.sh` refreshes the lock; host Docker validation is pending.
 - [NB47](completed_work/NB47.md) — Implemented ([D52](DESIGN.md#d52)): the devcontainer's `app` service builds a `dev` target that installs the locked dev tools through `PYPI_PROXY`; production services build `runtime`, and the creation hook only checks the lock offline.
 - [T1](completed_work/T1.md) — Implemented ([D54](DESIGN.md#d54)–[D57](DESIGN.md#d57)): the default devcontainer uses development-only storage in its own Compose project, an opt-in REAL DATA configuration mounts the real library, no SSH keys are mounted, and agent state and the shared `agent-workflow-common` checkout persist on `dev_persist`.
+- [T2](completed_work/T2.md) — Implemented ([D58](DESIGN.md#d58)): reviews use the shared `snapshot.py`, `dispatch.py` and `check_docs.py`, and the ported `mutate.py` and `worktree_gates.py`. The reviewer is `gpt-6.2-sol` with high effort.
 - [Earlier dispositions and legacy mapping](completed_work/history.md#deferred-accepted-and-completed-dispositions) — Historical closures and accepted limitations predating per-task completion records; retained without inventing missing evidence.
 
 ## Integration acceptance

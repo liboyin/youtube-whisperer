@@ -3,6 +3,7 @@
 import json
 import shlex
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -44,7 +45,28 @@ def report(files):
     return {'files': {path: {'summary': data} for path, data in files.items()}, 'totals': totals}
 
 
-def run_gate(runner, *, coverage_report=None, pytest_status=0, threshold=None, args=()):
+def python3_version():
+    """Return the ``platform.python_version()`` of the ``python3`` the gate runs, and its path.
+
+    Returns:
+        The version string, such as ``3.14.4``, and the interpreter's path.
+    """
+    python3 = shutil.which('python3')
+    assert python3 is not None, 'python3 is required by the gate script'
+    probe = subprocess.run(
+        [python3, '-c', 'import platform; print(platform.python_version())'],
+        check=True, capture_output=True, text=True,
+    )
+    return probe.stdout.strip(), python3
+
+
+MATCHING_PIN = object()
+
+
+def run_gate(
+    runner, *, coverage_report=None, pytest_status=0, threshold=None, args=(), python_version=MATCHING_PIN,
+    package_root=None, package_link=None,
+):
     """Run the gate through the shared owned-subprocess runner with a ``pytest`` stub first on ``PATH``.
 
     The stub never runs tests: it records its arguments, copies the synthetic report (if any) to
@@ -56,12 +78,26 @@ def run_gate(runner, *, coverage_report=None, pytest_status=0, threshold=None, a
         pytest_status: Exit status of the stub.
         threshold: ``COVERAGE_THRESHOLD`` value, or None to leave it unset.
         args: Arguments forwarded to the gate.
+        python_version: Content of the ``.python-version`` written to the working directory; by
+            default the major and minor version of the gate's ``python3``, or None to write no file.
+        package_root: Directory the child's ``youtube_whisperer`` resolves from, through ``PYTHONPATH``;
+            by default the working directory, which then holds an empty package.
+        package_link: Directory that the working directory's ``youtube_whisperer`` is a symlink to,
+            instead of an empty package; the target must already hold ``__init__.py``.
 
     Returns:
         The completed process and the stub's recorded arguments, or None if the stub never ran.
     """
-    python3 = shutil.which('python3')
-    assert python3 is not None, 'python3 is required by the gate script'
+    actual, python3 = python3_version()
+    if python_version is MATCHING_PIN:
+        python_version = '.'.join(actual.split('.')[:2]) + '\n'
+    if python_version is not None:
+        (runner.cwd / '.python-version').write_text(python_version, encoding='utf-8')
+    if package_link is None:
+        (runner.cwd / 'youtube_whisperer').mkdir()
+        (runner.cwd / 'youtube_whisperer' / '__init__.py').touch()
+    else:
+        (runner.cwd / 'youtube_whisperer').symlink_to(package_link)
     stub_dir = runner.cwd / 'bin'
     stub_dir.mkdir()
     invocations = runner.cwd / 'pytest-invocation'
@@ -84,7 +120,9 @@ def run_gate(runner, *, coverage_report=None, pytest_status=0, threshold=None, a
         encoding='utf-8',
     )
     stub.chmod(0o755)
-    env = {} if threshold is None else {'COVERAGE_THRESHOLD': threshold}
+    env = {'PYTHONPATH': str(package_root or runner.cwd)}
+    if threshold is not None:
+        env['COVERAGE_THRESHOLD'] = threshold
     result = runner(SCRIPT, *args, path_dirs=(stub_dir, Path(python3).parent), env=env)
     # The gate must remove its mktemp report from the owned TMPDIR on every path.
     assert list(runner.temp.iterdir()) == []
@@ -96,7 +134,9 @@ PASSING_REPORT = report({'pkg/a.py': summary(100, 90, 20, 18), 'pkg/b.py': summa
 DEFAULT_THRESHOLDS = pytest.mark.parametrize('threshold', [None, '', '80'], ids=['unset', 'empty', 'explicit'])
 
 
-@pytest.mark.parametrize('threshold', ['nan', 'NaN', 'inf', '-inf', 'infinity', '-1', '-0.5', '100.1', '1e3', 'eighty', '80%'])
+@pytest.mark.parametrize(
+    'threshold', ['nan', 'NaN', 'inf', '-inf', 'infinity', '-1', '-0.5', '100.1', '1e3', 'eighty', '80%'],
+)
 def test_invalid_threshold_fails_clearly_without_running_pytest(run_shell_script, threshold):
     """Non-numeric, non-finite and out-of-range thresholds exit non-zero with a message before pytest runs."""
     result, recorded = run_gate(run_shell_script, coverage_report=PASSING_REPORT, threshold=threshold)
@@ -106,6 +146,94 @@ def test_invalid_threshold_fails_clearly_without_running_pytest(run_shell_script
     assert result.stderr.startswith('check-coverage: COVERAGE_THRESHOLD')
     assert repr(threshold) in result.stderr
     assert result.stdout == ''
+
+
+def test_a_package_from_another_tree_fails_without_running_pytest(run_shell_script, tmp_path_factory):
+    """A youtube_whisperer that resolves elsewhere stops the gate, naming both locations."""
+    other = tmp_path_factory.mktemp('other-tree')
+    (other / 'youtube_whisperer').mkdir()
+    (other / 'youtube_whisperer' / '__init__.py').touch()
+
+    result, recorded = run_gate(run_shell_script, coverage_report=PASSING_REPORT, package_root=other)
+
+    assert recorded is None
+    assert result.returncode != 0
+    assert result.stderr.startswith('check-coverage: youtube_whisperer resolves to')
+    assert str((other / 'youtube_whisperer').resolve()) in result.stderr
+    assert str((run_shell_script.cwd / 'youtube_whisperer').resolve()) in result.stderr
+    assert 'PYTHONPATH' in result.stderr
+
+
+
+@pytest.mark.parametrize('inside', [False, True], ids=['outside', 'inside'])
+def test_a_symlinked_package_runs_pytest_only_if_it_resolves_inside_the_working_tree(
+    run_shell_script, tmp_path_factory, inside,
+):
+    """A package symlink resolves to its target on both sides of the check, so only containment can refuse it."""
+    parent = run_shell_script.cwd / 'src' if inside else tmp_path_factory.mktemp('other-tree')
+    target = parent / 'youtube_whisperer'
+    target.mkdir(parents=True)
+    (target / '__init__.py').touch()
+
+    result, recorded = run_gate(run_shell_script, coverage_report=PASSING_REPORT, package_link=target)
+
+    if inside:
+        assert result.returncode == 0, result.stderr
+        assert recorded is not None
+    else:
+        assert recorded is None
+        assert result.returncode != 0
+        assert result.stderr.startswith(f'check-coverage: youtube_whisperer resolves to {target.resolve()}, not ')
+
+def test_the_working_tree_package_runs_pytest(run_shell_script):
+    """A package resolving to the working directory passes the check and reaches pytest."""
+    result, recorded = run_gate(run_shell_script, coverage_report=PASSING_REPORT)
+
+    assert result.returncode == 0, result.stderr
+    assert recorded is not None
+
+
+def test_matching_pins_run_pytest(run_shell_script):
+    """A full-version pin equal to the interpreter, after comment and blank lines, lets the gate run pytest."""
+    actual, _ = python3_version()
+
+    result, recorded = run_gate(run_shell_script, coverage_report=PASSING_REPORT, python_version=f'# pin\n\n{actual}\n')
+
+    assert recorded is not None
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize('pin_kind', ['other-major', 'longer-minor-prefix', 'other-patch'])
+def test_interpreter_not_matching_the_pin_fails_without_running_pytest(run_shell_script, pin_kind):
+    """A pin naming another version, a shorter minor that is only a string prefix, or another patch fails first."""
+    actual, _ = python3_version()
+    major, minor = actual.split('.')[:2]
+    pin = {
+        'other-major': f'{int(major) + 1}.{minor}',
+        # '3.1' is a string prefix of '3.14.4' but names a different minor version.
+        'longer-minor-prefix': f'{major}.{minor[:-1]}' if len(minor) > 1 else f'{major}.{minor}9',
+        'other-patch': f'{major}.{minor}.9999',
+    }[pin_kind]
+
+    result, recorded = run_gate(run_shell_script, coverage_report=PASSING_REPORT, python_version=f'{pin}\n')
+
+    assert recorded is None
+    assert result.returncode != 0
+    assert result.stderr.startswith(f'check-coverage: python3 is Python {actual}, but .python-version pins {pin};')
+    assert result.stdout == ''
+
+
+@pytest.mark.parametrize(('python_version', 'message'), [
+    (None, 'check-coverage: cannot read .python-version'),
+    ('# no version here\n\n', 'check-coverage: .python-version names no Python version'),
+], ids=['missing', 'empty'])
+def test_unusable_python_version_file_fails_without_running_pytest(run_shell_script, python_version, message):
+    """A missing .python-version, or one without a version line, stops the gate before pytest runs."""
+    result, recorded = run_gate(run_shell_script, coverage_report=PASSING_REPORT, python_version=python_version)
+
+    assert recorded is None
+    assert result.returncode != 0
+    assert result.stderr.startswith(message)
 
 
 @pytest.mark.parametrize(

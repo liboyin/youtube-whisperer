@@ -12,6 +12,9 @@
 # Environment:
 #   COVERAGE_THRESHOLD  Minimum percentage per file and for the total, from 0 to 100 inclusive.
 #                       Defaults to 80 when unset or empty; an invalid value fails before pytest runs.
+#
+# Run from the repository root: the gate also refuses to run unless python3 matches the version
+# that .python-version pins and youtube_whisperer resolves to this tree's package.
 set -uo pipefail
 
 threshold="${COVERAGE_THRESHOLD:-80}"
@@ -29,6 +32,53 @@ except ValueError:
 # The chained comparison is false for NaN and both infinities, so it also enforces finiteness.
 if not 0 <= threshold <= 100:
     sys.exit(f"check-coverage: COVERAGE_THRESHOLD must be a number from 0 to 100, got {raw_threshold!r}")
+PY
+
+# Run the suite only on the interpreter the repository pins. A dev container built before a
+# Python upgrade keeps its old venv, and the suite would pass there on the wrong interpreter, so
+# the gate refuses instead. .python-version is read from the working directory, which is the
+# repository root when the gate runs; python3 is the PATH interpreter, which in the dev container
+# is the venv that also provides pytest. A pin such as 3.14 accepts any 3.14.x; a full version
+# such as 3.14.4 must match exactly.
+python3 - <<'PY' || exit 1
+"""Exit with a message unless python3 matches the .python-version pin in the working directory."""
+import platform
+import sys
+from pathlib import Path
+
+try:
+    lines = Path('.python-version').read_text(encoding='utf-8').splitlines()
+except OSError as error:
+    sys.exit(f"check-coverage: cannot read .python-version ({error.strerror}); run the gate from the repository root")
+pins = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith('#')]
+if not pins:
+    sys.exit("check-coverage: .python-version names no Python version")
+pin, actual = pins[0], platform.python_version()
+if actual != pin and not actual.startswith(f'{pin}.'):
+    sys.exit(f"check-coverage: python3 is Python {actual}, but .python-version pins {pin}; "
+             "rebuild the dev container so its venv uses the pinned interpreter")
+PY
+
+# Measure only the package in this tree. pytest does not put the working directory on sys.path, so
+# in a separate git worktree the dev container's editable install would supply the main tree's
+# package, and the gate would pass on the wrong files. -P gives this check that same sys.path:
+# without it, python3 reading its program from stdin would look in the working directory first. A
+# package directory that is a symlink resolves to its target on both sides, so the check also requires
+# the resolved package to lie inside the working directory.
+python3 -P - <<'PY' || exit 1
+"""Exit with a message unless youtube_whisperer resolves to the working directory's package."""
+import importlib.util
+import sys
+from pathlib import Path
+
+root = Path.cwd().resolve()
+expected = root / 'youtube_whisperer'
+spec = importlib.util.find_spec('youtube_whisperer')
+origin = None if spec is None else spec.origin
+actual = None if origin is None else Path(origin).resolve().parent
+if actual is None or actual != expected.resolve() or not actual.is_relative_to(root):
+    sys.exit(f"check-coverage: youtube_whisperer resolves to {actual}, not {expected}; "
+             "set PYTHONPATH to this tree's root so the gate measures this tree")
 PY
 
 report="$(mktemp -t coverage-XXXXXXXX.json)"

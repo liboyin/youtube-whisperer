@@ -1,0 +1,11 @@
+{
+  "check_docs": {
+    "changed_lines_only": [
+      "DESIGN.md",
+      "completed_work/"
+    ]
+  },
+  "dispatch": {
+    "safety": "Never contact YouTube, Azure Speech or a real Redis server, never load a real Whisper model, and never use .env, the browser profile, the media library or the host model cache."
+  }
+}
