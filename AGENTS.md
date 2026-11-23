@@ -14,8 +14,8 @@ Each document owns one subject:
 - **[STYLE.md](STYLE.md):** rules for writing documentation, and the glossary of process terms.
 - **[README.md](README.md):** the project overview, and the procedures to build, run, configure and test. This includes how the gates run.
 - **[tests/README.md](tests/README.md):** conventions for writing tests.
-- **[TODO.md](TODO.md):** open work, its dependencies and its execution boundaries. Its [maintenance rules](TODO.md#maintaining-this-plan) own how tasks are recorded, bounded and closed.
-- **[completed_work/](completed_work/):** completion records. [completed_work/history.md](completed_work/history.md) holds the dispositions that predate per-task records.
+- **[project-reviews.md](project-reviews.md):** historical project reviews and finding provenance, and the dispositions that predate completion records.
+- **[tasks/](tasks/):** task state and completion records. [tasks/README.md](tasks/README.md) owns its rules.
 - **[TRANSCRIPTION_REDESIGN.md](TRANSCRIPTION_REDESIGN.md):** the research handoff for a transcription redesign. It is a proposal, which DESIGN D53 summarizes.
 - **[Adversarial review skill](.agents/skills/adversarial-review/SKILL.md):** how a review runs, including mutation evidence and evidence retention.
 - **[Grouped task execution skill](.agents/skills/grouped-task-execution/SKILL.md):** the recommended workflow for a group of related tasks, unless the user chooses another.
@@ -85,7 +85,7 @@ These rules settle conflicts between documents:
 
 # Governance Files
 
-The governance files are this file, [STYLE.md](STYLE.md), [tests/README.md](tests/README.md), the [maintenance rules](TODO.md#maintaining-this-plan) of TODO.md, and the Markdown files under `.agents/skills/`.
+The governance files are this file, [STYLE.md](STYLE.md), [tasks/README.md](tasks/README.md), [tests/README.md](tests/README.md) and the Markdown files under `.agents/skills/`.
 
 - The user MUST review the diff of every governance edit before an agent commits it.
 - Propose a governance change in the handoff. Edit a governance file only after the user agrees to the proposal.
@@ -167,7 +167,7 @@ The governance files are this file, [STYLE.md](STYLE.md), [tests/README.md](test
 - Never discard or reclassify a finding silently.
 - After a non-trivial fix, run the gates again and obtain an updated verdict.
 
-**Completion record.** Every committed non-trivial change leaves a completion record in `completed_work/`, under the [task rules](TODO.md#maintaining-this-plan). This holds for a recorded task and for an ad-hoc request, which takes the next `T` ID (DESIGN D57).
+**Completion record.** Every committed non-trivial change leaves a completion record in `tasks/closed/`, under the [task rules](tasks/README.md#maintaining-tasks). This holds for a recorded task and for an ad-hoc request, which takes the next `T` ID (DESIGN D57).
 
 **Exemptions.** Documentation-only changes and read-only assessments are exempt from the gates, the formal review and the completion record. Governance files and skill instructions count as documentation.
 

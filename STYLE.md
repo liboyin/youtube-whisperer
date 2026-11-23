@@ -8,8 +8,8 @@ The rules follow ASD-STE100 and ISO 24495-1 loosely. Full compliance with either
 
 - Apply these rules to all documentation text that you add or change, and to messages to the user.
 - Code, commands, quoted output and tables of data are exempt.
-- The completion records in [completed_work/](completed_work/) stay as written. Do not rewrite them to meet these rules.
-- [DESIGN.md](DESIGN.md), [README.md](README.md), [TODO.md](TODO.md) and [TRANSCRIPTION_REDESIGN.md](TRANSCRIPTION_REDESIGN.md) predate these rules and are not rewritten as a whole. Apply the rules to the text that a change touches.
+- The completion records in [tasks/closed/](tasks/closed/) stay as written. Do not rewrite them to meet these rules.
+- [DESIGN.md](DESIGN.md), [project-reviews.md](project-reviews.md), [README.md](README.md) and [TRANSCRIPTION_REDESIGN.md](TRANSCRIPTION_REDESIGN.md) predate these rules and are not rewritten as a whole. Apply the rules to the text that a change touches.
 - The [documentation check](README.md#testing) checks the rules that need no judgment. [README Testing](README.md#testing) describes it.
 
 ## Structure
@@ -36,7 +36,7 @@ The rules follow ASD-STE100 and ISO 24495-1 loosely. Full compliance with either
 
 - **Boundary:** the statement of a change's intent, dependencies, non-goals, validation and done criteria.
 - **Candidate:** the frozen set of changes that the gates and the review assess.
-- **Completion record:** the committed file in `completed_work/` that records a finished change and its evidence.
+- **Completion record:** the committed file in `tasks/closed/` that records a finished change and its evidence.
 - **Deferral:** the decision to leave a finding or a task open. It records a reason and a revisit trigger.
 - **Disposition:** the main agent's recorded decision on a finding: fix it, defer it, or accept it without change.
 - **Finding:** a defect that the reviewer reports. Its class is Blocking, Non-blocking or Nit.

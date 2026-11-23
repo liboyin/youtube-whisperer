@@ -1,6 +1,6 @@
 # Transcription redesign: discussion and experiment handoff
 
-Recorded on 2026-11-06 from the architecture and backend research discussion. This is a proposal and research handoff, not an implemented design or authorization for the entire redesign. [DESIGN.md](DESIGN.md) owns accepted decisions and current product contracts; [TODO.md](TODO.md) owns future assignments and their execution boundaries; [AGENTS.md](AGENTS.md) owns working standards. Promote selected work into bounded TODO tasks when a follow-up session takes it on.
+Recorded on 2026-11-06 from the architecture and backend research discussion. This is a proposal and research handoff, not an implemented design or authorization for the entire redesign. [DESIGN.md](DESIGN.md) owns accepted decisions and current product contracts; [TODO.md](tasks/TODO.md) owns future assignments and their execution boundaries; [AGENTS.md](AGENTS.md) owns working standards. Promote selected work into bounded TODO tasks when a follow-up session takes it on.
 
 The immediate deliverable is this document. No inference experiments, cloud calls, repository extraction, or runtime changes were performed in this session. Documentation validation consists of checking source claims, references and the diff; application gates and formal adversarial review are not required for this documentation-only change.
 
@@ -137,7 +137,7 @@ Verify actual execution placement with available diagnostics. A Core ML compute-
 
 ## Suggested follow-up sessions
 
-These are separable session suggestions, not assigned TODO tasks. Each session should first accept a boundary under [TODO maintenance](TODO.md#maintaining-this-plan); architecture-changing choices require confirmation before dependent implementation. CUDA and Apple experiments can proceed independently after agreeing the corpus and protocol.
+These are separable session suggestions, not assigned TODO tasks. Each session should first accept a boundary under [TODO maintenance](tasks/README.md#maintaining-tasks); architecture-changing choices require confirmation before dependent implementation. CUDA and Apple experiments can proceed independently after agreeing the corpus and protocol.
 
 | Session | Intent and dependencies | Non-goals | Done criteria and handoff |
 |---|---|---|---|

@@ -13,7 +13,7 @@ The main agent implements the group itself, without implementation subagents. Th
 
 1. Choose a small, high-value group of tasks that share a behavior, an invariant or a dependency.
 2. Revalidate each task against the current code.
-3. Bound each task under the [task rules](../../../TODO.md#maintaining-this-plan). Keep one authoritative boundary for each task in its TODO entry.
+3. Bound each task under the [task rules](../../../tasks/README.md#bound-a-task). Keep one authoritative boundary for each task in `tasks/open/<ID>.md`.
 4. Record the intended commit boundaries and their order before implementation.
 
 Grouping does not expand authorization, and it does not settle an unresolved material decision.
@@ -44,7 +44,7 @@ These rules also apply:
 ## 5. Close
 
 1. Verify the done criteria of each task.
-2. Close the tasks under the [task rules](../../../TODO.md#maintaining-this-plan) before the commit.
+2. Close the tasks under the [task rules](../../../tasks/README.md#close-a-task) before the commit.
 
 ## 6. Gap review
 

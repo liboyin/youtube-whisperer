@@ -65,7 +65,7 @@ Ask the [recorded reviewer](#reviewer-session) to read this skill and perform st
 - The base revision. Read it from the candidate with `git rev-parse HEAD`.
 - The in-scope paths, each included untracked file, and the unrelated dirty paths to ignore.
 - The purpose, in a few sentences.
-- The path to the accepted boundary. Under the [task rules](../../../TODO.md#maintaining-this-plan), this can be a TODO entry or an ad-hoc completion record in the candidate.
+- The path to the accepted boundary. Under the [task rules](../../../tasks/README.md#two-kinds-of-work), this can be an open task or an ad-hoc completion record in the candidate.
 - The location of the working record that holds the evidence, and a separate report destination if you need one.
 
 These rules protect the reviewer's independence:
@@ -210,7 +210,7 @@ The main agent appends the result of the snapshot comparison, and the validation
 - If tests are consolidated, the retained tests must reject a representative regression of each distinct property.
 - A mutant that bypasses validation or changes routing must still leave the tests in control of every resource. Inert configuration alone is not isolation.
 
-**Closure.** The [task rules](../../../TODO.md#maintaining-this-plan) own the completion record.
+**Closure.** The [task rules](../../../tasks/README.md#maintaining-tasks) own the completion record.
 
 - Preserve the exact mutants, the identities of the candidate and the tests, the commands, the provenance and the relevant failure excerpts.
 - Full passing logs and repeated tracebacks are optional. Keep raw output only if it explains a finding.

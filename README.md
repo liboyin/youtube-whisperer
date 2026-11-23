@@ -4,7 +4,7 @@
 
 Whisper runs locally through `faster-whisper` on an NVIDIA GPU or CPU (default model: `large-v3`, approximately 9 GB RAM/VRAM). Azure Speech provides a cloud transcription option. Dedicated workers use Redis Streams for assignment, recovery and dead-letter reporting.
 
-See [DESIGN.md](DESIGN.md) for architecture, product contracts and topic-grouped user decisions; [TODO.md](TODO.md) for future work; and [AGENTS.md](AGENTS.md) for contribution standards.
+[DESIGN.md](DESIGN.md) holds the architecture, the product contracts and the user's decisions, grouped by topic. [tasks/](tasks/) holds open work and completion records. [AGENTS.md](AGENTS.md) holds the contribution standards.
 
 ## Security / trust model
 
@@ -185,4 +185,4 @@ Tests run in random order through `pytest-randomly`; reproduce an ordering failu
 - Queue and dead-letter clearing snapshots then deletes non-atomically; concurrent additions can be removed without appearing in the response. Clearing queues does not cancel work already running.
 - Older persisted payloads may require manual Redis repair; see [upgrade guidance](DESIGN.md#transcription-requests-and-upgrades) before switching versions.
 
-The repository also includes `extract_subtitle_text.sh` to print an SRT file's cue text without its indexes, timing lines or blank lines, from LF or CRLF input, and `ls_mp4_without_srt.sh` to find videos without sibling subtitles. Known defects and accepted limitations are tracked in [TODO.md](TODO.md) and [DESIGN.md](DESIGN.md).
+The repository also includes `extract_subtitle_text.sh` to print an SRT file's cue text without its indexes, timing lines or blank lines, from LF or CRLF input, and `ls_mp4_without_srt.sh` to find videos without sibling subtitles. Known defects and accepted limitations are tracked in [tasks/TODO.md](tasks/TODO.md) and [DESIGN.md](DESIGN.md).
