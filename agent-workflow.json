@@ -16,6 +16,8 @@
     }
   },
   "dispatch": {
+    "model": "gpt-6.2-sol",
+    "effort": "high",
     "safety": "Never contact YouTube, Azure Speech or a real Redis server, never load a real Whisper model, and never use .env, the browser profile, the media library or the host model cache."
   }
 }
