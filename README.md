@@ -169,11 +169,11 @@ ruff check .
 
 Coverage also includes the standalone review tools in [the review skill's references](.agents/skills/adversarial-review/references/). `mutate.py` runs tests and mutants in an isolated scratch copy. `worktree_gates.py` freezes a candidate in its own Git worktree and runs the gates there. Their tests load each script by file path and use owned temporary Git repositories. The integrity snapshot, reviewer dispatch and documentation checks are shared tools in the [agent-workflow-common](https://github.com/liboyin/agent-workflow-common) checkout at `../agent-workflow-common` ([D58](DESIGN.md#d58)). [agent-workflow.json](agent-workflow.json) configures them.
 
-Run `../agent-workflow-common/tools/check_docs.py` to check the Markdown links and style. It checks `DESIGN.md` and the completion records on changed lines only. The other documents predate its style rules and still report style problems, so currently only its link problems are expected to be none.
+Run `../agent-workflow-common/tools/check_docs.py` to check the Markdown links and the style rules of [STYLE.md](STYLE.md). Every change that touches Markdown must pass it. The documents that predate those rules, which `agent-workflow.json` lists, are checked on changed lines only.
 
 Tests run in random order through `pytest-randomly`; reproduce an ordering failure with the printed `--randomly-seed=<seed>`. For focused checks, use `pytest --no-cov` to avoid the aggregate coverage failure caused by selecting only part of the suite.
 
-[The test bootstrap](tests/conftest.py) owns temporary home, asset and model paths, synthetic settings and cleanup. Always start pytest in a fresh Python process; prior application-settings imports or repeated embedded `pytest.main()` calls are rejected. Tests must not reach external services, real models or host data; [AGENTS.md](AGENTS.md#test-guidelines) owns these protections.
+[The test bootstrap](tests/conftest.py) owns temporary home, asset and model paths, synthetic settings and cleanup. Always start pytest in a fresh Python process; prior application-settings imports or repeated embedded `pytest.main()` calls are rejected. Tests must not reach external services, real models or host data; [AGENTS.md](AGENTS.md#tests) owns these protections.
 
 ## Operational Notes
 

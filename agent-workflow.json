@@ -2,6 +2,9 @@
   "check_docs": {
     "changed_lines_only": [
       "DESIGN.md",
+      "README.md",
+      "TODO.md",
+      "TRANSCRIPTION_REDESIGN.md",
       "completed_work/"
     ]
   },

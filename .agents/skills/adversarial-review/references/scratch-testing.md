@@ -22,7 +22,7 @@ A mutant can reach code that the passing test never ran. For example, a mutant t
 - If the probe intentionally changes a safeguard, record that change and contain its side effects separately.
 - An invalid hostname, synthetic credentials or temporary settings do not prevent a network attempt.
 - If you add a guard, preserve the import lifecycle under test.
-- A mutant that weakens a guard removes that guard's protection. Its probes MUST target destinations that reach nothing, such as the TEST-NET-1 address `192.0.2.1` (RFC 5737) or a name under `.invalid` (RFC 2606).
+- A mutant that weakens a guard removes that guard's protection. Its probes MUST target destinations that reach nothing, as the [external-service conventions](../../../../tests/README.md#external-services) describe.
 
 ## Limits of the provenance check
 
